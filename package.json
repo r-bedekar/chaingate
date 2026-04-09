@@ -1,0 +1,19 @@
+{
+  "name": "chaingate",
+  "version": "0.1.0",
+  "description": "Supply chain integrity gate — deterministic gating for package registries",
+  "type": "module",
+  "main": "proxy/server.js",
+  "bin": {
+    "scw": "./cli/index.js"
+  },
+  "scripts": {
+    "start": "node proxy/server.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "keywords": ["supply-chain", "security", "npm", "proxy", "integrity"],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
