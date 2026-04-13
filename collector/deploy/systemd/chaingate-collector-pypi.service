@@ -1,0 +1,28 @@
+[Unit]
+Description=ChainGate PyPI collector — one-shot run
+Documentation=https://github.com/chaingate
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vps_admin
+Group=vps_admin
+WorkingDirectory=/home/vps_admin/projects/chaingate
+EnvironmentFile=/home/vps_admin/projects/chaingate/.env
+ExecStart=/home/vps_admin/projects/chaingate/.venv/bin/python -m collector.collector pypi
+
+TimeoutStartSec=900
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=chaingate-collector-pypi
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/vps_admin/projects/chaingate
+PrivateTmp=true

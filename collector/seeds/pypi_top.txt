@@ -1,0 +1,134 @@
+# Curated PyPI seed list for ChainGate — top 100 by practical importance.
+# Lines starting with # are comments. Grouped for readability.
+
+# === Attack-relevant (retroactive test fixtures) ===
+# Both `ctx` and `phpass` were unpublished after their 2022 attacks and return
+# 404 from the PyPI JSON API today. For retroactive gate tests we need stored
+# snapshots of the pre-unpublish metadata, not live fetches — kept here as a
+# reminder rather than polled (would break the hourly run status otherwise).
+# ctx
+# phpass
+
+# === Core / foundation ===
+requests
+urllib3
+certifi
+charset-normalizer
+idna
+setuptools
+pip
+wheel
+six
+python-dateutil
+typing-extensions
+packaging
+attrs
+platformdirs
+filelock
+tomli
+importlib-metadata
+zipp
+markupsafe
+pyyaml
+
+# === Data / scientific ===
+numpy
+pandas
+scipy
+matplotlib
+scikit-learn
+pyarrow
+sympy
+statsmodels
+
+# === Web frameworks / HTTP ===
+flask
+django
+fastapi
+uvicorn
+pydantic
+starlette
+werkzeug
+itsdangerous
+blinker
+httpx
+httpcore
+h11
+anyio
+aiohttp
+multidict
+yarl
+frozenlist
+aiosignal
+requests-toolbelt
+
+# === DB / ORM ===
+sqlalchemy
+psycopg2-binary
+pymysql
+redis
+pymongo
+alembic
+
+# === AWS / cloud ===
+boto3
+botocore
+s3transfer
+jmespath
+awscli
+google-api-core
+google-auth
+google-cloud-storage
+protobuf
+grpcio
+
+# === Security / crypto ===
+cryptography
+cffi
+pycparser
+pyopenssl
+rsa
+pyasn1
+bcrypt
+pynacl
+
+# === Utilities ===
+click
+jinja2
+rich
+typer
+colorama
+tqdm
+python-dotenv
+more-itertools
+tabulate
+fsspec
+
+# === HTML / parsing ===
+beautifulsoup4
+lxml
+soupsieve
+
+# === Image / media ===
+pillow
+
+# === Testing / quality ===
+pytest
+pytest-cov
+coverage
+tox
+mock
+hypothesis
+
+# === Linting / formatting ===
+black
+isort
+flake8
+mypy
+ruff
+pre-commit
+pylint
+
+# === Task / process ===
+celery
+gunicorn

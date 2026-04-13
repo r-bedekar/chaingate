@@ -1,0 +1,19 @@
+[Unit]
+Description=ChainGate npm collector — 15-minute schedule
+Documentation=https://github.com/chaingate
+
+[Timer]
+# Runs at :00, :15, :30, :45 of every hour. PyPI is staggered to
+# :07/:22/:37/:52 so the two collectors never overlap their DB writes.
+OnCalendar=*:00,15,30,45
+
+# If the VPS was offline when a trigger fired, run it on next boot
+Persistent=true
+
+# Randomize start within a 30s window so multiple collectors don't collide
+RandomizedDelaySec=30
+
+Unit=chaingate-collector-npm.service
+
+[Install]
+WantedBy=timers.target

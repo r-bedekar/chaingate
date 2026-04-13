@@ -1,0 +1,15 @@
+[Unit]
+Description=ChainGate PyPI collector — 15-minute schedule (staggered)
+Documentation=https://github.com/chaingate
+
+[Timer]
+# npm fires at :00/:15/:30/:45; PyPI offset by 7 minutes to :07/:22/:37/:52.
+# Staggering prevents DB contention and makes failure attribution obvious.
+OnCalendar=*:07,22,37,52
+Persistent=true
+RandomizedDelaySec=30
+
+Unit=chaingate-collector-pypi.service
+
+[Install]
+WantedBy=timers.target

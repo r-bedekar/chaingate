@@ -1,0 +1,130 @@
+# Curated npm seed list for ChainGate — top 100 by practical importance.
+# Lines starting with # are comments. Grouped for readability.
+
+# === Attack-relevant (retroactive test fixtures) ===
+axios
+eslint-config-prettier
+ua-parser-js
+coa
+rc
+node-ipc
+event-stream
+
+# === Foundational utilities (top by downloads) ===
+lodash
+debug
+chalk
+commander
+minimist
+semver
+rimraf
+uuid
+yargs
+glob
+async
+fs-extra
+dotenv
+moment
+tslib
+ms
+inherits
+readable-stream
+safer-buffer
+graceful-fs
+lru-cache
+buffer
+events
+process
+
+# === Web frameworks / HTTP ===
+express
+body-parser
+cors
+cookie
+cookie-parser
+node-fetch
+ws
+got
+undici
+
+# === React ecosystem ===
+react
+react-dom
+next
+classnames
+prop-types
+@types/react
+@types/react-dom
+redux
+react-redux
+react-router-dom
+
+# === Other frontend frameworks ===
+vue
+svelte
+
+# === TypeScript ecosystem ===
+typescript
+ts-node
+@types/node
+tsconfig-paths
+@typescript-eslint/parser
+@typescript-eslint/eslint-plugin
+
+# === Auth / crypto ===
+jsonwebtoken
+bcrypt
+
+# === Build tooling ===
+webpack
+@babel/core
+babel-loader
+ts-loader
+css-loader
+style-loader
+postcss
+autoprefixer
+eslint
+eslint-plugin-react
+eslint-plugin-import
+prettier
+rollup
+vite
+esbuild
+tsx
+
+# === Testing ===
+jest
+mocha
+chai
+supertest
+vitest
+puppeteer
+playwright
+sinon
+
+# === Validation / schema ===
+joi
+zod
+yup
+ajv
+
+# === Date / time ===
+date-fns
+dayjs
+
+# === Databases ===
+mongoose
+redis
+ioredis
+pg
+mysql2
+better-sqlite3
+
+# === Process / dev tooling ===
+nodemon
+concurrently
+cross-env
+
+# === Media / image ===
+sharp
