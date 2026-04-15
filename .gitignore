@@ -20,5 +20,15 @@ venv/
 # Data (collected data stays on VPS, not in repo)
 data/
 
+# Seed export artifacts (generated on VPS, uploaded to GH Release)
+seed_export/
+
+# Signing keys (outside repo tree anyway, but belt-and-suspenders)
+collector/signing/privkey.pem
+collector/signing/*.key
+
+# Test fixtures generated at test time
+test/witness/fixtures/
+
 # OS
 .DS_Store

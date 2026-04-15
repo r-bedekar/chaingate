@@ -9,11 +9,17 @@
   },
   "scripts": {
     "start": "node proxy/server.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/**/*.test.js",
+    "test:witness": "node --test test/witness/*.test.js"
   },
   "keywords": ["supply-chain", "security", "npm", "proxy", "integrity"],
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "semver": "^7.6.0",
+    "undici": "^6.0.0"
   }
 }
