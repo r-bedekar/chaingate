@@ -12,9 +12,11 @@ import {
   UpstreamError,
 } from './registry.js';
 import { openWitnessDB } from '../witness/db.js';
+import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
 import { rewritePackument } from '../gates/rewriter.js';
+import { createDepFetcher } from './dep-fetcher.js';
 
 // Canonical package name form: decode %2F once so that /@babel/core and
 // /@babel%2Fcore collide on the same packages.package_name row and the
@@ -240,6 +242,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   // to start rather than running degraded.
   let witness = null;
   let witnessDb = null;
+  let depCache = null;
+  let depFetcher = null;
   if (config.witnessDbPath) {
     try {
       mkdirSync(dirname(config.witnessDbPath), { recursive: true });
@@ -247,11 +251,24 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       if (err.code !== 'EEXIST') throw err;
     }
     witnessDb = openWitnessDB(config.witnessDbPath);
+    depCache = new DepCache(witnessDb);
+    // Background dep-first-publish fetcher for the scope-boundary gate.
+    // Uses the same upstream fetchPackument helper as the main request path,
+    // but runs out-of-band so gates stay synchronous.
+    depFetcher = createDepFetcher({
+      depCache,
+      fetchPackument: (name) => fetchPackument(name, { config }),
+      logger: log,
+    });
     const modules =
       Array.isArray(hooks.gateModules) ? hooks.gateModules : DEFAULT_GATE_MODULES;
     const runGates = createGateRunner({
       modules,
       getOverride: (pkg, ver) => witnessDb.getOverride(pkg, ver),
+      services: {
+        lookupDepFirstPublish: (name) => depCache.lookup(name),
+        enqueueDepLookup: (name) => depFetcher.enqueue(name),
+      },
       logger: log,
     });
     witness = createWitness({ db: witnessDb, runGates, config, logger: log });
@@ -311,12 +328,25 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   server.config = config;
   server.witness = witness;
   server.witnessDb = witnessDb;
+  server.depCache = depCache;
+  server.depFetcher = depFetcher;
   const origClose = server.close.bind(server);
-  server.close = (cb) =>
-    origClose(() => {
-      try { witness?.close(); } catch { /* already closed */ }
-      if (cb) cb();
-    });
+  server.close = (cb) => {
+    // Drain the background dep fetcher first so no in-flight HTTP requests
+    // touch a closing DB. stop() is graceful — current request finishes,
+    // queue aborts, promise resolves.
+    const finish = () => {
+      origClose(() => {
+        try { witness?.close(); } catch { /* already closed */ }
+        if (cb) cb();
+      });
+    };
+    if (depFetcher) {
+      depFetcher.stop().then(finish, finish);
+    } else {
+      finish();
+    }
+  };
   return server;
 }
 

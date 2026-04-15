@@ -47,6 +47,9 @@
 import contentHash from './content-hash.js';
 import publisherIdentity from './publisher-identity.js';
 import depStructure from './dep-structure.js';
+import provenanceContinuity from './provenance-continuity.js';
+import releaseAge from './release-age.js';
+import scopeBoundary from './scope-boundary.js';
 
 const DEFAULT_WARN_ESCALATION = 4;
 const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK']);
@@ -55,6 +58,9 @@ export const DEFAULT_GATE_MODULES = Object.freeze([
   contentHash,
   depStructure,
   publisherIdentity,
+  provenanceContinuity,
+  releaseAge,
+  scopeBoundary,
 ]);
 
 function normalizeResult(moduleName, raw) {
@@ -88,14 +94,20 @@ function aggregate(results, threshold) {
 export function createGateRunner({
   modules = DEFAULT_GATE_MODULES,
   getOverride = null,
+  services = null,
   logger = null,
 } = {}) {
   if (!Array.isArray(modules)) {
     throw new Error('createGateRunner: modules must be an array');
   }
   const log = logger ?? { info() {}, warn() {}, error() {} };
+  const boundServices = services ?? {};
 
   return function runGates(input) {
+    // Merge injected services with any caller-provided services (tests).
+    const mergedServices = { ...boundServices, ...(input?.services ?? {}) };
+    const gateInput = { ...input, services: mergedServices };
+
     if (getOverride && typeof getOverride === 'function') {
       let override = null;
       try {
@@ -128,11 +140,11 @@ export function createGateRunner({
     for (const mod of modules) {
       const name = mod?.name ?? 'anonymous';
       try {
-        const raw = mod.evaluate(input);
+        const raw = mod.evaluate(gateInput);
         results.push(normalizeResult(name, raw));
       } catch (err) {
         log.warn(
-          `[gates] ${name} threw on ${input.packageName}@${input.version}: ${err.message}`,
+          `[gates] ${name} threw on ${gateInput.packageName}@${gateInput.version}: ${err.message}`,
         );
         results.push({
           gate: name,
@@ -143,8 +155,8 @@ export function createGateRunner({
     }
 
     const threshold =
-      Number.isFinite(input?.config?.warnEscalationThreshold) && input.config.warnEscalationThreshold > 0
-        ? input.config.warnEscalationThreshold
+      Number.isFinite(gateInput?.config?.warnEscalationThreshold) && gateInput.config.warnEscalationThreshold > 0
+        ? gateInput.config.warnEscalationThreshold
         : DEFAULT_WARN_ESCALATION;
 
     return {

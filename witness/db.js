@@ -81,6 +81,21 @@ CREATE TABLE IF NOT EXISTS seed_metadata (
     value TEXT NOT NULL
 );
 
+-- Out-of-band dep first-publish cache used by the scope-boundary gate.
+-- status:      'ok' = first_publish populated; 'vanished' = upstream 404;
+--              'error' = transient failure (short TTL so we retry).
+-- first_publish is immutable on npm (it's the package's creation
+-- timestamp), so 'ok' rows never need refreshing. 'vanished' rows also
+-- never need refreshing (deleted packages don't un-delete). Only 'error'
+-- rows get a 5-minute negative-cache TTL. See witness/dep-cache.js.
+CREATE TABLE IF NOT EXISTS dep_first_publish (
+    package_name  TEXT PRIMARY KEY,
+    first_publish TEXT,
+    status        TEXT NOT NULL CHECK (status IN ('ok','vanished','error')),
+    cached_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    attempts      INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE INDEX IF NOT EXISTS idx_versions_pkg      ON versions(package_id);
 CREATE INDEX IF NOT EXISTS idx_versions_pub_at   ON versions(package_id, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_vfiles_ver        ON version_files(version_id);
