@@ -220,7 +220,7 @@ function enforceTarballGate(db, canonicalName, filename, log) {
     version,
     gates: decision.gates_fired,
     decided_at: decision.decided_at,
-    how_to_override: `scw allow ${canonicalName}@${version} --reason "<reason>"`,
+    how_to_override: `chaingate allow ${canonicalName}@${version} --reason "<reason>"`,
   };
 }
 

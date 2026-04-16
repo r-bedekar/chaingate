@@ -219,7 +219,7 @@ test('tarball request for BLOCK version → 403 with gate evidence', async () =>
     assert.equal(json.version, '1.7.9');
     assert.ok(Array.isArray(json.gates));
     assert.ok(json.gates.some((g) => g.gate === 'test-block'));
-    assert.match(json.how_to_override, /scw allow axios@1\.7\.9/);
+    assert.match(json.how_to_override, /chaingate allow axios@1\.7\.9/);
     assert.equal(tarballHit, false, 'upstream tarball must not be hit for blocked version');
   } finally {
     await close(proxy.server);

@@ -26,12 +26,10 @@ Developer → ChainGate proxy → upstream registry
                   ↓
           Compare against baseline
           Apply deterministic gates
-          Score with anomaly model
-                  ↓
           ✅ ALLOW  ⚠️ WARN  🚫 BLOCK
 ```
 
-No AI required for the core gates. No threat intelligence feeds. Just: "this version is different from what I expect" → warn or block.
+No threat intelligence feeds required. Just: "this version is different from what I expect" → warn or block.
 
 ## What You See
 
@@ -46,7 +44,7 @@ $ npm install axios@1.14.1
    ├── Provenance: NONE (previous 14 versions had OIDC attestation)
    └── Publish method: CLI token (previous versions via GitHub Actions)
    
-   Run: scw allow axios@1.14.1 --reason "..." to override
+   Run: chaingate allow axios@1.14.1 --reason "..." to override
 ```
 
 ## Gates
@@ -69,16 +67,21 @@ Content hash mismatch is the only hard block by default. Everything else warns. 
 | **Axios** (phantom dep + publisher change) | 4 gates fire simultaneously |
 | **Trivy** (Git tag force-pushed) | Content hash mismatch |
 | **Notepad++** (binary replaced via server hijack) | Content hash mismatch |
-| **Shai-Hulud** (500+ packages via stolen tokens) | Publisher changes + anomaly model |
+| **Shai-Hulud** (500+ packages via stolen tokens) | Publisher identity changes across packages |
 
 **Honest limitation:** If an attacker compromises the CI/CD pipeline and publishes through the same workflow with the same structure — only changing code — the metadata looks clean. For that you need code-level analysis (Socket, Snyk). ChainGate is complementary, not a replacement.
 
 ## Quick Start
 
+Requires **Node.js 22+**.
+
 ```bash
 npm install -g chaingate
-scw init
-npm install axios   # now routed through ChainGate
+chaingate init          # downloads seed DB, starts proxy, patches .npmrc
+npm install axios       # now routed through ChainGate
+chaingate status        # see what was observed
+chaingate why axios@1.7.9   # explain the gate decision
+chaingate stop          # restore .npmrc, stop proxy
 ```
 
 ## Deployment Modes
@@ -92,10 +95,8 @@ npm install axios   # now routed through ChainGate
 | Ecosystem | Status |
 |-----------|--------|
 | npm | 🟢 Active |
-| Docker Hub | 🟡 In progress |
-| PyPI | 🟡 Planned |
-| GitHub Actions | 🔵 Planned |
-| Binary updates | 🔵 Planned |
+| PyPI | 🔵 Planned |
+| Docker Hub | 🔵 Planned |
 
 ## Architecture
 
@@ -120,12 +121,6 @@ npm install axios   # now routed through ChainGate
 │  │        DECISION ENGINE           │   │
 │  │   ALLOW / WARN / BLOCK           │   │
 │  └──────────────────────────────────┘   │
-│         │                               │
-│         ▼                               │
-│  ┌──────────────────────────────────┐   │
-│  │    ANOMALY MODEL (optional)      │   │
-│  │    Trained on historical attacks │   │
-│  └──────────────────────────────────┘   │
 └─────────────────────────────────────────┘
 ```
 
@@ -146,8 +141,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We welcome ecosystem conn
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
-
-The open-source core includes all deterministic gates and the proxy infrastructure. The pre-trained anomaly model is available under a separate enterprise license.
 
 ---
 

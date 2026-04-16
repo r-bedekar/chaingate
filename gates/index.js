@@ -22,7 +22,7 @@
 //      results     = [{ gate:'override', result:'ALLOW', detail:`override: ${reason}` }]
 //      Real modules do NOT run — overrides exist to bypass known false
 //      positives, and running gates would just waste cycles and pollute logs.
-//      The synthetic override entry is still persisted so `scw status` can
+//      The synthetic override entry is still persisted so `chaingate status` can
 //      show override history.
 //
 //   2. Otherwise run all modules in insertion order. A module is:

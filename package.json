@@ -5,7 +5,7 @@
   "type": "module",
   "main": "proxy/server.js",
   "bin": {
-    "scw": "./cli/index.js"
+    "chaingate": "./cli/index.js"
   },
   "scripts": {
     "start": "node proxy/server.js",

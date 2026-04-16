@@ -97,13 +97,13 @@ Progress Log at the bottom of this file has the dated detail for every landed st
 
 ### Week 4: CLI + Polish
 
-- [ ] `cli/index.js` — main `scw` command entry point
-- [ ] `cli/init.js` — `scw init`: start proxy, update .npmrc to point at it
-- [ ] `cli/status.js` — `scw status`: show gate stats (packages tracked, decisions made, warnings, blocks)
-- [ ] `cli/allow.js` — `scw allow pkg@version --reason "..."`: override a warning, log to gate_decisions
+- [ ] `cli/index.js` — main `chaingate` command entry point
+- [ ] `cli/init.js` — `chaingate init`: start proxy, update .npmrc to point at it
+- [ ] `cli/status.js` — `chaingate status`: show gate stats (packages tracked, decisions made, warnings, blocks)
+- [ ] `cli/allow.js` — `chaingate allow pkg@version --reason "..."`: override a warning, log to gate_decisions
 - [ ] Terminal output: colored pass/fail for each gate on install
-- [ ] `package.json` bin entry so `npm install -g chaingate` makes `scw` available
-- [ ] End-to-end test: `scw init` → `npm install axios` → see gate results in terminal
+- [ ] `package.json` bin entry so `npm install -g chaingate` makes `chaingate` available
+- [ ] End-to-end test: `chaingate init` → `npm install axios` → see gate results in terminal
 
 ---
 

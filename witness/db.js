@@ -213,6 +213,23 @@ export class WitnessDB {
          ON CONFLICT(package_name, version) DO UPDATE SET
            reason = excluded.reason, created_at = datetime('now')`,
       ),
+      listOverrides: this.db.prepare(
+        `SELECT package_name, version, reason, created_at FROM overrides ORDER BY created_at DESC`,
+      ),
+      deleteOverride: this.db.prepare(
+        `DELETE FROM overrides WHERE package_name = ? AND version = ?`,
+      ),
+      decisionStats: this.db.prepare(
+        `SELECT disposition, COUNT(*) as count FROM gate_decisions GROUP BY disposition`,
+      ),
+      decisionTotal: this.db.prepare(`SELECT COUNT(*) as count FROM gate_decisions`),
+      recentDecisions: this.db.prepare(
+        `SELECT package_name, version, disposition, gates_fired, decided_at
+         FROM gate_decisions ORDER BY decided_at DESC, id DESC LIMIT ?`,
+      ),
+      packageCount: this.db.prepare(`SELECT COUNT(*) as count FROM packages`),
+      versionCount: this.db.prepare(`SELECT COUNT(*) as count FROM versions`),
+      fileCount: this.db.prepare(`SELECT COUNT(*) as count FROM version_files`),
       getSeedMeta: this.db.prepare(`SELECT value FROM seed_metadata WHERE key = ?`),
       setSeedMeta: this.db.prepare(
         `INSERT INTO seed_metadata (key, value) VALUES (?, ?)
@@ -323,6 +340,44 @@ export class WitnessDB {
     this._prepare();
     const res = this._stmts.insertOverride.run(packageName, version, reason);
     return res.lastInsertRowid;
+  }
+
+  listOverrides() {
+    this._prepare();
+    return this._stmts.listOverrides.all();
+  }
+
+  deleteOverride(packageName, version) {
+    this._prepare();
+    const res = this._stmts.deleteOverride.run(packageName, version);
+    return res.changes > 0;
+  }
+
+  getDecisionStats() {
+    this._prepare();
+    const rows = this._stmts.decisionStats.all();
+    const stats = { ALLOW: 0, WARN: 0, BLOCK: 0 };
+    for (const r of rows) stats[r.disposition] = r.count;
+    stats.total = this._stmts.decisionTotal.get().count;
+    return stats;
+  }
+
+  getRecentDecisions(limit = 5) {
+    this._prepare();
+    return this._stmts.recentDecisions.all(limit).map((row) => {
+      let parsed;
+      try { parsed = JSON.parse(row.gates_fired); } catch { parsed = []; }
+      return { ...row, gates_fired: parsed };
+    });
+  }
+
+  getStoreCounts() {
+    this._prepare();
+    return {
+      packages: this._stmts.packageCount.get().count,
+      versions: this._stmts.versionCount.get().count,
+      files: this._stmts.fileCount.get().count,
+    };
   }
 
   getSeedMetadata(key) {
