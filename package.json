@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node proxy/server.js",
+    "prepare": "git config core.hooksPath .githooks",
     "test": "node --test test/**/*.test.js",
     "test:witness": "node --test test/witness/*.test.js"
   },
