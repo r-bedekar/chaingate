@@ -2,7 +2,7 @@ import { createHash, createPublicKey, verify as cryptoVerify } from 'node:crypto
 import { createReadStream, readFileSync } from 'node:fs';
 
 // Embedded literal — the only trust anchor in the CLI.
-// Generated from /home/vps_admin/.chaingate-signing/privkey.pem on 2026-04-14.
+// Generated from the project signing key on 2026-04-14.
 // Rotation requires a new CLI release.
 export const CHAINGATE_SEED_PUBKEY_B64 =
   'MCowBQYDK2VwAyEAP2W40LmbxTrDqDKaOpbfWD/xrbSPW4hz6RqQxZFte5E=';

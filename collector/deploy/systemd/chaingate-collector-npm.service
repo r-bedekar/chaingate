@@ -6,11 +6,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=vps_admin
-Group=vps_admin
-WorkingDirectory=/home/vps_admin/projects/chaingate
-EnvironmentFile=/home/vps_admin/projects/chaingate/.env
-ExecStart=/home/vps_admin/projects/chaingate/.venv/bin/python -m collector.collector npm
+User=chaingate
+Group=chaingate
+WorkingDirectory=/home/chaingate/projects/chaingate
+EnvironmentFile=/home/chaingate/projects/chaingate/.env
+ExecStart=/home/chaingate/projects/chaingate/.venv/bin/python -m collector.collector npm
 
 # Hard ceilings — match RUN_TIMEOUT_SECONDS in collector.py with some headroom
 TimeoutStartSec=900
@@ -28,5 +28,5 @@ SyslogIdentifier=chaingate-collector-npm
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/vps_admin/projects/chaingate
+ReadWritePaths=/home/chaingate/projects/chaingate
 PrivateTmp=true
