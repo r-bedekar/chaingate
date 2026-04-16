@@ -6,7 +6,7 @@
 git clone https://github.com/r-bedekar/chaingate.git
 cd chaingate
 npm install    # also activates git guard hooks via prepare script
-npm test       # 229 tests, should all pass
+npm test       # 243 tests, should all pass
 ```
 
 Requires **Node.js 22+** (uses built-in `fetch`, `node:test`, ESM).
@@ -53,7 +53,7 @@ test/        Node.js test:runner tests, mirrors the source tree
 
 - One logical change per PR
 - Include tests for new gates or CLI commands
-- Run `npm test` before pushing — all 229 tests must pass
+- Run `npm test` before pushing — all 243 tests must pass
 - The pre-commit hook will catch common issues automatically
 
 ## Adding a New Gate

@@ -3,6 +3,9 @@ claude.md
 .claude/
 .cursorrules
 
+# Internal design docs (implementation context, not public)
+docs/V2_DESIGN.md
+
 # Environment
 .env
 *.sqlite
