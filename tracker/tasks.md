@@ -1,6 +1,6 @@
 # TASKS.md — ChainGate Development Tracker
 
-Update this file as tasks are completed. Claude Code can read this to understand current progress and what's next.
+Update this file as tasks are completed.
 
 ## Current Phase: Month 1-2 (Foundation)
 
@@ -27,7 +27,7 @@ These phases cut across the original Week 1-4 plan below. They exist because the
 | P5.6   | Gates 1-3: content-hash, publisher-identity, dep-structure                                 | done         | 2026-04-15 |
 | P5.7   | Gates 4-6: provenance-continuity, release-age, scope-boundary (+ dep-cache + dep-fetcher)  | done         | 2026-04-15 |
 
-Progress Log at the bottom of this file has the dated detail for every landed step. TaskList (via the Claude Code task tool) tracks intra-phase step status.
+Progress Log at the bottom of this file has the dated detail for every landed step.
 
 ---
 
@@ -36,8 +36,8 @@ Progress Log at the bottom of this file has the dated detail for every landed st
 **Setup (do first — everything depends on this):**
 - [x] Create PostgreSQL database: `chaingate`
 - [x] Create database schema (packages, versions, gate_decisions, attack_labels tables)
-- [x] Initialize git repo with .gitignore, .env, README.md, CLAUDE.md
-- [x] Create project folder structure per CLAUDE.md
+- [x] Initialize git repo with .gitignore, .env, README.md
+- [x] Create project folder structure
 - [x] First commit
 
 **Data Collector — npm:**
@@ -121,7 +121,7 @@ Progress Log at the bottom of this file has the dated detail for every landed st
 
 ## NOT YET (Month 3+)
 
-These are documented here so Claude Code knows they exist but does NOT build them:
+These are deferred to later phases:
 
 - Merkle tree implementation (Month 3-4)
 - Anomaly detection model (Month 3-4)
@@ -153,10 +153,10 @@ These are documented here so Claude Code knows they exist but does NOT build the
 | 2026-04-13 | Seed lists scaled to 100 | `seeds/npm_top.txt` and `seeds/pypi_top.txt` expanded to 100 packages each (attack-relevant + foundational) |
 | 2026-04-13 | Gap #5 closed — PyPI per-version enrichment | `enrich_version` hook in `sources/pypi.py` fetches per-version JSON for publisher_email/dependencies/source_repo_url; wired into collector delta path |
 | 2026-04-13 | Gap #6 closed — PyPI install-scripts detection | `sources/pypi_tarball.py` streams sdist (150MB cap), AST-walks setup.py for dangerous imports/os calls/cmdclass; ~30% of pypi versions flagged True |
-| 2026-04-13 | DB fill-NULL UPDATE helper | `db.update_version_fill_nulls` — COALESCE-protected narrow UPDATE, append-only invariant preserved; CLAUDE.md invariant #1 amended |
+| 2026-04-13 | DB fill-NULL UPDATE helper | `db.update_version_fill_nulls` — COALESCE-protected narrow UPDATE, append-only invariant preserved; invariant #1 amended |
 | 2026-04-13 | PyPI historical backfill — publisher/deps | `backfill_pypi.py` run in tmux: 12,183 rows filled, 0 errors, 20 min. Final coverage 11,630/19,541 = 59% (remaining 7,911 NULL because PyPI authors didn't publish an email — data-source limit) |
 | 2026-04-13 | PyPI historical backfill — tarballs | `backfill_pypi_tarballs.py` run in tmux: 17,641 rows filled, 0 errors, 75 min. Final `has_install_scripts` coverage: 100%; 5,866 flagged true (~30%) |
-| 2026-04-13 | P1: lifecycle detection (yank / deprecation / vanish) | Schema: added `last_seen_at, deprecated_at, deprecated_reason, yanked_at, yanked_reason, vanished_at` to `versions` + new `version_events` table. Parsers: npm `deprecated`, pypi per-file `yanked`/`yanked_reason`. db helpers: `bulk_mark_seen`, `apply_lifecycle` (write-once COALESCE on `*_at`), `mark_vanished`. CLAUDE.md invariant #1 amended. Validated on test seeds: `request`/`left-pad`/`bower`/`ua-parser-js` = 299 deprecation events; `setuptools`/`pip`/`urllib3`/`numpy`/`cryptography` = 21 yank events (with real reasons). Idempotent on re-run. |
+| 2026-04-13 | P1: lifecycle detection (yank / deprecation / vanish) | Schema: added `last_seen_at, deprecated_at, deprecated_reason, yanked_at, yanked_reason, vanished_at` to `versions` + new `version_events` table. Parsers: npm `deprecated`, pypi per-file `yanked`/`yanked_reason`. db helpers: `bulk_mark_seen`, `apply_lifecycle` (write-once COALESCE on `*_at`), `mark_vanished`. invariant #1 amended. Validated on test seeds: `request`/`left-pad`/`bower`/`ua-parser-js` = 299 deprecation events; `setuptools`/`pip`/`urllib3`/`numpy`/`cryptography` = 21 yank events (with real reasons). Idempotent on re-run. |
 | 2026-04-13 | P2.1: versions-table extensions + fill-NULL backfill | Schema: added 16 columns to `versions` (`integrity_hash`, `git_head`, `dev/peer/optional/bundled_dependencies` + counts, `publisher_tool`, `publisher_maintainer`, `publisher_maintainer_email`, `maintainers`, `license_text`, `license_expression`). Parsers: npm `_parse_single_version` extracts all dist-group data + maintainers[] + `_npmVersion`; pypi `parse_versions` + `parse_version_detail` extract maintainer/license from `info` block. `db.update_version_fill_nulls` extended with all new fillable columns + new JSONB set. `collector._fill_existing_versions` wired into the in-loop pass so hourly runs backfill historical rows via COALESCE. New `backfill_pypi_p21.py` (resumable id-cursor, same pattern as P1 backfill) ran 19,459 rows in 32 min, 0 errors, 0 not_found. **Final coverage**: npm 50,419 rows — integrity_hash 99.99%, maintainers 99%, publisher_tool 92%, git_head 70%, dev_deps 66%, peer_deps 37%. pypi 19,541 rows — license (either field) 91%, license_text 88%, license_expression 3%, publisher_maintainer 6%, publisher_maintainer_email 9%. Remaining pypi maintainer NULLs are data-source limit (authors didn't populate the field). |
 | 2026-04-13 | P2.2: `version_files` child table + parsers + collector wiring + history backfill | Schema: new `version_files` table with per-file hash/size/uploaded_at/packagetype/python_version/yanked + PEP 740 attestation columns (`attestation_present` tri-state nullable, `attestation_publisher` JSONB, `attestation_bundles` JSONB, `attestation_fetched_at`) + lifecycle (`first_observed_at`, `last_seen_at`, `vanished_at`) + `UNIQUE (version_id, filename)` + 3 indexes. Parsers: `pypi._parse_files` emits one row per sdist/wheel; `npm._synthesize_files` emits single tarball row per version. `db.insert_version_if_new` now returns `int|None` (the new id) so children can be written in the same transaction. New db helpers: `insert_version_file_if_new`, `update_file_fill_nulls` (COALESCE-protected), `bulk_mark_files_seen`, `mark_files_vanished`, `apply_file_yank`, `existing_version_ids`, `existing_file_names`. `collector._write_new_versions` inserts children inline; `_fill_existing_versions` handles new-wheel insert + fill-null + mark-seen + mark-vanished per version. `backfill_version_files.py` reconstructs files[] from each version's captured `raw_metadata` with no HTTP cost: 19,379 pypi versions + 50,068 npm versions processed in 7.2 min, **181,240 total file rows inserted** (130,817 pypi at ~6.7 files/version + 50,423 npm at 1 file/version). 162 pypi versions stayed childless (raw_metadata was truncated at original fetch; would require re-fetch to recover). |
 | 2026-04-13 | P4: collector cadence 1h → 15m | Updated both timer units: npm `OnCalendar=*:00,15,30,45`, pypi `OnCalendar=*:07,22,37,52` (7-minute offset to prevent DB contention). `RandomizedDelaySec` dropped from 60→30. Installed, daemon-reloaded, both timers restarted cleanly. Next firings verified: npm 22:15, pypi 22:22. First new-cadence pypi run (22:10) fired and completed without error. Prior hourly runs preserved in `collector_runs` history. |

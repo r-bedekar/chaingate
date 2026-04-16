@@ -12,7 +12,7 @@ PyPI quirks worth knowing:
    version in the hourly run — `enrich_version` handles that. Historical rows
    already in the DB with NULL enrichable fields are filled by the one-time
    `collector.backfill_pypi` script. Both paths use `db.update_version_fill_nulls`
-   which protects non-NULL values at the SQL layer (see CLAUDE.md invariant #1).
+   which protects non-NULL values at the SQL layer (see invariant #1).
 
 2. Each version has ONE OR MORE files (one sdist plus possibly many wheels).
    Our schema has a single `content_hash` column, so we record the sdist's

@@ -194,7 +194,7 @@ def update_version_fill_nulls(
     Non-NULL values are protected via `SET col = COALESCE(col, %s)` so a
     second enrichment pass can never overwrite an already-populated value.
     This is the sole sanctioned UPDATE path on the versions table — see
-    CLAUDE.md Collector Design invariant #1.
+    Collector Design invariant #1.
 
     Returns True if the row existed (regardless of whether any column
     actually changed — COALESCE makes repeated calls harmless).
@@ -226,7 +226,7 @@ def update_version_fill_nulls(
 def bulk_mark_seen(conn, package_id: int, versions: list[str]) -> None:
     """Bump last_seen_at for all observed versions of a package.
 
-    Harmless monotonic UPDATE — permitted by CLAUDE.md invariant #1 as a
+    Harmless monotonic UPDATE — permitted by invariant #1 as a
     lifecycle-observation write. Repeated calls just advance the timestamp.
     """
     if not versions:

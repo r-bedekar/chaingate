@@ -4,7 +4,7 @@ Fills `publisher_*`, `dependencies`, and `source_repo_url` on rows the cheap
 `/pypi/{name}/json` pass could only populate with NULL. Fetches the per-version
 endpoint `/pypi/{name}/{version}/json` and calls `db.update_version_fill_nulls`,
 which at the SQL layer uses `SET col = COALESCE(col, %s)` so any non-NULL value
-is protected (see CLAUDE.md Collector Design invariant #1).
+is protected (see Collector Design invariant #1).
 
 Resumable via an id cursor — `WHERE publisher_email IS NULL AND v.id > cursor`
 means a 404'd row is visited exactly once per run, not infinitely. Packages
