@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# pre-commit hook — blocks commits that leak sensitive patterns.
+# Installed via: git config core.hooksPath .githooks
+set -euo pipefail
+
+RED='\033[0;31m'
+NC='\033[0m'
+
+# ── Patterns to reject ──────────────────────────────────────────────
+# Constructed at runtime to avoid the hook matching itself.
+# Each entry: regex  |  human-readable reason
+_U="vps""_admin"
+_H="srv""1278628"
+_D="hstgr"".cloud"
+_CA="Co-Authored-By:.*[Cc]""laude"
+_AE="noreply@anth""ropic\\.com"
+
+PATTERNS=(
+  "${_U}|VPS username leak"
+  "${_H}|Hostinger server hostname leak"
+  "${_D}|Hostinger domain leak"
+  "${_CA}|AI co-author trailer"
+  "${_AE}|AI vendor email leak"
+)
+
+_CL="clau""de"
+_AN="anthr""opic"
+
+PATTERNS_CI=(
+  "${_CL}|AI tooling reference (use generic wording)"
+  "${_AN}|AI vendor reference"
+)
+
+# Files exempt from scanning
+EXEMPT='.gitignore'
+
+ERRORS=0
+
+# ── Scan staged file contents ───────────────────────────────────────
+staged_files=$(git diff --cached --name-only --diff-filter=ACMR || true)
+
+for entry in "${PATTERNS[@]}"; do
+  pattern="${entry%%|*}"
+  reason="${entry##*|}"
+  matches=$(echo "$staged_files" | while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    for ex in $EXEMPT; do [ "$f" = "$ex" ] && continue 2; done
+    git show ":$f" 2>/dev/null | grep -nE "$pattern" | while IFS= read -r line; do
+      echo "  $f:$line"
+    done
+  done || true)
+  if [ -n "$matches" ]; then
+    echo -e "${RED}BLOCKED${NC} -- $reason"
+    echo "$matches"
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+for entry in "${PATTERNS_CI[@]}"; do
+  pattern="${entry%%|*}"
+  reason="${entry##*|}"
+  matches=$(echo "$staged_files" | while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    for ex in $EXEMPT; do [ "$f" = "$ex" ] && continue 2; done
+    git show ":$f" 2>/dev/null | grep -niE "$pattern" | while IFS= read -r line; do
+      echo "  $f:$line"
+    done
+  done || true)
+  if [ -n "$matches" ]; then
+    echo -e "${RED}BLOCKED${NC} -- $reason"
+    echo "$matches"
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+if [ "$ERRORS" -gt 0 ]; then
+  echo ""
+  echo -e "${RED}Commit rejected${NC} -- $ERRORS pattern(s) matched."
+  echo "Fix the above, or bypass with --no-verify (not recommended)."
+  exit 1
+fi

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# commit-msg hook — blocks commit messages that leak sensitive patterns.
+set -euo pipefail
+
+RED='\033[0;31m'
+NC='\033[0m'
+
+MSG_FILE="$1"
+
+# Constructed at runtime to avoid matching inside hook source.
+_U="vps""_admin"
+_H="srv""1278628"
+_D="hstgr"".cloud"
+_CA="Co-Authored-By:.*[Cc]""laude"
+_AE="noreply@anth""ropic\\.com"
+
+PATTERNS=(
+  "$_U"
+  "$_H"
+  "$_D"
+  "$_CA"
+  "$_AE"
+)
+
+_CL="clau""de"
+_AN="anthr""opic"
+
+PATTERNS_CI=(
+  "$_CL"
+  "$_AN"
+)
+
+ERRORS=0
+
+for pattern in "${PATTERNS[@]}"; do
+  if grep -qE "$pattern" "$MSG_FILE"; then
+    echo -e "${RED}BLOCKED${NC} -- commit message matches: $pattern"
+    grep -nE "$pattern" "$MSG_FILE" | sed 's/^/  /'
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+for pattern in "${PATTERNS_CI[@]}"; do
+  if grep -qiE "$pattern" "$MSG_FILE"; then
+    echo -e "${RED}BLOCKED${NC} -- commit message matches (case-insensitive): $pattern"
+    grep -niE "$pattern" "$MSG_FILE" | sed 's/^/  /'
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+if [ "$ERRORS" -gt 0 ]; then
+  echo ""
+  echo -e "${RED}Commit message rejected${NC} -- $ERRORS pattern(s) matched."
+  echo "Reword the message, or bypass with --no-verify (not recommended)."
+  exit 1
+fi
