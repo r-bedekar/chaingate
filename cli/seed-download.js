@@ -1,12 +1,63 @@
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { createWriteStream, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { SEED_RELEASE_URL, SEED_FILES } from './constants.js';
 
+function formatMB(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(1);
+}
+
+function renderProgress(filename, received, total) {
+  if (!process.stdout.isTTY) return;
+  if (total > 0) {
+    const pct = ((received / total) * 100).toFixed(1);
+    process.stdout.write(
+      `\r  ${filename}: ${formatMB(received)} MB / ${formatMB(total)} MB (${pct}%)`
+    );
+  } else {
+    process.stdout.write(`\r  ${filename}: ${formatMB(received)} MB`);
+  }
+}
+
+async function downloadStream(url, dest, filename) {
+  const resp = await fetch(url, { redirect: 'follow' });
+  if (!resp.ok) throw new Error(`Failed to download ${filename}: HTTP ${resp.status}`);
+
+  const total = Number(resp.headers.get('content-length') || 0);
+  const showProgress = total > 1024 * 1024 && process.stdout.isTTY;
+  let received = 0;
+  let lastRender = 0;
+
+  const out = createWriteStream(dest);
+  try {
+    for await (const chunk of resp.body) {
+      received += chunk.length;
+      out.write(chunk);
+      if (showProgress) {
+        const now = Date.now();
+        if (now - lastRender > 100) {
+          renderProgress(filename, received, total);
+          lastRender = now;
+        }
+      }
+    }
+  } finally {
+    out.end();
+    await new Promise((resolve, reject) => {
+      out.on('finish', resolve);
+      out.on('error', reject);
+    });
+    if (showProgress) {
+      renderProgress(filename, received, total);
+      process.stdout.write('\n');
+    }
+  }
+}
+
 /**
  * Download seed bundle (db + sha256 + sig) to a temp directory.
- * Uses Node's built-in fetch (available in Node 22+).
+ * Streams the large DB file with a progress bar on TTYs.
  *
  * @param {string} [baseUrl] Override the release URL.
  * @returns {Promise<{dir: string, dbPath: string, sha256Path: string, sigPath: string}>}
@@ -18,13 +69,8 @@ export async function fetchSeedBundle(baseUrl = SEED_RELEASE_URL) {
   const paths = {};
   for (const filename of SEED_FILES) {
     const url = `${baseUrl}/${filename}`;
-    const resp = await fetch(url, { redirect: 'follow' });
-    if (!resp.ok) {
-      throw new Error(`Failed to download ${filename}: HTTP ${resp.status}`);
-    }
-    const buf = Buffer.from(await resp.arrayBuffer());
     const dest = join(dir, filename);
-    writeFileSync(dest, buf);
+    await downloadStream(url, dest, filename);
 
     if (filename.endsWith('.sha256')) paths.sha256Path = dest;
     else if (filename.endsWith('.sig')) paths.sigPath = dest;

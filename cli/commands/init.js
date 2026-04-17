@@ -9,12 +9,13 @@ import { openWitnessDB } from '../../witness/db.js';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_UPSTREAM, EXIT } from '../constants.js';
 
 function parseArgs(args) {
-  const opts = { scope: 'user', noSeed: false, seedPath: null, force: false };
+  const opts = { scope: 'user', noSeed: false, seedPath: null, force: false, dryRun: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scope' && args[i + 1]) opts.scope = args[++i];
     else if (args[i] === '--no-seed') opts.noSeed = true;
     else if (args[i] === '--seed' && args[i + 1]) opts.seedPath = args[++i];
     else if (args[i] === '--force') opts.force = true;
+    else if (args[i] === '--dry-run') opts.dryRun = true;
   }
   return opts;
 }
@@ -22,6 +23,43 @@ function parseArgs(args) {
 export default async function init(args) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
+
+  if (opts.dryRun) {
+    const rc = npmrcPath(opts.scope);
+    const existingRegistry = readCurrentRegistry(rc);
+    const scopedRegs = findScopedRegistries(rc);
+    const existingPid = readPid(paths.pidFile);
+    const registryUrl = `http://${DEFAULT_HOST}:${DEFAULT_PORT}`;
+
+    console.log(fmt.dim('(dry-run — no changes will be made)'));
+    console.log('');
+    console.log('Planned actions:');
+    console.log(`  1. Create directory: ${paths.base}`);
+    if (existingPid) {
+      console.log(`  2. Skip proxy spawn (already running, pid ${existingPid}; --force would reinitialize)`);
+    } else {
+      console.log(`  2. Spawn proxy on ${registryUrl}`);
+    }
+    if (opts.noSeed) {
+      console.log('  3. Skip seed (--no-seed); empty witness DB will be created');
+    } else if (opts.seedPath) {
+      console.log(`  3. Verify and install local seed: ${opts.seedPath}`);
+    } else {
+      console.log('  3. Download + verify seed from GitHub Release');
+    }
+    if (existingRegistry && existingRegistry !== DEFAULT_UPSTREAM) {
+      console.log(`  4. Chain through existing upstream: ${existingRegistry}`);
+    } else {
+      console.log(`  4. Use default upstream: ${DEFAULT_UPSTREAM}`);
+    }
+    console.log(`  5. Patch .npmrc (${rc}) with chaingate block → registry=${registryUrl}`);
+    if (scopedRegs.length > 0) {
+      console.log(`     (${scopedRegs.length} scoped registries will be preserved)`);
+    }
+    console.log('');
+    console.log('Re-run without --dry-run to apply.');
+    return EXIT.OK;
+  }
 
   // 1. Create chaingate directory
   try {

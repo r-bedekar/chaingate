@@ -73,7 +73,7 @@ async function main() {
   // Per-command --help: show usage hint without running the command
   if (cmdArgs.includes('--help') || cmdArgs.includes('-h')) {
     const HELP = {
-      init: 'chaingate init [--no-seed] [--seed <path>] [--scope user|project] [--force]',
+      init: 'chaingate init [--no-seed] [--seed <path>] [--scope user|project] [--force] [--dry-run]',
       status: 'chaingate status [--json] [--scope user|project]',
       allow: 'chaingate allow <package>@<version> --reason "..." [--scope user|project]',
       stop: 'chaingate stop [--scope user|project]',
