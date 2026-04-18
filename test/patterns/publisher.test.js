@@ -1213,3 +1213,130 @@ test('known_contributor: determinism — permuted input produces byte-identical 
   assert.equal(forward.transitions[1].prior_contribution_count, 3);
   assert.equal(forward.transitions[1].is_known_contributor_K10, false);
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2f: signals aggregation — RED lock (fixtures P, Q, empty)
+//
+// 2f collapses per-transition detail into package-level aggregates in
+// three tiers:
+//
+//   Tier 1 — sufficiency:  observed_versions_count, unique_identity_count,
+//                          has_sufficient_history
+//   Tier 2 — severity:     max_prior_tenure_versions,
+//                          max_cold_handoff_prior_tenure,
+//                          cold_handoff_count,           (F,F)
+//                          new_committee_member_count,   (T,F)
+//                          returning_dormant_count,      (F,T) — STANDOUT
+//                          recurring_member_count        (T,T)
+//   Tier 3 — temporal:     total_history_duration_ms,
+//                          longest_tenure_versions,
+//                          longest_tenure_duration_ms
+//
+// Fixtures P/Q/empty below are locked as failing tests before any
+// implementation — the L/M/N / F/H/I discipline extended to 2f. The
+// four-cell trace from fixture O (sub-step 2e) is reused in P: a single
+// trace with every 2×2 cell present plus enough run-length to exercise
+// Tier 1 sufficiency and Tier 3 temporal extrema.
+//
+// Zero semantics (risk #3 decision): max_cold_handoff_prior_tenure is 0
+// when no (F,F) transitions exist. Paired with cold_handoff_count=0 this
+// disambiguates from "one (F,F) transition with prior_tenure=0" — a
+// degenerate state that cannot arise from a real history anyway (the
+// smallest tenure block has version_count=1).
+// ---------------------------------------------------------------------------
+
+test('fixture P: all three tiers on a full-coverage trace', () => {
+  // Layout — 18 rows, 8 tenure blocks, 7 transitions, every 2×2 cell hit:
+  //
+  //   block[0] A(×11)  → exercises Tier 1 sufficiency (>=8) and
+  //                      Tier 3 longest_tenure_versions=11
+  //   block[1] B(×1)   t0 A→B  (F, F) prior_tenure=11 — cold, event-stream shape
+  //   block[2] A(×1)   t1 B→A  (T, T) prior_tenure=1
+  //   block[3] B(×1)   t2 A→B  (T, F) prior_tenure=1
+  //   block[4] C(×1)   t3 B→C  (F, F) prior_tenure=1
+  //   block[5] D(×1)   t4 C→D  (F, F) prior_tenure=1
+  //   block[6] E(×1)   t5 D→E  (F, F) prior_tenure=1
+  //   block[7] A(×1)   t6 E→A  (F, T) prior_tenure=1 — returning dormant
+  //
+  // buildRows places rows one DAY_MS apart from startMs → total span is
+  // 17 * DAY_MS across 18 rows.
+  const rows = buildRows([
+    ['a@x.com', 11],
+    ['b@y.com', 1],
+    ['a@x.com', 1],
+    ['b@y.com', 1],
+    ['c@z.com', 1],
+    ['d@w.com', 1],
+    ['e@v.com', 1],
+    ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'full-coverage', history: rows });
+
+  // --- Tier 1: sufficiency ---
+  assert.equal(out.signals.observed_versions_count, 18);
+  assert.equal(out.signals.unique_identity_count, 5);
+  assert.equal(out.signals.has_sufficient_history, true);
+
+  // --- Tier 2: severity extrema + 2×2 cell histogram ---
+  assert.equal(out.signals.max_prior_tenure_versions, 11);
+  assert.equal(out.signals.max_cold_handoff_prior_tenure, 11);
+  assert.equal(out.signals.cold_handoff_count, 4);            // cell (F, F)
+  assert.equal(out.signals.new_committee_member_count, 1);    // cell (T, F)
+  assert.equal(out.signals.returning_dormant_count, 1);       // cell (F, T)
+  assert.equal(out.signals.recurring_member_count, 1);        // cell (T, T)
+
+  // --- Tier 3: temporal summary ---
+  assert.equal(out.signals.total_history_duration_ms, 17 * DAY_MS);
+  assert.equal(out.signals.longest_tenure_versions, 11);
+  assert.equal(out.signals.longest_tenure_duration_ms, 10 * DAY_MS);
+});
+
+test('fixture Q (insufficient history): has_sufficient_history=false, no zero-case surprises', () => {
+  // Three rows — below MIN_HISTORY_DEPTH=8. The gate layer will SKIP
+  // pattern-based evaluations; the signals must still be well-defined
+  // numeric zeros (not null/undefined) so the gate can read them without
+  // defensive guards. This is the zero-semantics fixture.
+  const rows = buildRows([['a@x.com', 3]]);
+  const out = publisher.extract({ packageName: 'thin-history', history: rows });
+
+  // Tier 1
+  assert.equal(out.signals.observed_versions_count, 3);
+  assert.equal(out.signals.unique_identity_count, 1);
+  assert.equal(out.signals.has_sufficient_history, false);
+
+  // Tier 2 — no transitions, every extremum is 0, every cell count is 0.
+  assert.equal(out.signals.max_prior_tenure_versions, 0);
+  assert.equal(out.signals.max_cold_handoff_prior_tenure, 0);
+  assert.equal(out.signals.cold_handoff_count, 0);
+  assert.equal(out.signals.new_committee_member_count, 0);
+  assert.equal(out.signals.returning_dormant_count, 0);
+  assert.equal(out.signals.recurring_member_count, 0);
+
+  // Tier 3 — one tenure block of 3 versions across 2 DAY_MS spans.
+  assert.equal(out.signals.total_history_duration_ms, 2 * DAY_MS);
+  assert.equal(out.signals.longest_tenure_versions, 3);
+  assert.equal(out.signals.longest_tenure_duration_ms, 2 * DAY_MS);
+});
+
+test('fixture empty: no history → every signal is a defined zero / false', () => {
+  // Closes the defined-numeric-zero contract. An empty signals object
+  // or any undefined field would force every gate that consumes signals
+  // to add `?? 0` guards at every read site — the kind of drift the
+  // pattern layer exists to prevent.
+  const out = publisher.extract({ packageName: 'empty-signals', history: [] });
+
+  assert.equal(out.signals.observed_versions_count, 0);
+  assert.equal(out.signals.unique_identity_count, 0);
+  assert.equal(out.signals.has_sufficient_history, false);
+
+  assert.equal(out.signals.max_prior_tenure_versions, 0);
+  assert.equal(out.signals.max_cold_handoff_prior_tenure, 0);
+  assert.equal(out.signals.cold_handoff_count, 0);
+  assert.equal(out.signals.new_committee_member_count, 0);
+  assert.equal(out.signals.returning_dormant_count, 0);
+  assert.equal(out.signals.recurring_member_count, 0);
+
+  assert.equal(out.signals.total_history_duration_ms, 0);
+  assert.equal(out.signals.longest_tenure_versions, 0);
+  assert.equal(out.signals.longest_tenure_duration_ms, 0);
+});
