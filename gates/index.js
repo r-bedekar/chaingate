@@ -43,6 +43,7 @@
 //      true-positive-by-construction signal. V2 may re-introduce
 //      escalation once pattern-aware gates produce low-FP WARNs.
 
+import { MIN_HISTORY_DEPTH } from '../constants.js';
 import contentHash from './content-hash.js';
 import publisherIdentity from './publisher-identity.js';
 import depStructure from './dep-structure.js';
@@ -53,18 +54,20 @@ import scopeBoundary from './scope-boundary.js';
 const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK']);
 
 // First-seen baseline poisoning protection (V2 foundation, Section 7 item 4
-// of docs/V2_DESIGN.md). Packages with fewer than MIN_HISTORY_DEPTH observed
-// prior versions don't carry enough signal to evaluate pattern-based gates
-// reliably — an attacker who publishes a brand-new package and has it observed
-// first by a target user could poison the baseline. Until a package
-// accumulates sufficient observed depth, every gate NOT in the exempt set is
-// short-circuited to SKIP with a poisoning-protection detail.
+// of docs/V2_DESIGN.md). The constant lives in `constants.js` because
+// `patterns/publisher.js` also consumes it — one source of truth. Packages
+// with fewer than MIN_HISTORY_DEPTH observed prior versions have every gate
+// NOT in the exempt set short-circuited to SKIP with a poisoning-protection
+// detail.
 //
 // Only content-hash is exempt: it compares against a recorded baseline and
 // does not rely on pattern extraction from history. Any future gate added to
 // the exempt set must be explicitly justified — the default for any new gate
 // is "pattern-based, requires depth."
-export const MIN_HISTORY_DEPTH = 8;
+//
+// Re-exported here for backward compatibility with existing callers that
+// import it from this module.
+export { MIN_HISTORY_DEPTH };
 const HISTORY_INDEPENDENT_GATES = new Set(['content-hash']);
 
 export const DEFAULT_GATE_MODULES = Object.freeze([
