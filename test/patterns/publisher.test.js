@@ -685,3 +685,173 @@ test('fixture I (W=3 boundary INSIDE, A,B,C,A): A just inside window, overlap fi
 
   assert.equal(out.signals.has_overlap_transition, true);
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2d: remaining fixture matrix
+//
+// F, H, I are the boundary-regression core (above). These are the
+// broader coverage cases — canonical cold handoffs, the solo-only
+// case that produces no transitions, and the aggregate-signal table.
+// Together with F/H/I this is the complete 2d matrix.
+// ---------------------------------------------------------------------------
+
+test('fixture A overlap: event-stream cold handoff → is_overlap=false', () => {
+  // Canonical cold-handoff shape: right9ctrl has never contributed
+  // before. The single transition must be marked non-overlapping —
+  // that's the field that turns a noisy "publisher_changed" boolean
+  // into an audit-grade signal.
+  const rows = buildRows([
+    ['dominictarr@example.com', 27],
+    ['right9ctrl@example.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'event-stream', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture B overlap: 40 distinct committee singletons → all cold', () => {
+  // Deliberately NOT a rotating committee (each identity appears once).
+  // Every hop is to a previously-unseen identity; overlap must fire
+  // nowhere. Distinguishes "distinct-maintainer sequence" (cold) from
+  // "rotating committee" (fixture F, overlap-dominant).
+  const spec = [];
+  for (let i = 0; i < 40; i += 1) {
+    spec.push([`maintainer${i}@example.com`, 1]);
+  }
+  const rows = buildRows(spec);
+  const out = publisher.extract({ packageName: 'distinct-40', history: rows });
+
+  assert.equal(out.transitions.length, 39);
+  for (const t of out.transitions) {
+    assert.equal(t.is_overlap_window_W3, false);
+  }
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture C overlap: long solo tenure → vacuous (no transitions, no overlap)', () => {
+  const rows = buildRows([['faisalman@example.com', 100]]);
+  const out = publisher.extract({ packageName: 'ua-parser-js', history: rows });
+
+  assert.equal(out.transitions.length, 0);
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture D overlap: dormancy-revive → is_overlap=false despite long gap', () => {
+  // Critical: gap_ms is huge (730 days) but overlap is definitional,
+  // not temporal. newowner never published prior — cold regardless
+  // of how much time passed. Proves definition (a) is independent of
+  // the gap field. This is why we didn't pick definition (c)
+  // (time-windowed): it would collapse the distinct signals.
+  const rows = buildRowsAbsolute([
+    ['orig@example.com', 0],
+    ['orig@example.com', 25 * DAY_MS],
+    ['orig@example.com', 50 * DAY_MS],
+    ['orig@example.com', 75 * DAY_MS],
+    ['orig@example.com', 100 * DAY_MS],
+    ['newowner@example.com', 830 * DAY_MS],
+  ]);
+  const out = publisher.extract({ packageName: 'dormancy-revive-overlap', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+  assert.equal(out.transitions[0].gap_ms, 730 * DAY_MS); // sanity: gap is huge
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture G overlap: A/B/A minimal reappearance → [false, true]', () => {
+  const rows = buildRows([
+    ['a@x.com', 2],
+    ['b@y.com', 1],
+    ['a@x.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'aba-overlap', history: rows });
+
+  assert.equal(out.transitions.length, 2);
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+  assert.equal(
+    out.transitions[1].is_overlap_window_W3,
+    true,
+    'B→A transition: A is in the window [block[0], block[1]] = [A, B]',
+  );
+  assert.equal(out.signals.has_overlap_transition, true);
+});
+
+test('fixture J overlap: empty history → empty transitions, aggregate false', () => {
+  const out = publisher.extract({ packageName: 'empty-overlap', history: [] });
+  assert.equal(out.transitions.length, 0);
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture K overlap: single block (no transitions) → aggregate false', () => {
+  const rows = buildRows([['solo@example.com', 1]]);
+  const out = publisher.extract({ packageName: 'single-block', history: rows });
+  assert.equal(out.transitions.length, 0);
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('overlap: aggregate has_overlap_transition matches per-transition OR', () => {
+  // Invariant: signals.has_overlap_transition === transitions.some(is_overlap).
+  // Walk a small matrix where the answer is statically known and verify
+  // the aggregate is the OR of the per-transition booleans — this is
+  // the field the gate contract warns NOT to shortcut on, so it must
+  // be structurally correct even when noisy.
+  const cases = [
+    { rows: [], expected: false },
+    { rows: buildRows([['a@x.com', 1]]), expected: false },
+    { rows: buildRows([['a@x.com', 1], ['b@y.com', 1]]), expected: false },
+    // A/B/A — one overlap
+    {
+      rows: buildRows([['a@x.com', 1], ['b@y.com', 1], ['a@x.com', 1]]),
+      expected: true,
+    },
+    // A/B/C/D — all cold
+    {
+      rows: buildRows([
+        ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1], ['d@w.com', 1],
+      ]),
+      expected: false,
+    },
+  ];
+  for (const { rows, expected } of cases) {
+    const out = publisher.extract({ packageName: 'agg', history: rows });
+    const manualOr = out.transitions.some((t) => t.is_overlap_window_W3);
+    assert.equal(out.signals.has_overlap_transition, manualOr);
+    assert.equal(out.signals.has_overlap_transition, expected);
+  }
+});
+
+test('overlap: determinism — permuted input produces byte-identical overlap flags', () => {
+  // Overlap is computed over sorted tenure; if sort is deterministic
+  // (proven by 2b sort-tertiary-key fix), overlap must be too. This
+  // is the closing guard — any future change that introduces
+  // non-determinism in tenure/transitions/overlap will fail here.
+  const rows = buildRowsAbsolute([
+    ['a@x.com', 0],
+    ['b@y.com', 10 * DAY_MS],
+    ['c@z.com', 20 * DAY_MS],
+    ['a@x.com', 30 * DAY_MS],
+    ['d@w.com', 40 * DAY_MS],
+    ['a@x.com', 50 * DAY_MS],
+  ]);
+  const forward = publisher.extract({ packageName: 'overlap-det', history: rows });
+  const reversed = publisher.extract({
+    packageName: 'overlap-det',
+    history: rows.slice().reverse(),
+  });
+  assert.equal(JSON.stringify(forward), JSON.stringify(reversed));
+
+  // Sanity-check the overlap pattern against hand-traced windows:
+  //   t0 A→B from_index=0 window [0]=[A]           — B? no  → false
+  //   t1 B→C from_index=1 window [0,1]=[A,B]       — C? no  → false
+  //   t2 C→A from_index=2 window [0,1,2]=[A,B,C]   — A? YES → true
+  //   t3 A→D from_index=3 window [1,2,3]=[B,C,A]   — D? no  → false
+  //   t4 D→A from_index=4 window [2,3,4]=[C,A,D]   — A? YES → true
+  //                                                  (A is at block 3,
+  //                                                   still inside W=3)
+  assert.deepEqual(
+    forward.transitions.map((t) => t.is_overlap_window_W3),
+    [false, false, true, false, true],
+  );
+});
