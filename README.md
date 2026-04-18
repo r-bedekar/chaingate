@@ -1,3 +1,9 @@
+> **Status: Active development — not ready for production use.**  
+> Core witness architecture and proxy are functional. Sequence-aware
+> pattern detection (V2) is in progress. Content-hash gate is the
+> only active BLOCK gate. Other metadata gates are informational
+> until V2 ships. Feedback welcome.
+
 # ChainGate
 
 **Supply chain integrity gate that catches what threat intelligence misses.**
@@ -46,6 +52,11 @@ $ npm install axios@1.14.1
    
    Run: chaingate allow axios@1.14.1 --reason "..." to override
 ```
+
+*Demo shows target V2 behavior. Current V1 surfaces publisher,
+dependency, and provenance signals as informational warnings
+while sequence-aware pattern detection is in development.
+Content-hash mismatch is the only active BLOCK gate.*
 
 ## Gates
 
