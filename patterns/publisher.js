@@ -4,6 +4,44 @@
 // shape from a package's observed publisher history. Deterministic,
 // pure function over sorted version rows. No external calls.
 //
+// =====================================================================
+// GATE CONTRACT — READ BEFORE CONSUMING PATTERN OUTPUT
+// =====================================================================
+// The publisher pattern emits per-transition feature booleans. The
+// disposition gate (Section 11 step 3) MUST evaluate each transition
+// against THREE axes per event, not against any single aggregate:
+//
+//   axis 1: is_overlap_window_W3     — recency    (sub-step 2d)
+//   axis 2: is_known_contributor_K10 — historicity (sub-step 2e)
+//   axis 3: prior_tenure_versions    — severity    (sub-step 2c)
+//
+// The 2×2 of (axis 1, axis 2) identifies transition SHAPE:
+//
+//   (true,  true)  — active recurring committee member      ALLOW
+//   (true,  false) — new committee member (first K-1 rel.)  ALLOW
+//   (false, true)  — returning dormant maintainer           ALLOW
+//   (false, false) — cold handoff — disposition depends on axis 3
+//
+// axis 3 (prior_tenure_versions) is the SEVERITY MULTIPLIER for the
+// cold-handoff cell:
+//
+//   (false, false) AND prior_tenure_versions >= HIGH_THRESHOLD
+//     → BLOCK (the attacker shape — e.g., event-stream class)
+//   (false, false) AND prior_tenure_versions small
+//     → WARN (committee churn, not an attack)
+//
+// The 2×2 alone is NOT sufficient for disposition. A transition with
+// (false, false) and prior_tenure=1 is committee churn. The same cell
+// with prior_tenure=147 is a takeover. The gate MUST read prior_tenure
+// on every (false, false) transition.
+//
+// signals.has_overlap_transition exists for DISPLAY ONLY — summary
+// counters in decision logs, metric emission, etc. The gate MUST NOT
+// consume it for disposition logic. Reading the aggregate as a shortcut
+// misclassifies every non-trivial package (one legitimate rotation
+// followed by a takeover will have has_overlap_transition=true).
+// =====================================================================
+//
 // Why this matters (competitive positioning):
 //   Other tools treat every publisher change equally, or ignore the
 //   signal entirely. This module is built around tenure-weighted
@@ -36,7 +74,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 2e — known_contributor detection (K=10)
 //   sub-step 2f — signals aggregation (max_prior_tenure etc.)
 //   sub-step 3  — identity_profile (domain/provider/similarity) + shape
 //   sub-step 4  — calibrate.js (derive K, W from seed) + corpus validation
@@ -59,6 +96,18 @@ import { compareSemver } from './semver.js';
 // test/patterns/publisher.test.js — that is BY DESIGN, the regression
 // alarm that tells a future contributor calibration moved.
 const WINDOW_W = 3;
+
+// Threshold for known_contributor detection (sub-step 2e).
+// "How many prior releases does an incoming identity need to be treated
+// as a known contributor?" K=10 is a defensible starter — above the
+// drive-by range (1–3 patches) but reachable by legitimate committee
+// members within a few months of active participation. Distinguishes
+// returning-dormant-maintainer (ALLOW-biasing) from cold-handoff
+// attacker (BLOCK-biasing when paired with high prior_tenure).
+//
+// Subject to revision in sub-step 4. Changing this constant will flip
+// fixtures L and M — the inclusive >= K boundary guard.
+const WINDOW_K = 10;
 
 function validateInput(input) {
   if (!input || typeof input !== 'object') {
@@ -259,6 +308,58 @@ function extractOverlap(transitions, tenure) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Known-contributor detection — sub-step 2e, K=WINDOW_K.
+//
+// SIGNAL SEMANTICS (read carefully before reasoning about this field):
+//
+//   is_known_contributor_K10 = true
+//     → The incoming identity has published at least K prior versions
+//       across all of observable history (not just the recent window).
+//     → This is HISTORICITY EVIDENCE — orthogonal to recency.
+//     → Bias: ALLOW regardless of overlap. A returning maintainer with
+//       15 prior versions after a multi-year gap is still a known
+//       contributor; the visible gap is a dormancy signal, not a
+//       takeover signal.
+//
+//   is_known_contributor_K10 = false
+//     → The incoming identity is novel at the K threshold.
+//     → Combined with overlap=true: "new committee member" — benign,
+//       first K-1 releases of a legitimate new maintainer.
+//     → Combined with overlap=false: "cold handoff shape" — prerequisite
+//       for escalation but NOT sufficient; disposition depends on the
+//       severity axis (prior_tenure_versions) per the top-of-file
+//       contract.
+//
+// Companion field `prior_contribution_count` is the raw integer count.
+// Emitted alongside the boolean so the gate layer can tier severity
+// (e.g., K-1 looks different from 0) and so calibration in sub-step 4
+// can sweep K against the seed corpus without re-running extract().
+//
+// Why count across ALL prior tenure (not just within W):
+//   The 2×2 matrix's whole purpose is to separate recency (axis 1) from
+//   historicity (axis 2). A W-scoped count would collapse the two back
+//   into one axis — specifically, it would make the cell (false, true)
+//   unreachable, which is the returning-dormant-maintainer shape we
+//   need to distinguish from cold-handoff takeover. That cell is the
+//   product-differentiator; competitors don't publish it.
+//
+// Mutates transition records in place — same pattern as extractOverlap.
+// O(n*m) worst case where n = transitions, m = tenure blocks. Fine for
+// the sizes we process (≤ few-hundred versions per package).
+function extractKnownContributor(transitions, tenure) {
+  for (const t of transitions) {
+    let count = 0;
+    for (let k = 0; k <= t.from_index; k += 1) {
+      if (tenure[k].identity === t.to_identity) {
+        count += tenure[k].version_count;
+      }
+    }
+    t.prior_contribution_count = count;
+    t.is_known_contributor_K10 = count >= WINDOW_K;
+  }
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -273,8 +374,9 @@ export default {
     const tenure = extractTenure(sorted);
     const transitions = extractTransitions(tenure);
     extractOverlap(transitions, tenure);
+    extractKnownContributor(transitions, tenure);
 
-    // Sub-step 2d stops here. identity_profile / shape keep the locked
+    // Sub-step 2e stops here. identity_profile / shape keep the locked
     // contract shape from sub-step 1 and are filled in by step 3.
     // max_prior_tenure remains zero-initialized until sub-step 2f wires
     // the signals-aggregation pass.
