@@ -1478,6 +1478,85 @@ test('invariants: tenure-derived signals are consistent with the tenure array', 
   }
 });
 
+test('signals: determinism — permuted input produces byte-identical signals aggregate', () => {
+  // Closes 2f test coverage with the same determinism guard used for
+  // 2d overlap and 2e known_contributor — permute the input order and
+  // confirm byte-identical output. The 2d test already byte-compares
+  // extract() output wholesale, but this trace is chosen specifically
+  // to populate every Tier 1/2/3 field with a non-trivial value, so a
+  // computation-level drift (in addition to an ordering drift) surfaces
+  // here with named expected values rather than a deep-diff blob.
+  //
+  // Layout — 18 rows across non-uniform timing so Tier 3 temporal
+  // fields have meaningful magnitudes:
+  //   block[0] A(×11) days 0..100 step 10   — 100 DAY_MS span
+  //   block[1] B      day 105                — 5-day gap
+  //   block[2] A      day 110                — cell (T, T) at this transition
+  //   block[3] B      day 115
+  //   block[4] C      day 120
+  //   block[5] D      day 125
+  //   block[6] E      day 130
+  //   block[7] A      day 300                — 170-day dormancy
+  //                                            cell (F, T) — standout return
+  const spec = [];
+  for (let i = 0; i < 11; i += 1) spec.push(['a@x.com', i * 10 * DAY_MS]);
+  spec.push(['b@y.com', 105 * DAY_MS]);
+  spec.push(['a@x.com', 110 * DAY_MS]);
+  spec.push(['b@y.com', 115 * DAY_MS]);
+  spec.push(['c@z.com', 120 * DAY_MS]);
+  spec.push(['d@w.com', 125 * DAY_MS]);
+  spec.push(['e@v.com', 130 * DAY_MS]);
+  spec.push(['a@x.com', 300 * DAY_MS]);
+  const rows = buildRowsAbsolute(spec);
+
+  const forward = publisher.extract({ packageName: 'signals-det', history: rows });
+  const reversed = publisher.extract({
+    packageName: 'signals-det',
+    history: rows.slice().reverse(),
+  });
+  assert.equal(
+    JSON.stringify(forward),
+    JSON.stringify(reversed),
+    'permuted input must produce byte-identical extract() output',
+  );
+
+  // Explicit expected-value anchors — any computation drift in any tier
+  // fails here with a named field, not a JSON diff.
+  assert.deepEqual(
+    {
+      // Tier 1
+      observed: forward.signals.observed_versions_count,
+      identities: forward.signals.unique_identity_count,
+      sufficient: forward.signals.has_sufficient_history,
+      // Tier 2
+      max_prior: forward.signals.max_prior_tenure_versions,
+      max_cold: forward.signals.max_cold_handoff_prior_tenure,
+      cold: forward.signals.cold_handoff_count,
+      new_member: forward.signals.new_committee_member_count,
+      returning: forward.signals.returning_dormant_count,
+      recurring: forward.signals.recurring_member_count,
+      // Tier 3
+      total_ms: forward.signals.total_history_duration_ms,
+      longest_vers: forward.signals.longest_tenure_versions,
+      longest_ms: forward.signals.longest_tenure_duration_ms,
+    },
+    {
+      observed: 18,
+      identities: 5,
+      sufficient: true,
+      max_prior: 11,
+      max_cold: 11,
+      cold: 4,
+      new_member: 1,
+      returning: 1,
+      recurring: 1,
+      total_ms: 300 * DAY_MS,
+      longest_vers: 11,
+      longest_ms: 100 * DAY_MS,
+    },
+  );
+});
+
 test('invariants: has_sufficient_history boundary at MIN_HISTORY_DEPTH=8', () => {
   // The threshold is inclusive >= MIN_HISTORY_DEPTH (currently 8). Pins
   // the boundary so a future constant change or comparator flip (e.g.,
