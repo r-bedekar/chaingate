@@ -157,6 +157,23 @@ test('fixture F: all-degraded history produces empty result without throwing', (
 // produce byte-identical output.
 // ---------------------------------------------------------------------------
 
+test('sort: permutation of input with same ts + same version + different identities is deterministic', () => {
+  // Determinism regression guard: two rows sharing (published_at_ms,
+  // version) but published under different identities must produce the
+  // same tenure regardless of input order. Without the identity tertiary
+  // key, sortRows would fall back on input order and tenure would drift
+  // between calibration runs.
+  const rows = [
+    { version: '1.0.0', publisher_email: 'a@x.com', publisher_name: 'A', published_at_ms: 1000 },
+    { version: '2.0.0', publisher_email: 'a@x.com', publisher_name: 'A', published_at_ms: 2000 },
+    // Same ts AND same version, different identities — the degenerate case.
+    { version: '2.0.0', publisher_email: 'b@y.com', publisher_name: 'B', published_at_ms: 2000 },
+  ];
+  const forward = publisher.extract({ packageName: 'dup-ver', history: rows });
+  const reversed = publisher.extract({ packageName: 'dup-ver', history: rows.slice().reverse() });
+  assert.equal(JSON.stringify(forward), JSON.stringify(reversed));
+});
+
 test('sort: permutation of input produces byte-identical output', () => {
   const rows = [
     { version: '1.0.0', publisher_email: 'a@x.com', publisher_name: 'A', published_at_ms: 1000 },

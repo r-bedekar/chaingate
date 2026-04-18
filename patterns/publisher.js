@@ -84,14 +84,28 @@ function normalizeAndFilter(history) {
 }
 
 // Sort by published_at_ms ascending (primary), breaking ties by semver
-// ascending (secondary). Deliberately NOT semver-first: attackers that
-// backport under old version numbers would exploit semver-sorted tools.
+// ascending (secondary), and finally by identity string (tertiary).
+//
+// Deliberately NOT semver-first: attackers that backport under old
+// version numbers would exploit semver-sorted tools.
+//
+// The identity tertiary key exists because (ts, semver) does NOT uniquely
+// order rows when a version is republished under a different publisher
+// (same ts + same version + different identity → compareSemver === 0).
+// Without a tertiary key, two equivalent inputs in different orders can
+// produce different tenure blocks — a silent determinism hole that
+// surfaces as drift in calibration diffs. Integer-order string compare
+// is locale-independent and cheap.
 function sortRows(rows) {
   return rows.slice().sort((a, b) => {
     if (a.published_at_ms !== b.published_at_ms) {
       return a.published_at_ms < b.published_at_ms ? -1 : 1;
     }
-    return compareSemver(a.version ?? '', b.version ?? '');
+    const semver = compareSemver(a.version ?? '', b.version ?? '');
+    if (semver !== 0) return semver;
+    if (a.identity < b.identity) return -1;
+    if (a.identity > b.identity) return 1;
+    return 0;
   });
 }
 
