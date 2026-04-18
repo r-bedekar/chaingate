@@ -36,7 +36,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 2b — tenure extraction (maximal same-identity runs)
 //   sub-step 2c — transitions with prior_tenure + gap
 //   sub-step 2d — overlap detection (definition (a), W=3)
 //   sub-step 2e — known_contributor detection (K=10)
@@ -61,9 +60,11 @@ function validateInput(input) {
   }
 }
 
-// Normalize + filter: drop rows missing either identity or timestamp.
+// Normalize + filter: drop rows missing identity, timestamp, or version.
 // Return { rows, skipped } where rows are ready for sort and downstream
 // analysis, and skipped counts rows the caller should report in signals.
+// A row without any ONE of (identity, integer timestamp, non-empty string
+// version) is unusable for tenure/transition anchoring — never fabricate.
 function normalizeAndFilter(history) {
   const rows = [];
   let skipped = 0;
@@ -71,15 +72,13 @@ function normalizeAndFilter(history) {
     const identity = normalizeIdentity(raw?.publisher_email, raw?.publisher_name);
     const tsRaw = raw?.published_at_ms;
     const ts = Number.isInteger(tsRaw) ? tsRaw : null;
-    if (!identity || ts === null) {
+    const version =
+      typeof raw?.version === 'string' && raw.version.length > 0 ? raw.version : null;
+    if (!identity || ts === null || !version) {
       skipped += 1;
       continue;
     }
-    rows.push({
-      version: typeof raw?.version === 'string' ? raw.version : null,
-      identity,
-      published_at_ms: ts,
-    });
+    rows.push({ version, identity, published_at_ms: ts });
   }
   return { rows, skipped };
 }
@@ -96,6 +95,46 @@ function sortRows(rows) {
   });
 }
 
+// Extract tenure blocks: maximal runs of consecutive versions by the same
+// identity in the sorted sequence. Returns [] for empty input. Each block
+// carries first/last version + timestamp and a count so downstream
+// transition/signals logic can compute prior_tenure without re-scanning.
+//
+// Determinism note: duration_ms is last_ts - first_ts (integer arithmetic
+// only). A single-version block has duration_ms = 0 — not "undefined" or
+// "null" — so consumers can treat tenure as a dense numeric column.
+//
+// Degraded rows (nulls) are filtered in normalizeAndFilter BEFORE sort,
+// so a run like [A, A, A, (null), A, A] collapses into one A-block of 5,
+// not two blocks split around the null. This is deliberate: a missing
+// row is an observability gap, not a tenure event.
+function extractTenure(sortedRows) {
+  const tenure = [];
+  if (sortedRows.length === 0) return tenure;
+  let current = null;
+  for (const row of sortedRows) {
+    if (current === null || row.identity !== current.identity) {
+      if (current !== null) tenure.push(current);
+      current = {
+        identity: row.identity,
+        version_count: 1,
+        first_version: row.version,
+        last_version: row.version,
+        first_published_at_ms: row.published_at_ms,
+        last_published_at_ms: row.published_at_ms,
+        duration_ms: 0,
+      };
+    } else {
+      current.version_count += 1;
+      current.last_version = row.version;
+      current.last_published_at_ms = row.published_at_ms;
+      current.duration_ms = row.published_at_ms - current.first_published_at_ms;
+    }
+  }
+  tenure.push(current);
+  return tenure;
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -106,12 +145,14 @@ export default {
     const { rows, skipped } = normalizeAndFilter(input.history);
     // Sort runs even when rows is empty — keeps behaviour uniform and
     // guarantees downstream sub-steps can assume sorted input.
-    const _sorted = sortRows(rows);
+    const sorted = sortRows(rows);
+    const tenure = extractTenure(sorted);
 
-    // Sub-step 2a stops here. Tenure/transitions fields keep the locked
-    // contract shape from sub-step 1 and will be populated in 2b–2f.
+    // Sub-step 2b stops here. Transitions / identity_profile / shape
+    // keep the locked contract shape from sub-step 1 and are filled in
+    // by sub-steps 2c–2f and step 3.
     return {
-      tenure: [],
+      tenure,
       transitions: [],
       identity_profile: {},
       shape: 'unknown',
