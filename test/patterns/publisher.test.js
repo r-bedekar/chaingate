@@ -1340,3 +1340,170 @@ test('fixture empty: no history → every signal is a defined zero / false', () 
   assert.equal(out.signals.longest_tenure_versions, 0);
   assert.equal(out.signals.longest_tenure_duration_ms, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2f: invariants
+//
+// Properties that MUST hold on any input. Each is a one-line regression
+// pin: any future change that breaks structural consistency fails here
+// with a specific invariant identification, not a deep assertion diff in
+// a fixture test. Swept across a small omnibus matrix — empty, thin
+// history, solo tenure, committee rotation, full-coverage fixture P —
+// so the invariants cover every shape in the design at once.
+// ---------------------------------------------------------------------------
+
+test('invariants: 2×2 cell histogram partitions transitions with no remainder', () => {
+  // The four cell counts are mutually exclusive and collectively
+  // exhaustive — every transition belongs to exactly one cell. If a
+  // future change adds a third axis without updating the histogram
+  // dispatch, this invariant fails loudly. Load-bearing for the gate's
+  // shortcut path: shortcutting on max_cold_handoff_prior_tenure is
+  // only safe if cold_handoff_count is an exact count, not a subset.
+  const cases = [
+    { name: 'empty',      rows: [] },
+    { name: 'thin-solo',  rows: buildRows([['a@x.com', 3]]) },
+    { name: 'solo-deep',  rows: buildRows([['a@x.com', 50]]) },
+    { name: 'committee',  rows: buildRows([
+      ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+      ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+      ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ]) },
+    { name: 'event-stream', rows: buildRows([
+      ['dominictarr@example.com', 27],
+      ['right9ctrl@example.com', 3],
+    ]) },
+    { name: 'fixture-P',  rows: buildRows([
+      ['a@x.com', 11], ['b@y.com', 1], ['a@x.com', 1], ['b@y.com', 1],
+      ['c@z.com', 1],  ['d@w.com', 1], ['e@v.com', 1], ['a@x.com', 1],
+    ]) },
+  ];
+  for (const { name, rows } of cases) {
+    const out = publisher.extract({ packageName: name, history: rows });
+    const sum =
+      out.signals.cold_handoff_count +
+      out.signals.new_committee_member_count +
+      out.signals.returning_dormant_count +
+      out.signals.recurring_member_count;
+    assert.equal(
+      sum,
+      out.signals.transition_count,
+      `${name}: cell histogram sum must equal transition_count (got ${sum} vs ${out.signals.transition_count})`,
+    );
+    assert.equal(
+      sum,
+      out.transitions.length,
+      `${name}: cell histogram sum must equal transitions array length`,
+    );
+  }
+});
+
+test('invariants: max_cold_handoff_prior_tenure <= max_prior_tenure_versions', () => {
+  // (F,F) is a subset of all transitions, so the (F,F)-filtered max
+  // can never exceed the unfiltered max. A regression that flipped the
+  // filter (e.g., computing max over the WRONG cell) would trip here
+  // immediately. Also pins the zero-case invariant: when
+  // cold_handoff_count=0, max_cold_handoff_prior_tenure MUST be 0.
+  const cases = [
+    buildRows([]),
+    buildRows([['a@x.com', 5]]),
+    buildRows([['a@x.com', 10], ['b@y.com', 1], ['a@x.com', 1]]),  // (T,T) return
+    buildRows([['a@x.com', 27], ['b@y.com', 3]]),                   // (F,F) cold
+    buildRows([
+      ['a@x.com', 11], ['b@y.com', 1], ['a@x.com', 1], ['b@y.com', 1],
+      ['c@z.com', 1],  ['d@w.com', 1], ['e@v.com', 1], ['a@x.com', 1],
+    ]),
+  ];
+  for (const rows of cases) {
+    const out = publisher.extract({ packageName: 'inv-max', history: rows });
+    assert.ok(
+      out.signals.max_cold_handoff_prior_tenure <= out.signals.max_prior_tenure_versions,
+      `subset max must not exceed total max: cold=${out.signals.max_cold_handoff_prior_tenure}, all=${out.signals.max_prior_tenure_versions}`,
+    );
+    if (out.signals.cold_handoff_count === 0) {
+      assert.equal(
+        out.signals.max_cold_handoff_prior_tenure,
+        0,
+        'zero-semantics: no (F,F) transitions ⇒ max_cold_handoff_prior_tenure must be 0',
+      );
+    }
+  }
+});
+
+test('invariants: tenure-derived signals are consistent with the tenure array', () => {
+  // - observed_versions_count equals the sum of tenure block version_counts
+  //   (normalizeAndFilter-survivors partition into blocks with no remainder)
+  // - unique_identity_count <= tenure.length (re-appearance collapses
+  //   distinct blocks to fewer distinct identities, never more)
+  // - longest_tenure_versions >= 1 whenever tenure.length > 0
+  //   (a tenure block's minimum version_count is 1 by construction)
+  // - total_history_duration_ms >= longest_tenure_duration_ms
+  //   (total spans first block's first ts to last block's last ts,
+  //    which covers any single block's internal span)
+  const cases = [
+    { name: 'empty',      rows: [] },
+    { name: 'solo-1',     rows: buildRows([['a@x.com', 1]]) },
+    { name: 'solo-deep',  rows: buildRows([['a@x.com', 50]]) },
+    { name: 'aba',        rows: buildRows([['a@x.com', 2], ['b@y.com', 1], ['a@x.com', 3]]) },
+    { name: 'fixture-P',  rows: buildRows([
+      ['a@x.com', 11], ['b@y.com', 1], ['a@x.com', 1], ['b@y.com', 1],
+      ['c@z.com', 1],  ['d@w.com', 1], ['e@v.com', 1], ['a@x.com', 1],
+    ]) },
+  ];
+  for (const { name, rows } of cases) {
+    const out = publisher.extract({ packageName: name, history: rows });
+    const tenureSum = out.tenure.reduce((acc, b) => acc + b.version_count, 0);
+    assert.equal(
+      tenureSum,
+      out.signals.observed_versions_count,
+      `${name}: tenure version_counts must sum to observed_versions_count`,
+    );
+    assert.ok(
+      out.signals.unique_identity_count <= out.tenure.length,
+      `${name}: unique identities (${out.signals.unique_identity_count}) cannot exceed tenure block count (${out.tenure.length})`,
+    );
+    if (out.tenure.length > 0) {
+      assert.ok(
+        out.signals.longest_tenure_versions >= 1,
+        `${name}: non-empty tenure must have longest_tenure_versions >= 1`,
+      );
+      assert.ok(
+        out.signals.unique_identity_count >= 1,
+        `${name}: non-empty tenure must have at least one unique identity`,
+      );
+    }
+    assert.ok(
+      out.signals.total_history_duration_ms >= out.signals.longest_tenure_duration_ms,
+      `${name}: total_history_duration_ms (${out.signals.total_history_duration_ms}) must cover longest_tenure_duration_ms (${out.signals.longest_tenure_duration_ms})`,
+    );
+  }
+});
+
+test('invariants: has_sufficient_history boundary at MIN_HISTORY_DEPTH=8', () => {
+  // The threshold is inclusive >= MIN_HISTORY_DEPTH (currently 8). Pins
+  // the boundary so a future constant change or comparator flip (e.g.,
+  // `>` instead of `>=`) breaks a test rather than silently moving the
+  // first-seen poisoning protection.
+  const at7 = publisher.extract({
+    packageName: 'boundary-7',
+    history: buildRows([['a@x.com', 7]]),
+  });
+  assert.equal(at7.signals.observed_versions_count, 7);
+  assert.equal(at7.signals.has_sufficient_history, false);
+
+  const at8 = publisher.extract({
+    packageName: 'boundary-8',
+    history: buildRows([['a@x.com', 8]]),
+  });
+  assert.equal(at8.signals.observed_versions_count, 8);
+  assert.equal(
+    at8.signals.has_sufficient_history,
+    true,
+    'observed=8 must satisfy the inclusive >= threshold',
+  );
+
+  const at9 = publisher.extract({
+    packageName: 'boundary-9',
+    history: buildRows([['a@x.com', 9]]),
+  });
+  assert.equal(at9.signals.has_sufficient_history, true);
+});
