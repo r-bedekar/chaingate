@@ -83,7 +83,7 @@ test('publisher.extract: empty history yields zero skipped, empty tenure/transit
   const out = publisher.extract({ packageName: 'axios', history: [] });
   assert.equal(out.signals.skipped_versions_count, 0);
   assert.equal(out.signals.transition_count, 0);
-  assert.equal(out.signals.max_prior_tenure, 0);
+  assert.equal(out.signals.max_prior_tenure_versions, 0);
   assert.equal(out.signals.has_overlap_transition, false);
   assert.deepEqual(out.tenure, []);
   assert.deepEqual(out.transitions, []);

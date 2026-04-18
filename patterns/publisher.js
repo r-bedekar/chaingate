@@ -15,6 +15,23 @@
 //   axis 2: is_known_contributor_K10 — historicity (sub-step 2e)
 //   axis 3: prior_tenure_versions    — severity    (sub-step 2c)
 //
+// SUFFICIENCY AXIS (sub-step 2f — cross-cuts the three axes above).
+//   Before applying any of the three axes, the gate MUST check:
+//
+//     signals.has_sufficient_history
+//
+//   When false, the gate MUST short-circuit to ALLOW with an
+//   "insufficient history" detail. Every downstream signal above is
+//   mathematically well-defined on thin history but NOT statistically
+//   meaningful. Applying K=10 against a package with 3 visible versions
+//   would misclassify every first contribution as a cold handoff.
+//
+//   has_sufficient_history is observed_versions_count >=
+//   MIN_HISTORY_DEPTH (constants.js — currently 8). Same threshold the
+//   gate runner uses for V1 first-seen poisoning protection; the
+//   pattern emits the verdict so the gate can short-circuit without
+//   re-deriving it.
+//
 // The 2×2 of (axis 1, axis 2) identifies transition SHAPE:
 //
 //   (true,  true)  — active recurring committee member      ALLOW
@@ -80,6 +97,7 @@
 //   sub-step 5  — cross-package campaign detection (STRETCH)
 //   step 3      — V2 publisher-identity gate wiring
 
+import { MIN_HISTORY_DEPTH } from '../constants.js';
 import { normalizeIdentity } from './identity.js';
 import { compareSemver } from './semver.js';
 
@@ -360,6 +378,86 @@ function extractKnownContributor(transitions, tenure) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Signals aggregation — sub-step 2f.
+//
+// Collapses per-transition detail into package-level aggregates, in three
+// tiers, so the gate can answer disposition questions cheaply without
+// re-scanning `transitions[]`:
+//
+//   Tier 1 — sufficiency (populated below, step 2 of 2f)
+//     observed_versions_count   — valid rows that survived normalizeAndFilter
+//     unique_identity_count     — distinct identities across tenure blocks
+//     has_sufficient_history    — observed >= MIN_HISTORY_DEPTH (constants.js)
+//
+//   Tier 2 — severity extrema + 2×2 cell histogram (step 3 of 2f)
+//     max_prior_tenure_versions, max_cold_handoff_prior_tenure,
+//     cold_handoff_count, new_committee_member_count,
+//     returning_dormant_count, recurring_member_count
+//
+//   Tier 3 — temporal summary (step 4 of 2f)
+//     total_history_duration_ms, longest_tenure_versions,
+//     longest_tenure_duration_ms
+//
+// The signals object is ALWAYS a complete numeric record — every field
+// defined as an integer/boolean zero-state when no data is present.
+// Consumers can read fields unconditionally without `?? 0` guards; this
+// is the load-bearing contract that makes the gate's short-circuit path
+// simple and inspection-friendly.
+//
+// Temporal-field caveat (risk #4 decision): normalizeAndFilter drops
+// degraded rows BEFORE tenure runs, so total_history_duration_ms and
+// longest_tenure_duration_ms reflect the span of OBSERVED rows only.
+// A history like [A@day-0, A@day-1000, (null-row at day-500)] reports
+// duration = 1000 * DAY_MS — no gap-filling, no interpolation. Missing
+// rows are observability gaps, not tenure events.
+function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
+  // --- Tier 1: sufficiency ---
+  const observedVersionsCount = rows.length;
+  const identitySet = new Set();
+  for (const block of tenure) identitySet.add(block.identity);
+  const uniqueIdentityCount = identitySet.size;
+  const hasSufficientHistory = observedVersionsCount >= MIN_HISTORY_DEPTH;
+
+  // --- Tier 2/3: zero-initialized; populated by steps 3 and 4 of 2f.
+  // Kept inline (not a separate stub module) so the single source of
+  // truth for the signals shape lives in exactly one place.
+
+  return {
+    // Tier 1
+    observed_versions_count: observedVersionsCount,
+    unique_identity_count: uniqueIdentityCount,
+    has_sufficient_history: hasSufficientHistory,
+
+    // Tier 2 — placeholders, step 3 of 2f will populate.
+    max_prior_tenure_versions: 0,
+    max_cold_handoff_prior_tenure: 0,
+    cold_handoff_count: 0,
+    new_committee_member_count: 0,
+    returning_dormant_count: 0,
+    recurring_member_count: 0,
+
+    // Tier 3 — placeholders, step 4 of 2f will populate.
+    total_history_duration_ms: 0,
+    longest_tenure_versions: 0,
+    longest_tenure_duration_ms: 0,
+
+    // Pre-2f signals kept: these predate the tiered aggregation and are
+    // still referenced by tests / future wiring.
+    transition_count: transitions.length,
+    skipped_versions_count: skippedVersionsCount,
+    // GATE CONTRACT — READ BEFORE USING THIS AGGREGATE.
+    //
+    // has_overlap_transition is the OR of is_overlap_window_W3 across
+    // all transitions. It answers "did ANY transition look like
+    // committee rotation?" — nothing more. The gate MUST NOT shortcut
+    // to ALLOW on this aggregate alone: a package with one legitimate
+    // rotation followed by a cold-handoff takeover will have it set
+    // to true. Use the 2×2 cell histogram (Tier 2) for disposition.
+    has_overlap_transition: transitions.some((t) => t.is_overlap_window_W3),
+  };
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -375,36 +473,18 @@ export default {
     const transitions = extractTransitions(tenure);
     extractOverlap(transitions, tenure);
     extractKnownContributor(transitions, tenure);
+    const signals = extractSignals(sorted, tenure, transitions, skipped);
 
-    // Sub-step 2e stops here. identity_profile / shape keep the locked
-    // contract shape from sub-step 1 and are filled in by step 3.
-    // max_prior_tenure remains zero-initialized until sub-step 2f wires
-    // the signals-aggregation pass.
+    // Sub-step 2f step 2 (Tier 1) lands here. identity_profile / shape
+    // keep the locked contract shape from sub-step 1 and are filled in
+    // by step 3. Tier 2 (severity extrema + 2×2 cell histogram) lands
+    // in step 3 of 2f; Tier 3 (temporal summary) in step 4 of 2f.
     return {
       tenure,
       transitions,
       identity_profile: {},
       shape: 'unknown',
-      signals: {
-        transition_count: transitions.length,
-        max_prior_tenure: 0,
-        // GATE CONTRACT — READ BEFORE USING THIS AGGREGATE.
-        //
-        // has_overlap_transition is the OR of is_overlap_window_W3
-        // across all transitions. It answers "did ANY transition look
-        // like committee rotation?" — nothing more.
-        //
-        // A package with one legitimate committee rotation followed by
-        // a cold-handoff takeover will have has_overlap_transition=true.
-        // The gate MUST NOT shortcut to ALLOW on this aggregate alone.
-        //
-        // Correct gate read: iterate `transitions[]` and evaluate each
-        // transition independently (overlap + prior_tenure + gap). The
-        // aggregate exists only for cheap summary queries where per-
-        // transition detail is already being inspected elsewhere.
-        has_overlap_transition: transitions.some((t) => t.is_overlap_window_W3),
-        skipped_versions_count: skipped,
-      },
+      signals,
     };
   },
 };
