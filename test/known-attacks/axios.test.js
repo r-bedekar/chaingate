@@ -1,10 +1,17 @@
-// P5.9 — Axios attack validation (flagship test)
+// Axios attack validation (flagship test)
 //
 // Simulates the Axios 1.14.1 supply chain attack (2026-03-31): a phantom
 // dependency (plain-crypto-js), publisher email change, OIDC provenance
 // dropped, and install scripts added. ChainGate fires 4 gates simultaneously:
 // dep-structure WARN, publisher-identity WARN, provenance-continuity WARN,
-// scope-boundary BLOCK. Overall disposition: BLOCK.
+// scope-boundary WARN (V2-demoted from BLOCK). Overall disposition: WARN.
+//
+// V2 foundation note (Section 7 item 1 of docs/V2_DESIGN.md): during the
+// V2 dev window only content-hash can BLOCK. The four advisory signals
+// are all observed and persisted to gate_decisions, but the packument is
+// NOT rewritten and the tarball is NOT refused. V2 pattern-aware gates
+// will restore BLOCK on this fixture once they can distinguish attack-
+// shape from legitimate-evolution-shape without cry-wolfing.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -152,7 +159,7 @@ const packumentBody = buildPackument();
 // Tests
 // ---------------------------------------------------------------------------
 
-test('axios attack: 3 WARN + 1 BLOCK from scope-boundary', async (t) => {
+test('axios attack: 4 WARN signals observed, no BLOCK (V1 post-demotion)', async (t) => {
   const { path: dbPath, cleanup } = tmpDbPath();
 
   const upstream = await startFakeUpstream((req, res) => {
@@ -190,34 +197,35 @@ test('axios attack: 3 WARN + 1 BLOCK from scope-boundary', async (t) => {
     proxy.server.depCache.recordOk('plain-crypto-js', hoursAgo(6));
 
     // -- Observation 2: full history available → gates fire on 1.14.1 --
-    await t.test('second observation: 1.14.1 BLOCKED, stripped from packument', async () => {
+    await t.test('second observation: 1.14.1 observed as WARN, NOT stripped', async () => {
       const resp = await undiciRequest(`${proxy.url}/axios`);
       assert.equal(resp.statusCode, 200);
       const parsed = JSON.parse(await resp.body.text());
 
-      // 1.14.1 blocked: stripped from response
-      assert.ok(!('1.14.1' in parsed.versions), '1.14.1 should be stripped (BLOCK)');
+      // V1 post-demotion: WARN does not strip versions from the packument.
+      // 1.14.1 stays visible to npm — advisory only.
+      assert.ok('1.14.1' in parsed.versions, '1.14.1 stays in packument (WARN, not BLOCK)');
 
       // Clean versions still present
       for (const v of CLEAN_VERSIONS) {
         assert.ok(v in parsed.versions, `${v} should remain in packument`);
       }
 
-      // dist-tags.latest downgraded from 1.14.1 to 1.14.0
-      assert.equal(parsed['dist-tags'].latest, '1.14.0');
+      // dist-tags.latest NOT downgraded (nothing blocked)
+      assert.equal(parsed['dist-tags'].latest, '1.14.1');
     });
 
-    await t.test('gate_decisions for 1.14.1: BLOCK with 4 gates firing', async () => {
+    await t.test('gate_decisions for 1.14.1: WARN with 4 gates firing WARN', async () => {
       const decision = proxy.server.witnessDb.getLatestDecision('axios', '1.14.1');
-      assert.equal(decision.disposition, 'BLOCK');
+      assert.equal(decision.disposition, 'WARN',
+        'V1 post-demotion: 4 WARNs do not escalate to BLOCK');
 
-      // Build a map of gate name → result for easy assertions
       const gateMap = {};
       for (const g of decision.gates_fired) {
         gateMap[g.gate] = g;
       }
 
-      // content-hash: SKIP (re-observation with same hash as baseline)
+      // content-hash: ALLOW (same hash as recorded baseline from obs 1)
       assert.ok(gateMap['content-hash'], 'content-hash gate should be present');
       assert.equal(gateMap['content-hash'].result, 'ALLOW',
         'content-hash should ALLOW (same hash as recorded baseline)');
@@ -240,9 +248,10 @@ test('axios attack: 3 WARN + 1 BLOCK from scope-boundary', async (t) => {
       assert.ok(gateMap['release-age'], 'release-age gate should be present');
       assert.equal(gateMap['release-age'].result, 'ALLOW');
 
-      // scope-boundary: BLOCK (new dep + install scripts + dep < 24h old)
+      // scope-boundary: WARN (V2-demoted from BLOCK; detail still names the fresh dep)
       assert.ok(gateMap['scope-boundary'], 'scope-boundary gate should be present');
-      assert.equal(gateMap['scope-boundary'].result, 'BLOCK');
+      assert.equal(gateMap['scope-boundary'].result, 'WARN',
+        'V2 foundation: scope-boundary BLOCK demoted to WARN');
       assert.match(gateMap['scope-boundary'].detail, /plain-crypto-js/);
     });
 
@@ -250,21 +259,16 @@ test('axios attack: 3 WARN + 1 BLOCK from scope-boundary', async (t) => {
       const decision = proxy.server.witnessDb.getLatestDecision('axios', '1.14.0');
       assert.ok(decision, 'decision should exist for 1.14.0');
       // On re-observation, 1.14.0's "latest prior" by publish_at is 1.14.1
-      // (the attack version), so publisher-identity fires WARN — this is
-      // correct: the gate is history-driven and the newest version in history
-      // has a different publisher. Overall disposition stays WARN (not BLOCK).
+      // (the attack version), so publisher-identity fires WARN.
       assert.notEqual(decision.disposition, 'BLOCK',
         '1.14.0 should not be BLOCK (it has no attack signals of its own)');
     });
 
-    await t.test('tarball for 1.14.1 → 403 blocked_by_chaingate', async () => {
+    await t.test('tarball for 1.14.1 → 200 (V1 post-demotion: WARN does not refuse)', async () => {
       const resp = await undiciRequest(`${proxy.url}/axios/-/axios-1.14.1.tgz`);
-      assert.equal(resp.statusCode, 403);
-      const body = JSON.parse(await resp.body.text());
-      assert.equal(body.error, 'blocked_by_chaingate');
-      assert.equal(body.package, 'axios');
-      assert.equal(body.version, '1.14.1');
-      assert.match(body.how_to_override, /chaingate allow axios@1\.14\.1/);
+      assert.equal(resp.statusCode, 200,
+        'WARN dispositions do not trigger tarball gate; only BLOCK does');
+      await resp.body.text(); // drain
     });
 
     await t.test('tarball for clean 1.14.0 → 200', async () => {

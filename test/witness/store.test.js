@@ -291,9 +291,12 @@ test('runner flips ALLOW→BLOCK on second observation → new BLOCK decision ro
   try {
     const db = openWitnessDB(path);
     let mode = 'ALLOW';
+    // Named `content-hash` so it's exempt from the first-seen poisoning-
+    // protection depth gate (only content-hash can BLOCK in V1 anyway, so
+    // this matches the real architectural rule).
     const toggleMod = {
-      name: 'toggle',
-      evaluate: () => ({ result: mode, detail: `mode=${mode}` }),
+      name: 'content-hash',
+      evaluate: () => ({ gate: 'content-hash', result: mode, detail: `mode=${mode}` }),
     };
     const runGates = createGateRunner({ modules: [toggleMod] });
     const w = createWitness({ db, runGates, config: {} });

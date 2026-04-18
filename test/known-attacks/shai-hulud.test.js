@@ -93,39 +93,43 @@ function makePackument(name, basename, versions) {
   return JSON.stringify({ name, 'dist-tags': { latest }, versions: versionsObj, time });
 }
 
+// 8 legit priors + 1 compromised — satisfies MIN_HISTORY_DEPTH=8 poisoning
+// protection so publisher-identity can actually evaluate on the attack version.
+function buildVersions(baseMinor, legitCount = 8) {
+  const out = [];
+  for (let i = 0; i < legitCount; i += 1) {
+    out.push({
+      ver: `${baseMinor}.${i}.0`,
+      email: LEGIT_EMAIL,
+      time: hoursAgo(2400 - i * 250),
+    });
+  }
+  out.push({
+    ver: `${baseMinor}.${legitCount}.0`,
+    email: COMPROMISED_EMAIL,
+    time: hoursAgo(96),
+  });
+  return out;
+}
+
 const PACKAGES = [
   {
     name: 'colors-test',
     basename: 'colors-test',
-    versions: [
-      { ver: '1.0.0', email: LEGIT_EMAIL, time: hoursAgo(2400) },
-      { ver: '1.1.0', email: LEGIT_EMAIL, time: hoursAgo(1200) },
-      { ver: '1.2.0', email: LEGIT_EMAIL, time: hoursAgo(600) },
-      { ver: '1.3.0', email: COMPROMISED_EMAIL, time: hoursAgo(96) },
-    ],
-    attackVersion: '1.3.0',
+    versions: buildVersions('1'),
+    attackVersion: '1.8.0',
   },
   {
     name: 'faker-test',
     basename: 'faker-test',
-    versions: [
-      { ver: '5.0.0', email: LEGIT_EMAIL, time: hoursAgo(2000) },
-      { ver: '5.1.0', email: LEGIT_EMAIL, time: hoursAgo(1000) },
-      { ver: '5.2.0', email: LEGIT_EMAIL, time: hoursAgo(500) },
-      { ver: '5.3.0', email: COMPROMISED_EMAIL, time: hoursAgo(96) },
-    ],
-    attackVersion: '5.3.0',
+    versions: buildVersions('5'),
+    attackVersion: '5.8.0',
   },
   {
     name: 'ua-parser-test',
     basename: 'ua-parser-test',
-    versions: [
-      { ver: '0.7.0', email: LEGIT_EMAIL, time: hoursAgo(1800) },
-      { ver: '0.7.1', email: LEGIT_EMAIL, time: hoursAgo(900) },
-      { ver: '0.7.2', email: LEGIT_EMAIL, time: hoursAgo(400) },
-      { ver: '0.7.3', email: COMPROMISED_EMAIL, time: hoursAgo(96) },
-    ],
-    attackVersion: '0.7.3',
+    versions: buildVersions('7'),
+    attackVersion: '7.8.0',
   },
 ];
 

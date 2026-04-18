@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createGateRunner, DEFAULT_GATE_MODULES } from '../../gates/index.js';
+import { createGateRunner, DEFAULT_GATE_MODULES, MIN_HISTORY_DEPTH } from '../../gates/index.js';
+
+// Minimal prior-version history that satisfies the first-seen
+// poisoning-protection threshold. Aggregation tests use this by default so
+// they exercise the dispositions they're trying to test, not the depth gate.
+function sufficientHistory(n = MIN_HISTORY_DEPTH) {
+  const out = [];
+  for (let i = 0; i < n; i += 1) out.push({ version: `0.${i}.0` });
+  return out;
+}
 
 function input(overrides = {}) {
   return {
@@ -10,7 +19,7 @@ function input(overrides = {}) {
     version: '1.7.9',
     incoming: {},
     baseline: null,
-    history: [],
+    history: sufficientHistory(),
     config: {},
     ...overrides,
   };
@@ -51,22 +60,17 @@ test('one BLOCK module → BLOCK', () => {
   assert.equal(run(input()).disposition, 'BLOCK');
 });
 
-test('one WARN module → WARN (below threshold 4)', () => {
+test('one WARN module → WARN', () => {
   const run = createGateRunner({ modules: [mod('g1', 'WARN')], logger: silentLogger });
   assert.equal(run(input()).disposition, 'WARN');
 });
 
-test('4 WARN modules → BLOCK (escalated at default threshold)', () => {
+test('many WARN modules → WARN (V2 foundation: no N-warn escalation)', () => {
   const run = createGateRunner({
-    modules: [mod('a', 'WARN'), mod('b', 'WARN'), mod('c', 'WARN'), mod('d', 'WARN')],
-    logger: silentLogger,
-  });
-  assert.equal(run(input()).disposition, 'BLOCK');
-});
-
-test('3 WARN modules → WARN (still below threshold 4)', () => {
-  const run = createGateRunner({
-    modules: [mod('a', 'WARN'), mod('b', 'WARN'), mod('c', 'WARN')],
+    modules: [
+      mod('a', 'WARN'), mod('b', 'WARN'), mod('c', 'WARN'),
+      mod('d', 'WARN'), mod('e', 'WARN'), mod('f', 'WARN'),
+    ],
     logger: silentLogger,
   });
   assert.equal(run(input()).disposition, 'WARN');
@@ -152,15 +156,6 @@ test('result ordering preserves module insertion order', () => {
   assert.deepEqual(out.results.map((r) => r.gate), ['first', 'second', 'third']);
 });
 
-test('config.warnEscalationThreshold overrides default', () => {
-  const run = createGateRunner({
-    modules: [mod('a', 'WARN'), mod('b', 'WARN')],
-    logger: silentLogger,
-  });
-  assert.equal(run(input({ config: { warnEscalationThreshold: 2 } })).disposition, 'BLOCK');
-  assert.equal(run(input({ config: { warnEscalationThreshold: 3 } })).disposition, 'WARN');
-});
-
 test('getOverride not provided → runner works, never short-circuits', () => {
   const run = createGateRunner({ modules: [mod('a', 'BLOCK')], logger: silentLogger });
   assert.equal(run(input()).disposition, 'BLOCK');
@@ -180,4 +175,68 @@ test('getOverride throws → caught, gates still run', () => {
 
 test('createGateRunner: non-array modules → throws', () => {
   assert.throws(() => createGateRunner({ modules: 'nope' }), /modules must be an array/);
+});
+
+// -------------------------------------------------------------------------
+// First-seen baseline poisoning protection (V2 foundation, Section 7 item 4)
+// -------------------------------------------------------------------------
+
+test('MIN_HISTORY_DEPTH is exported and >= 8', () => {
+  assert.ok(Number.isInteger(MIN_HISTORY_DEPTH));
+  assert.ok(MIN_HISTORY_DEPTH >= 8);
+});
+
+test('insufficient history → non-content-hash gates SKIP with poisoning-protection detail', () => {
+  const run = createGateRunner({
+    modules: [mod('dep-structure', 'BLOCK', 'would block'), mod('content-hash', 'ALLOW')],
+    logger: silentLogger,
+  });
+  const out = run(input({ history: [{ version: '0.0.1' }] }));
+  const byGate = Object.fromEntries(out.results.map((r) => [r.gate, r]));
+  assert.equal(byGate['dep-structure'].result, 'SKIP');
+  assert.match(byGate['dep-structure'].detail, /insufficient history/);
+  assert.match(byGate['dep-structure'].detail, /poisoning/);
+  // content-hash is exempt from depth gating.
+  assert.equal(byGate['content-hash'].result, 'ALLOW');
+  // Any BLOCK that would have fired is suppressed → ALLOW overall.
+  assert.equal(out.disposition, 'ALLOW');
+});
+
+test('insufficient history: empty history → all non-exempt gates SKIP', () => {
+  const run = createGateRunner({
+    modules: [mod('a', 'WARN'), mod('b', 'BLOCK'), mod('content-hash', 'BLOCK', 'hash differs')],
+    logger: silentLogger,
+  });
+  const out = run(input({ history: [] }));
+  const byGate = Object.fromEntries(out.results.map((r) => [r.gate, r]));
+  assert.equal(byGate['a'].result, 'SKIP');
+  assert.equal(byGate['b'].result, 'SKIP');
+  // content-hash still runs.
+  assert.equal(byGate['content-hash'].result, 'BLOCK');
+  assert.equal(out.disposition, 'BLOCK');
+});
+
+test('exactly MIN_HISTORY_DEPTH priors → gates run normally', () => {
+  const run = createGateRunner({
+    modules: [mod('g', 'WARN', 'real finding')],
+    logger: silentLogger,
+  });
+  const out = run(input({ history: sufficientHistory(MIN_HISTORY_DEPTH) }));
+  assert.equal(out.results[0].result, 'WARN');
+  assert.equal(out.results[0].detail, 'real finding');
+  assert.equal(out.disposition, 'WARN');
+});
+
+test('current version in history does not count toward depth', () => {
+  // MIN_HISTORY_DEPTH entries total, but one of them is the version being
+  // evaluated — effective prior count is MIN_HISTORY_DEPTH-1 → SKIP.
+  const hist = sufficientHistory(MIN_HISTORY_DEPTH - 1);
+  hist.push({ version: '1.7.9' }); // same as input.version
+  const run = createGateRunner({
+    modules: [mod('g', 'BLOCK', 'would block')],
+    logger: silentLogger,
+  });
+  const out = run(input({ version: '1.7.9', history: hist }));
+  assert.equal(out.results[0].result, 'SKIP');
+  assert.match(out.results[0].detail, /insufficient history/);
 });

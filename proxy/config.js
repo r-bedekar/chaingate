@@ -8,7 +8,6 @@ const DEFAULTS = {
   headersTimeoutMs: 10_000,
   bodyTimeoutMs: 30_000,
   witnessDbPath: join(homedir(), '.chaingate', 'witness.db'),
-  warnEscalationThreshold: 4,
   releaseAgeHours: 72,
 };
 
@@ -37,11 +36,6 @@ export function loadConfig(env = process.env, overrides = {}) {
       DEFAULTS.bodyTimeoutMs,
     ),
     witnessDbPath: env.CHAINGATE_WITNESS_DB ?? DEFAULTS.witnessDbPath,
-    warnEscalationThreshold: toInt(
-      'CHAINGATE_WARN_ESCALATION_THRESHOLD',
-      env.CHAINGATE_WARN_ESCALATION_THRESHOLD,
-      DEFAULTS.warnEscalationThreshold,
-    ),
     releaseAgeHours: toInt(
       'CHAINGATE_RELEASE_AGE_HOURS',
       env.CHAINGATE_RELEASE_AGE_HOURS,

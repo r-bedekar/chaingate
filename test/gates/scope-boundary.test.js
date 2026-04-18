@@ -105,7 +105,7 @@ test('new dep + install scripts + warm cache, dep age > 24h → WARN', () => {
   assert.match(r.detail, /none freshly published/);
 });
 
-test('new dep + install scripts + warm cache, dep age < 24h → BLOCK', () => {
+test('new dep + install scripts + warm cache, dep age < 24h → WARN (V2-demoted from BLOCK)', () => {
   const svc = makeServices({
     cache: { 'plain-crypto-js': { status: 'ok', first_publish: hoursAgo(3) } },
   });
@@ -114,7 +114,7 @@ test('new dep + install scripts + warm cache, dep age < 24h → BLOCK', () => {
     incoming: v('1.7.9', { a: '1.0.0', 'plain-crypto-js': '1.0.0' }, { has_install_scripts: 1 }),
     services: svc,
   });
-  assert.equal(r.result, 'BLOCK');
+  assert.equal(r.result, 'WARN');
   assert.match(r.detail, /plain-crypto-js/);
   assert.match(r.detail, /3h ago/);
   assert.match(r.detail, /install scripts/);
@@ -133,7 +133,7 @@ test('new dep at exactly 24h → NOT BLOCK (boundary exclusive)', () => {
   assert.equal(r.result, 'WARN');
 });
 
-test('multiple new deps, one fresh → BLOCK names the fresh one', () => {
+test('multiple new deps, one fresh → WARN names the fresh one (V2-demoted from BLOCK)', () => {
   const svc = makeServices({
     cache: {
       'old-dep': { status: 'ok', first_publish: hoursAgo(200) },
@@ -145,7 +145,7 @@ test('multiple new deps, one fresh → BLOCK names the fresh one', () => {
     incoming: v('1.7.9', { 'old-dep': '1.0.0', 'fresh-dep': '1.0.0' }, { has_install_scripts: 1 }),
     services: svc,
   });
-  assert.equal(r.result, 'BLOCK');
+  assert.equal(r.result, 'WARN');
   assert.match(r.detail, /fresh-dep/);
 });
 

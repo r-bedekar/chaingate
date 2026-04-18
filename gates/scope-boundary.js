@@ -1,12 +1,10 @@
-// Gate 6: scope-boundary (WARN or BLOCK)
+// Gate 6: scope-boundary (WARN only until V2)
 //
 // THE keystone ChainGate gate. Individually-soft signals compose into
 // a high-confidence malicious indicator. This gate is the one that
 // detects the Axios 1.14.1 attack pattern by structural composition
 // alone — no CVE feed, no malicious-package database, no prior
 // knowledge. Just the shape of the release.
-//
-// Spec: docs/P5.md §6 lines 494-518.
 //
 // Detection logic:
 //
@@ -18,8 +16,16 @@
 //                        (< 24h old)
 //
 //   A + B alone            → WARN (medium-confidence supply-chain risk)
-//   A + B + C              → BLOCK (high-confidence; all three is rare
-//                                   outside actual attacks)
+//   A + B + C              → WARN (V2-demoted; see note below)
+//
+// V2 demotion note (Section 7 item 1 of docs/V2_DESIGN.md):
+//   During the V2 dev window, scope-boundary must not contribute to
+//   BLOCK. Point-in-time A+B+C can fire on legitimate evolution (a
+//   maintainer adds a new dep that happens to be a fresh minor-version
+//   bump of a sibling library). The fresh-dep signal is preserved in
+//   the WARN detail so forensic investigation still sees it. V2
+//   pattern-aware scope-boundary will re-introduce BLOCK once it can
+//   distinguish attack-shape from legitimate-evolution-shape.
 //
 // Why this combination specifically:
 //   A alone: happens constantly during normal development (refactors
@@ -164,8 +170,11 @@ export default {
       if (firstPublishMs == null) continue;
       const ageHours = Math.floor((nowMs - firstPublishMs) / (60 * 60 * 1000));
       if (ageHours < FRESH_DEP_HOURS) {
+        // V2-demoted: this is the A+B+C composition that was BLOCK
+        // pre-V2. Kept as WARN with full detail until V2 pattern-aware
+        // scope-boundary lands. See file header for rationale.
         return result(
-          'BLOCK',
+          'WARN',
           `new dep '${depName}' published ${ageHours}h ago + install scripts in ${currentPackageName}@${currentVersion}`,
         );
       }

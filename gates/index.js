@@ -1,6 +1,6 @@
 // Gate runner — aggregates per-gate results into a single disposition.
 //
-// Contract (locked in docs/P5.md §6):
+// Contract:
 //
 //   const runGates = createGateRunner({ modules, getOverride, logger });
 //   const decision = runGates(input);
@@ -16,7 +16,7 @@
 //   GateResult:
 //     { gate: string, result: 'ALLOW'|'SKIP'|'WARN'|'BLOCK', detail: string }
 //
-// Aggregation rules (docs/P5.md lines 522-544):
+// Aggregation rules:
 //   1. If getOverride(pkg, ver) returns a row → short-circuit:
 //      disposition = ALLOW
 //      results     = [{ gate:'override', result:'ALLOW', detail:`override: ${reason}` }]
@@ -31,18 +31,17 @@
 //         { gate: module.name, result: 'SKIP', detail: `gate_error: ${msg}` }
 //      Fail-open: a broken gate never escalates to BLOCK.
 //
-//   3. Aggregation:
+//   3. Aggregation (V2 foundation, Section 7 item 1):
 //        blocks = results.filter(r => r.result === 'BLOCK').length
 //        warns  = results.filter(r => r.result === 'WARN').length
-//        if blocks > 0                                  → 'BLOCK'
-//        elif warns >= warnEscalationThreshold (def 4)  → 'BLOCK' (escalated)
-//        elif warns > 0                                 → 'WARN'
-//        else                                           → 'ALLOW'
-//      SKIP results do NOT count toward warns.
-//
-//   4. P5.5 ships with DEFAULT_GATE_MODULES = []. Real modules land in
-//      P5.6 (content-hash, publisher-identity, dep-structure) and P5.7
-//      (provenance-continuity, release-age, scope-boundary).
+//        if blocks > 0    → 'BLOCK'
+//        elif warns > 0   → 'WARN'
+//        else             → 'ALLOW'
+//      SKIP results do NOT count. N-warnings-escalate-to-BLOCK was
+//      removed during the V2 dev window to prevent cry-wolf: only
+//      content-hash can currently BLOCK, so any BLOCK in results is a
+//      true-positive-by-construction signal. V2 may re-introduce
+//      escalation once pattern-aware gates produce low-FP WARNs.
 
 import contentHash from './content-hash.js';
 import publisherIdentity from './publisher-identity.js';
@@ -51,8 +50,22 @@ import provenanceContinuity from './provenance-continuity.js';
 import releaseAge from './release-age.js';
 import scopeBoundary from './scope-boundary.js';
 
-const DEFAULT_WARN_ESCALATION = 4;
 const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK']);
+
+// First-seen baseline poisoning protection (V2 foundation, Section 7 item 4
+// of docs/V2_DESIGN.md). Packages with fewer than MIN_HISTORY_DEPTH observed
+// prior versions don't carry enough signal to evaluate pattern-based gates
+// reliably — an attacker who publishes a brand-new package and has it observed
+// first by a target user could poison the baseline. Until a package
+// accumulates sufficient observed depth, every gate NOT in the exempt set is
+// short-circuited to SKIP with a poisoning-protection detail.
+//
+// Only content-hash is exempt: it compares against a recorded baseline and
+// does not rely on pattern extraction from history. Any future gate added to
+// the exempt set must be explicitly justified — the default for any new gate
+// is "pattern-based, requires depth."
+export const MIN_HISTORY_DEPTH = 8;
+const HISTORY_INDEPENDENT_GATES = new Set(['content-hash']);
 
 export const DEFAULT_GATE_MODULES = Object.freeze([
   contentHash,
@@ -78,7 +91,7 @@ function normalizeResult(moduleName, raw) {
   };
 }
 
-function aggregate(results, threshold) {
+function aggregate(results) {
   let blocks = 0;
   let warns = 0;
   for (const r of results) {
@@ -86,7 +99,6 @@ function aggregate(results, threshold) {
     else if (r.result === 'WARN') warns += 1;
   }
   if (blocks > 0) return 'BLOCK';
-  if (warns >= threshold) return 'BLOCK';
   if (warns > 0) return 'WARN';
   return 'ALLOW';
 }
@@ -136,9 +148,22 @@ export function createGateRunner({
       }
     }
 
+    const priorCount = Array.isArray(input?.history)
+      ? input.history.filter((h) => h && h.version !== input.version).length
+      : 0;
+    const insufficientHistory = priorCount < MIN_HISTORY_DEPTH;
+
     const results = [];
     for (const mod of modules) {
       const name = mod?.name ?? 'anonymous';
+      if (insufficientHistory && !HISTORY_INDEPENDENT_GATES.has(name)) {
+        results.push({
+          gate: name,
+          result: 'SKIP',
+          detail: `insufficient history (${priorCount} prior version(s), need ${MIN_HISTORY_DEPTH}) — first-seen poisoning protection`,
+        });
+        continue;
+      }
       try {
         const raw = mod.evaluate(gateInput);
         results.push(normalizeResult(name, raw));
@@ -154,13 +179,8 @@ export function createGateRunner({
       }
     }
 
-    const threshold =
-      Number.isFinite(gateInput?.config?.warnEscalationThreshold) && gateInput.config.warnEscalationThreshold > 0
-        ? gateInput.config.warnEscalationThreshold
-        : DEFAULT_WARN_ESCALATION;
-
     return {
-      disposition: aggregate(results, threshold),
+      disposition: aggregate(results),
       results,
       override: null,
     };

@@ -72,10 +72,14 @@ function axiosPackumentJson(versions = ['1.7.8', '1.7.9', '1.8.0'], latest = nul
   });
 }
 
+// Uses the `content-hash` gate name so the first-seen poisoning-protection
+// depth gate in gates/index.js does not suppress it — only content-hash is
+// exempt, which matches reality: content-hash is the only V1 gate that can
+// BLOCK, and it's baseline-based (not pattern-based) so depth is irrelevant.
 const blockVersionModule = (version) => ({
-  name: 'test-block',
+  name: 'content-hash',
   evaluate: (input) => ({
-    gate: 'test-block',
+    gate: 'content-hash',
     result: input.version === version ? 'BLOCK' : 'ALLOW',
     detail: `test block for ${version}`,
   }),
@@ -218,7 +222,7 @@ test('tarball request for BLOCK version → 403 with gate evidence', async () =>
     assert.equal(json.package, 'axios');
     assert.equal(json.version, '1.7.9');
     assert.ok(Array.isArray(json.gates));
-    assert.ok(json.gates.some((g) => g.gate === 'test-block'));
+    assert.ok(json.gates.some((g) => g.gate === 'content-hash'));
     assert.match(json.how_to_override, /chaingate allow axios@1\.7\.9/);
     assert.equal(tarballHit, false, 'upstream tarball must not be hit for blocked version');
   } finally {
