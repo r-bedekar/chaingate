@@ -579,3 +579,109 @@ test('transitions: determinism — permuted input produces byte-identical transi
   const reversed = publisher.extract({ packageName: 'perm', history: rows.slice().reverse() });
   assert.equal(JSON.stringify(forward.transitions), JSON.stringify(reversed.transitions));
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2d: overlap detection (W=3, definition (a))
+//
+// Fixtures F, H, I below are the BOUNDARY-REGRESSION CORE — locked as
+// test-first so the exact W=3 boundary is pinned down before any
+// implementation touches publisher.js. The sort-tertiary-key hole in 2b
+// was found only post-commit; this time the boundary fixtures exist
+// before the code does.
+//
+//   F — committee-of-3 rotation (A,B,C,A,B,C,A,B,C)
+//       Canonical POSITIVE: from transition #3 onward every incoming
+//       identity is within the last 3 contributor blocks. 6 of 8
+//       transitions overlap.
+//
+//   H — W=3 boundary OUTSIDE (A,B,C,D,A)
+//       A reappears at block 4, which is 4 tenure blocks after its
+//       original block 0. Window for the final transition is
+//       [B, C, D] — A must NOT be flagged as overlap. This is the
+//       fixture that catches off-by-one errors in the window bounds.
+//
+//   I — W=3 boundary INSIDE (A,B,C,A)
+//       A reappears at block 3, exactly 3 tenure blocks after its
+//       original block 0. Window for the final transition is
+//       [A, B, C] — A MUST be flagged as overlap. Pair with H: the
+//       two together pin the window to exactly [max(0, i-W+1) .. i].
+//
+// Expected to be RED until sub-step 2d step 2 lands extractOverlap.
+// ---------------------------------------------------------------------------
+
+test('fixture F (committee-of-3 rotation): transitions #0,#1 cold, #2–#7 overlap', () => {
+  // A,B,C,A,B,C,A,B,C → 9 tenure blocks → 8 transitions.
+  // First two hops exit the visible-history window (no prior occurrence
+  // of B, then of C). From transition #2 onward, the rotation has
+  // enough tail that every incoming identity sits in the last 3 blocks.
+  const rows = buildRows([
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'committee-rotation', history: rows });
+
+  assert.equal(out.tenure.length, 9);
+  assert.equal(out.transitions.length, 8);
+
+  const expected = [false, false, true, true, true, true, true, true];
+  for (let i = 0; i < expected.length; i += 1) {
+    assert.equal(
+      out.transitions[i].is_overlap_window_W3,
+      expected[i],
+      `transition[${i}] (${out.transitions[i].from_identity} → ${out.transitions[i].to_identity}) overlap mismatch`,
+    );
+  }
+
+  // Aggregate: committee shape produces has_overlap_transition=true.
+  assert.equal(out.signals.has_overlap_transition, true);
+});
+
+test('fixture H (W=3 boundary OUTSIDE, A,B,C,D,A): A just outside window, no overlap', () => {
+  // A sits at block 0. Final transition D→A has from_index=3; the
+  // window [max(0, 3-2) .. 3] = [1, 2, 3] = [B, C, D]. A is NOT in
+  // that window — reappearance happened one block too late. This is
+  // the failure mode an off-by-one in the window bounds would hide.
+  const rows = buildRows([
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ['d@w.com', 1], ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'w3-outside', history: rows });
+
+  assert.equal(out.tenure.length, 5);
+  assert.equal(out.transitions.length, 4);
+
+  for (let i = 0; i < out.transitions.length; i += 1) {
+    assert.equal(
+      out.transitions[i].is_overlap_window_W3,
+      false,
+      `transition[${i}] (${out.transitions[i].from_identity} → ${out.transitions[i].to_identity}) must NOT overlap — A is 4 blocks back, outside W=3`,
+    );
+  }
+
+  assert.equal(out.signals.has_overlap_transition, false);
+});
+
+test('fixture I (W=3 boundary INSIDE, A,B,C,A): A just inside window, overlap fires', () => {
+  // A sits at block 0. Final transition C→A has from_index=2; the
+  // window [max(0, 2-2) .. 2] = [0, 1, 2] = [A, B, C]. A IS in
+  // that window — reappearance exactly at the W=3 edge. Paired with
+  // fixture H this pins the window bounds to [max(0, i-W+1) .. i].
+  const rows = buildRows([
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1], ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'w3-inside', history: rows });
+
+  assert.equal(out.tenure.length, 4);
+  assert.equal(out.transitions.length, 3);
+
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+  assert.equal(out.transitions[1].is_overlap_window_W3, false);
+  assert.equal(
+    out.transitions[2].is_overlap_window_W3,
+    true,
+    'final transition C→A: A is exactly 3 blocks back, at the inclusive W=3 edge',
+  );
+
+  assert.equal(out.signals.has_overlap_transition, true);
+});
