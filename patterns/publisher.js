@@ -36,7 +36,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 2d — overlap detection (definition (a), W=3)
 //   sub-step 2e — known_contributor detection (K=10)
 //   sub-step 2f — signals aggregation (max_prior_tenure etc.)
 //   sub-step 3  — identity_profile (domain/provider/similarity) + shape
@@ -46,6 +45,20 @@
 
 import { normalizeIdentity } from './identity.js';
 import { compareSemver } from './semver.js';
+
+// Window size for overlap detection (sub-step 2d, definition (a)).
+// "How many most-recent tenure blocks we consider when asking whether an
+// incoming identity has appeared before." W=3 is a defensible starter
+// value, not a magic number — it catches rotation in 2–5 person
+// committees (the common shape across the 130-package seed) while
+// keeping the window tight enough that reappearances after multi-block
+// silence count as cold, not overlap.
+//
+// Subject to revision in sub-step 4 (calibrate.js) against the seed.
+// Changing this constant will flip fixtures H and I in
+// test/patterns/publisher.test.js — that is BY DESIGN, the regression
+// alarm that tells a future contributor calibration moved.
+const WINDOW_W = 3;
 
 function validateInput(input) {
   if (!input || typeof input !== 'object') {
@@ -191,6 +204,61 @@ function extractTransitions(tenure) {
   return transitions;
 }
 
+// ---------------------------------------------------------------------------
+// Overlap detection — sub-step 2d, definition (a), W=WINDOW_W.
+//
+// SIGNAL SEMANTICS (read carefully before reasoning about this field):
+//
+//   is_overlap_window_W3 = true
+//     → The incoming identity has appeared in the last W tenure blocks.
+//     → This is COMMITTEE-SHAPE EVIDENCE.
+//     → Bias: ALLOW. A rotating committee produces many true overlaps.
+//
+//   is_overlap_window_W3 = false
+//     → The incoming identity is NEW to the recent contributor set.
+//     → This is COLD-HANDOFF EVIDENCE.
+//     → Bias: toward BLOCK when combined with long prior_tenure.
+//       On its own, means little — every first contribution from a
+//       new committee member also reads as false.
+//
+// The signal is INVERTED relative to the usual "higher = more suspicious"
+// convention in security tooling. Keep this in mind when reading the
+// gate layer: overlap=true is a de-escalator, overlap=false is a
+// prerequisite for escalation (but not sufficient alone).
+//
+// Definition (a) — "to_identity appears as .identity in any tenure block
+// in the window [max(0, i-W+1) .. i] where i = transition.from_index."
+//
+// Including the from-block in the window is harmless: to_identity !=
+// from_identity by construction (tenure = maximal same-identity runs),
+// so the from-block can never match. Including it simplifies the
+// iteration bounds.
+//
+// Alternatives explicitly NOT implemented here (see deferment registry):
+//   (b) to-identity appears anywhere in prior history — would mislabel
+//       resurrected dormant committee members as overlap, missing the
+//       dormancy-revive attack shape.
+//   (c) to-identity published within last T days — time-windowed,
+//       attacker-pacing vulnerable, requires calibration.
+//
+// Mutates the transition records in place (adds is_overlap_window_W3)
+// rather than returning new objects — no cache/downstream concerns,
+// transitions are built in the same extract() call.
+function extractOverlap(transitions, tenure) {
+  for (const t of transitions) {
+    const windowStart = Math.max(0, t.from_index - WINDOW_W + 1);
+    const windowEnd = t.from_index; // inclusive
+    let found = false;
+    for (let k = windowStart; k <= windowEnd; k += 1) {
+      if (tenure[k].identity === t.to_identity) {
+        found = true;
+        break;
+      }
+    }
+    t.is_overlap_window_W3 = found;
+  }
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -204,11 +272,12 @@ export default {
     const sorted = sortRows(rows);
     const tenure = extractTenure(sorted);
     const transitions = extractTransitions(tenure);
+    extractOverlap(transitions, tenure);
 
-    // Sub-step 2c stops here. identity_profile / shape keep the locked
+    // Sub-step 2d stops here. identity_profile / shape keep the locked
     // contract shape from sub-step 1 and are filled in by step 3.
-    // max_prior_tenure and has_overlap_transition remain zero-initialized
-    // until sub-steps 2d–2f wire them up.
+    // max_prior_tenure remains zero-initialized until sub-step 2f wires
+    // the signals-aggregation pass.
     return {
       tenure,
       transitions,
@@ -217,7 +286,21 @@ export default {
       signals: {
         transition_count: transitions.length,
         max_prior_tenure: 0,
-        has_overlap_transition: false,
+        // GATE CONTRACT — READ BEFORE USING THIS AGGREGATE.
+        //
+        // has_overlap_transition is the OR of is_overlap_window_W3
+        // across all transitions. It answers "did ANY transition look
+        // like committee rotation?" — nothing more.
+        //
+        // A package with one legitimate committee rotation followed by
+        // a cold-handoff takeover will have has_overlap_transition=true.
+        // The gate MUST NOT shortcut to ALLOW on this aggregate alone.
+        //
+        // Correct gate read: iterate `transitions[]` and evaluate each
+        // transition independently (overlap + prior_tenure + gap). The
+        // aggregate exists only for cheap summary queries where per-
+        // transition detail is already being inspected elsewhere.
+        has_overlap_transition: transitions.some((t) => t.is_overlap_window_W3),
         skipped_versions_count: skipped,
       },
     };
