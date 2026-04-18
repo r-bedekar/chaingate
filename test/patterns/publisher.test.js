@@ -121,9 +121,12 @@ test('fixture F: degraded rows counted, not silently included', () => {
   const out = publisher.extract(fixtureF);
   // Out of 8 input rows, 5 are degraded (rows 2, 3, 4, 7, 8).
   assert.equal(out.signals.skipped_versions_count, 5);
-  // No synthetic transitions emitted on null boundaries in sub-step 2a.
-  assert.equal(out.signals.transition_count, 0);
-  assert.equal(out.transitions.length, 0);
+  // 3 valid rows (Alice, Bob, <c@z.com>) → 3 tenure blocks → exactly
+  // 2 transitions. Crucially NOT 4+ — no synthetic transitions are
+  // emitted across the null-row boundaries; those rows are dropped
+  // in normalizeAndFilter before tenure/transitions run.
+  assert.equal(out.signals.transition_count, 2);
+  assert.equal(out.transitions.length, 2);
 });
 
 test('fixture F: determinism — identical output on repeat extraction', () => {

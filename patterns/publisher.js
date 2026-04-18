@@ -36,7 +36,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 2c — transitions with prior_tenure + gap
 //   sub-step 2d — overlap detection (definition (a), W=3)
 //   sub-step 2e — known_contributor detection (K=10)
 //   sub-step 2f — signals aggregation (max_prior_tenure etc.)
@@ -149,6 +148,49 @@ function extractTenure(sortedRows) {
   return tenure;
 }
 
+// Extract transitions: one record per boundary between adjacent tenure
+// blocks. Output length is exactly max(tenure.length - 1, 0).
+//
+// Each record is a tenure-weighted event, not a boolean "publisher
+// changed" — it carries both the prior block's VERSION count and its
+// DURATION, plus the visible GAP (first_ts of the incoming block minus
+// last_ts of the outgoing block). This decomposition is what lets the
+// downstream gate tell apart four shapes that all look identical to a
+// "publisher_changed" boolean:
+//
+//   long tenure + zero gap     → takeover after stable ownership
+//   short tenure + huge gap    → dormancy revive (abandoned-package
+//                                  takeover, seen in multiple 2024–
+//                                  2026 campaigns)
+//   short tenure + small gap   → committee rotation
+//   long tenure + visible gap  → announced handoff (usually legitimate)
+//
+// Competitors ship only the boolean. Keeping count and duration separate
+// (not summed, not averaged) preserves the ability to distinguish them
+// deterministically and explain the distinction in a decision log.
+//
+// from_index is the tenure-array index of the outgoing block, kept so
+// sub-step 2d overlap detection can look up the W-window around a
+// transition in O(1) without re-scanning.
+function extractTransitions(tenure) {
+  const transitions = [];
+  for (let i = 1; i < tenure.length; i += 1) {
+    const prior = tenure[i - 1];
+    const next = tenure[i];
+    transitions.push({
+      from_identity: prior.identity,
+      to_identity: next.identity,
+      at_version: next.first_version,
+      at_published_at_ms: next.first_published_at_ms,
+      prior_tenure_versions: prior.version_count,
+      prior_tenure_duration_ms: prior.duration_ms,
+      gap_ms: next.first_published_at_ms - prior.last_published_at_ms,
+      from_index: i - 1,
+    });
+  }
+  return transitions;
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -161,17 +203,19 @@ export default {
     // guarantees downstream sub-steps can assume sorted input.
     const sorted = sortRows(rows);
     const tenure = extractTenure(sorted);
+    const transitions = extractTransitions(tenure);
 
-    // Sub-step 2b stops here. Transitions / identity_profile / shape
-    // keep the locked contract shape from sub-step 1 and are filled in
-    // by sub-steps 2c–2f and step 3.
+    // Sub-step 2c stops here. identity_profile / shape keep the locked
+    // contract shape from sub-step 1 and are filled in by step 3.
+    // max_prior_tenure and has_overlap_transition remain zero-initialized
+    // until sub-steps 2d–2f wire them up.
     return {
       tenure,
-      transitions: [],
+      transitions,
       identity_profile: {},
       shape: 'unknown',
       signals: {
-        transition_count: 0,
+        transition_count: transitions.length,
         max_prior_tenure: 0,
         has_overlap_transition: false,
         skipped_versions_count: skipped,
