@@ -200,6 +200,21 @@ test('sort: permutation of input produces byte-identical output', () => {
 // ---------------------------------------------------------------------------
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+
+// buildRowsAbsolute(spec): explicit (identity, offsetMs-from-startMs) per row.
+// Used for fixtures that need non-uniform spacing — e.g. a multi-month
+// silence followed by one republish (dormancy-revive), or a sub-day gap
+// following a many-day active run (rapid unannounced handoff). Each row
+// gets a unique patch-level version so semver ordering is total.
+function buildRowsAbsolute(spec, startMs = 1_700_000_000_000) {
+  return spec.map(([email, offsetMs], i) => ({
+    version: `1.0.${i}`,
+    publisher_email: email,
+    publisher_name: email.split('@')[0],
+    published_at_ms: startMs + offsetMs,
+  }));
+}
 
 // buildRows(spec): generate sorted rows from a compact [identity, count] spec.
 // Timestamps start at `startMs` and increment by DAY_MS per version; version
