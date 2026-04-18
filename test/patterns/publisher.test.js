@@ -855,3 +855,152 @@ test('overlap: determinism — permuted input produces byte-identical overlap fl
     [false, false, true, false, true],
   );
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2e: known_contributor detection (K=10)
+//
+// Fixtures L, M, N below are the BOUNDARY-REGRESSION CORE — locked as
+// test-first so the K=10 cutoff and the (false, true) "returning-dormant-
+// maintainer" cell are pinned before any code touches publisher.js.
+//
+//   L — K-boundary INSIDE  (A×10, B×1, A×1)
+//       Final B→A transition: A has exactly 10 prior versions.
+//       is_known_contributor_K10 MUST be true (>= comparison, inclusive).
+//
+//   M — K-boundary OUTSIDE (A×9, B×1, A×1)
+//       Final B→A transition: A has exactly 9 prior versions.
+//       is_known_contributor_K10 MUST be false.
+//
+//       L and M together pin the cutoff to exactly `>= K`. An off-by-
+//       one in the comparator (e.g. `> K`) would pass L but flip M.
+//
+//   N — returning dormant maintainer (A×15, B×5, C×5, D×5, A×1)
+//       Final D→A transition: A outside the W=3 overlap window
+//       [B, C, D] (overlap_W3=false) AND A has 15 prior versions
+//       (is_known_contributor_K10=true). This is cell (false, true)
+//       of the 2×2 — the product-differentiating case that every
+//       competing tool misclassifies as a cold handoff. Intermediate
+//       B/C/D blocks exist specifically to push A out of the W=3
+//       overlap window at the return; with fewer intermediate blocks,
+//       overlap_W3 would be true and we'd be testing a different
+//       2×2 cell.
+//
+// Expected RED until sub-step 2e step 2 lands extractKnownContributor.
+// ---------------------------------------------------------------------------
+
+test('fixture L (K-boundary INSIDE, 10 prior versions): known_contributor fires', () => {
+  const rows = buildRows([
+    ['a@x.com', 10],
+    ['b@y.com', 1],
+    ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'k-inside', history: rows });
+
+  assert.equal(out.tenure.length, 3);
+  assert.equal(out.transitions.length, 2);
+
+  const returnTransition = out.transitions[1];
+  assert.equal(returnTransition.from_identity, 'b <b@y.com>');
+  assert.equal(returnTransition.to_identity, 'a <a@x.com>');
+  assert.equal(
+    returnTransition.prior_contribution_count,
+    10,
+    'A has exactly 10 prior versions — the inclusive K=10 boundary',
+  );
+  assert.equal(
+    returnTransition.is_known_contributor_K10,
+    true,
+    'prior_contribution_count=10 MUST satisfy the >= K comparison',
+  );
+
+  // Sanity: the A→B transition has to_identity=B with 0 prior versions.
+  assert.equal(out.transitions[0].prior_contribution_count, 0);
+  assert.equal(out.transitions[0].is_known_contributor_K10, false);
+});
+
+test('fixture M (K-boundary OUTSIDE, 9 prior versions): known_contributor does NOT fire', () => {
+  const rows = buildRows([
+    ['a@x.com', 9],
+    ['b@y.com', 1],
+    ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'k-outside', history: rows });
+
+  assert.equal(out.tenure.length, 3);
+  assert.equal(out.transitions.length, 2);
+
+  const returnTransition = out.transitions[1];
+  assert.equal(returnTransition.to_identity, 'a <a@x.com>');
+  assert.equal(
+    returnTransition.prior_contribution_count,
+    9,
+    'A has exactly 9 prior versions — one below the K=10 threshold',
+  );
+  assert.equal(
+    returnTransition.is_known_contributor_K10,
+    false,
+    'prior_contribution_count=9 MUST NOT satisfy the >= K comparison (off-by-one guard)',
+  );
+});
+
+test('fixture N (returning dormant maintainer): cell (false, true) fires — the standout case', () => {
+  // A contributes 15 versions, then B/C/D each contribute 5 across the
+  // intermediate blocks, then A returns for one final release. At that
+  // return transition:
+  //   - overlap_W3 = false (A at block 0, window at from_index=3 is
+  //     [block[1], block[2], block[3]] = [B, C, D] — A not present)
+  //   - is_known_contributor_K10 = true (A has 15 prior versions)
+  // This is the 2×2 cell that tools without the knownness axis
+  // misclassify as a cold handoff. Our pattern layer emits both
+  // booleans so the step-3 gate can evaluate the 2×2 per transition.
+  const rows = buildRows([
+    ['a@x.com', 15],
+    ['b@y.com', 5],
+    ['c@z.com', 5],
+    ['d@w.com', 5],
+    ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'dormant-return', history: rows });
+
+  assert.equal(out.tenure.length, 5);
+  assert.equal(out.transitions.length, 4);
+
+  // Transitions 0, 1, 2 are all cold-and-unknown — this is the
+  // (false, false) cell, where disposition depends on prior_tenure
+  // (t0's prior_tenure=15 would be escalated by the gate; t1/t2's
+  // prior_tenure=5 would not).
+  assert.equal(out.transitions[0].to_identity, 'b <b@y.com>');
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+  assert.equal(out.transitions[0].prior_contribution_count, 0);
+  assert.equal(out.transitions[0].is_known_contributor_K10, false);
+
+  assert.equal(out.transitions[1].to_identity, 'c <c@z.com>');
+  assert.equal(out.transitions[1].is_overlap_window_W3, false);
+  assert.equal(out.transitions[1].prior_contribution_count, 0);
+  assert.equal(out.transitions[1].is_known_contributor_K10, false);
+
+  assert.equal(out.transitions[2].to_identity, 'd <d@w.com>');
+  assert.equal(out.transitions[2].is_overlap_window_W3, false);
+  assert.equal(out.transitions[2].prior_contribution_count, 0);
+  assert.equal(out.transitions[2].is_known_contributor_K10, false);
+
+  // The standout transition — cell (false, true).
+  const returnT = out.transitions[3];
+  assert.equal(returnT.from_identity, 'd <d@w.com>');
+  assert.equal(returnT.to_identity, 'a <a@x.com>');
+  assert.equal(
+    returnT.is_overlap_window_W3,
+    false,
+    'A is at block 0; at from_index=3 the window is blocks [1,2,3]=[B,C,D], A is NOT present',
+  );
+  assert.equal(
+    returnT.prior_contribution_count,
+    15,
+    'A contributed 15 versions before this transition',
+  );
+  assert.equal(
+    returnT.is_known_contributor_K10,
+    true,
+    'cell (false, true) — the returning-dormant-maintainer signature',
+  );
+});
