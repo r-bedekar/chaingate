@@ -57,6 +57,20 @@
 // consume it for disposition logic. Reading the aggregate as a shortcut
 // misclassifies every non-trivial package (one legitimate rotation
 // followed by a takeover will have has_overlap_transition=true).
+//
+// AGGREGATE SHORTCUT POLICY (sub-step 2f). Some signals CAN be
+// shortcut on; others cannot. The full policy is documented inline
+// on `extractSignals` — read it before adding a gate that reads the
+// signals object. TL;DR:
+//
+//   SAFE to shortcut: the 2×2 cell histogram
+//     (cold_handoff_count, new_committee_member_count,
+//      returning_dormant_count, recurring_member_count) and
+//     max_cold_handoff_prior_tenure — definition bakes in the cell
+//     filter, so the aggregate IS the disposition question.
+//
+//   UNSAFE to shortcut: has_overlap_transition — OR across
+//     heterogeneous transitions, misleads on mixed packages.
 // =====================================================================
 //
 // Why this matters (competitive positioning):
@@ -419,9 +433,73 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
   const uniqueIdentityCount = identitySet.size;
   const hasSufficientHistory = observedVersionsCount >= MIN_HISTORY_DEPTH;
 
-  // --- Tier 2/3: zero-initialized; populated by steps 3 and 4 of 2f.
-  // Kept inline (not a separate stub module) so the single source of
-  // truth for the signals shape lives in exactly one place.
+  // --- Tier 2: severity extrema + 2×2 cell histogram ---
+  //
+  // AGGREGATE SHORTCUT POLICY (extends the top-of-file GATE CONTRACT):
+  //
+  //   SAFE aggregates (gate MAY shortcut on these) — definitionally
+  //   answer a disposition question because the 2×2 cell filter is
+  //   baked into the aggregate itself:
+  //     max_cold_handoff_prior_tenure   — (F,F) only; filter is part
+  //                                        of the definition
+  //     cold_handoff_count              — (F,F) count
+  //     new_committee_member_count      — (T,F) count
+  //     returning_dormant_count         — (F,T) count
+  //     recurring_member_count          — (T,T) count
+  //     max_prior_tenure_versions       — severity-only, no cell
+  //                                        filter; safe as a WORST-
+  //                                        CASE severity read but not
+  //                                        a disposition shortcut on
+  //                                        its own (needs the cold-
+  //                                        handoff filter to matter)
+  //
+  //   UNSAFE aggregates (gate MUST NOT shortcut):
+  //     has_overlap_transition — OR across heterogeneous transitions.
+  //                              A single legitimate rotation sets it
+  //                              true regardless of any later cold
+  //                              handoff. Display-only. See the
+  //                              annotation on the field below.
+  //
+  // The 2×2 cell histogram — cold_handoff_count,
+  // new_committee_member_count, returning_dormant_count,
+  // recurring_member_count — is the STANDOUT AGGREGATE. A four-integer
+  // shape fingerprint per package that no competing tool publishes,
+  // derived deterministically from observable history. An auditor can
+  // read the package's entire publisher shape in one line.
+  //
+  // Zero semantics (risk #3 decision): max_cold_handoff_prior_tenure
+  // is 0 when no (F,F) transition exists. Paired with cold_handoff_count
+  // (also 0 in that case) this disambiguates from the degenerate state
+  // "(F,F) transition with prior_tenure=0" — which cannot arise from a
+  // real history anyway, since the smallest tenure block has
+  // version_count=1.
+  let maxPriorTenureVersions = 0;
+  let maxColdHandoffPriorTenure = 0;
+  let coldHandoffCount = 0;            // cell (F, F)
+  let newCommitteeMemberCount = 0;     // cell (T, F)
+  let returningDormantCount = 0;       // cell (F, T)
+  let recurringMemberCount = 0;        // cell (T, T)
+  for (const t of transitions) {
+    if (t.prior_tenure_versions > maxPriorTenureVersions) {
+      maxPriorTenureVersions = t.prior_tenure_versions;
+    }
+    const overlap = t.is_overlap_window_W3;
+    const known = t.is_known_contributor_K10;
+    if (overlap && known) {
+      recurringMemberCount += 1;
+    } else if (overlap && !known) {
+      newCommitteeMemberCount += 1;
+    } else if (!overlap && known) {
+      returningDormantCount += 1;
+    } else {
+      coldHandoffCount += 1;
+      if (t.prior_tenure_versions > maxColdHandoffPriorTenure) {
+        maxColdHandoffPriorTenure = t.prior_tenure_versions;
+      }
+    }
+  }
+
+  // --- Tier 3: zero-initialized; populated by step 4 of 2f.
 
   return {
     // Tier 1
@@ -429,13 +507,13 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
     unique_identity_count: uniqueIdentityCount,
     has_sufficient_history: hasSufficientHistory,
 
-    // Tier 2 — placeholders, step 3 of 2f will populate.
-    max_prior_tenure_versions: 0,
-    max_cold_handoff_prior_tenure: 0,
-    cold_handoff_count: 0,
-    new_committee_member_count: 0,
-    returning_dormant_count: 0,
-    recurring_member_count: 0,
+    // Tier 2
+    max_prior_tenure_versions: maxPriorTenureVersions,
+    max_cold_handoff_prior_tenure: maxColdHandoffPriorTenure,
+    cold_handoff_count: coldHandoffCount,
+    new_committee_member_count: newCommitteeMemberCount,
+    returning_dormant_count: returningDormantCount,
+    recurring_member_count: recurringMemberCount,
 
     // Tier 3 — placeholders, step 4 of 2f will populate.
     total_history_duration_ms: 0,
@@ -446,7 +524,7 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
     // still referenced by tests / future wiring.
     transition_count: transitions.length,
     skipped_versions_count: skippedVersionsCount,
-    // GATE CONTRACT — READ BEFORE USING THIS AGGREGATE.
+    // GATE CONTRACT — UNSAFE AGGREGATE. DISPLAY ONLY.
     //
     // has_overlap_transition is the OR of is_overlap_window_W3 across
     // all transitions. It answers "did ANY transition look like
