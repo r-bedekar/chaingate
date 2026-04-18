@@ -1004,3 +1004,212 @@ test('fixture N (returning dormant maintainer): cell (false, true) fires — the
     'cell (false, true) — the returning-dormant-maintainer signature',
   );
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2e: remaining fixture matrix
+//
+// L, M, N are the boundary-regression core (above). These are the broader
+// coverage cases — canonical cold handoffs, the committee-rotation regime
+// below K, and fixture O: a single trace that exercises all four cells of
+// the (overlap × known_contributor) 2×2 matrix in one place.
+// ---------------------------------------------------------------------------
+
+test('fixture A known: event-stream cold handoff → known_contributor=false, count=0', () => {
+  // right9ctrl has no prior versions. Cell (false, false) with
+  // prior_tenure=27 — the canonical takeover shape the step-3 gate
+  // escalates via the severity axis. Without the count field, this
+  // cell would look identical to committee churn.
+  const rows = buildRows([
+    ['dominictarr@example.com', 27],
+    ['right9ctrl@example.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'event-stream-known', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  assert.equal(out.transitions[0].prior_contribution_count, 0);
+  assert.equal(out.transitions[0].is_known_contributor_K10, false);
+  assert.equal(out.transitions[0].is_overlap_window_W3, false);
+});
+
+test('fixture B known: 40 distinct singletons → every to_identity unknown', () => {
+  // Distinct-maintainer sequence, not a rotation. Every incoming
+  // identity is novel — 39 transitions, all prior_count=0. Distinguishes
+  // from fixture F where rotation accumulates counts over time.
+  const spec = [];
+  for (let i = 0; i < 40; i += 1) {
+    spec.push([`maintainer${i}@example.com`, 1]);
+  }
+  const rows = buildRows(spec);
+  const out = publisher.extract({ packageName: 'distinct-40-known', history: rows });
+
+  assert.equal(out.transitions.length, 39);
+  for (const t of out.transitions) {
+    assert.equal(t.prior_contribution_count, 0);
+    assert.equal(t.is_known_contributor_K10, false);
+  }
+});
+
+test('fixture C known: long solo tenure → vacuous (no transitions)', () => {
+  const rows = buildRows([['faisalman@example.com', 100]]);
+  const out = publisher.extract({ packageName: 'ua-parser-js-known', history: rows });
+  assert.equal(out.transitions.length, 0);
+});
+
+test('fixture D known: dormancy-revive → newowner is NOT a known contributor', () => {
+  // Cell (false, false) with short prior_tenure=5. The 730-day gap and
+  // cold incoming identity together look like takeover-after-dormancy,
+  // but the severity axis (prior_tenure only 5) tells the gate this is
+  // closer to short-lived ownership handoff than the event-stream class.
+  // Contrast with fixture N, where the returning identity IS known
+  // despite the gap.
+  const rows = buildRowsAbsolute([
+    ['orig@example.com', 0],
+    ['orig@example.com', 25 * DAY_MS],
+    ['orig@example.com', 50 * DAY_MS],
+    ['orig@example.com', 75 * DAY_MS],
+    ['orig@example.com', 100 * DAY_MS],
+    ['newowner@example.com', 830 * DAY_MS],
+  ]);
+  const out = publisher.extract({ packageName: 'dormancy-revive-known', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  assert.equal(out.transitions[0].prior_contribution_count, 0);
+  assert.equal(out.transitions[0].is_known_contributor_K10, false);
+});
+
+test('fixture F known: committee-of-3 rotation → counts accumulate, none reach K=10', () => {
+  // A,B,C,A,B,C,A,B,C — cumulative counts by end are 3 each; none
+  // cross K=10. This is the legitimate "first K-1 releases" regime —
+  // cell (true, false) from t2 onward. The gate MUST allow this cell;
+  // it is the ordinary shape of small rotating committees, not an
+  // attack. A false positive here would misfire on express/moment/etc.
+  const rows = buildRows([
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+    ['a@x.com', 1], ['b@y.com', 1], ['c@z.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'committee-known', history: rows });
+
+  assert.equal(out.transitions.length, 8);
+  // Hand-traced cumulative counts — regression pin against miscount.
+  //   t0 A→B: B prior in [A]           = 0
+  //   t1 B→C: C prior in [A,B]         = 0
+  //   t2 C→A: A prior in [A,B,C]       = 1
+  //   t3 A→B: B prior in [A,B,C,A]     = 1
+  //   t4 B→C: C prior in [A,B,C,A,B]   = 1
+  //   t5 C→A: A prior in [A,B,C,A,B,C] = 2
+  //   t6 A→B: B prior "                = 2
+  //   t7 B→C: C prior "                = 2
+  const expected = [0, 0, 1, 1, 1, 2, 2, 2];
+  for (let i = 0; i < expected.length; i += 1) {
+    assert.equal(
+      out.transitions[i].prior_contribution_count,
+      expected[i],
+      `transition[${i}] prior count`,
+    );
+    assert.equal(out.transitions[i].is_known_contributor_K10, false);
+  }
+});
+
+test('fixture G known: A/B/A with A×2 → return transition count=2, below K', () => {
+  // Minimal reappearance with sub-threshold history. Cell (true, false):
+  // A is in the W=3 window (overlap=true) but has only 2 prior versions,
+  // below K=10. The gate treats this identically to a new committee
+  // member — ALLOW — even though A has appeared before.
+  const rows = buildRows([
+    ['a@x.com', 2],
+    ['b@y.com', 1],
+    ['a@x.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'aba-known', history: rows });
+
+  assert.equal(out.transitions.length, 2);
+  assert.equal(out.transitions[0].prior_contribution_count, 0);
+  assert.equal(out.transitions[0].is_known_contributor_K10, false);
+  assert.equal(out.transitions[1].prior_contribution_count, 2);
+  assert.equal(out.transitions[1].is_known_contributor_K10, false);
+});
+
+test('fixture O (four-cell matrix): all four (overlap, known) cells in one trace', () => {
+  // Comprehensive regression guard: a single fixture exercising every
+  // cell of the 2×2. Any future change that breaks one axis without
+  // touching the other will fail here with a specific cell mismatch.
+  //
+  // Layout — A×11 up front seeds A as a known contributor before the
+  // first transition:
+  //   block[0]=A(×11), [1]=B, [2]=A, [3]=B, [4]=C, [5]=D, [6]=E, [7]=A
+  //
+  // Hand-traced cells (overlap_W3, known_K10):
+  //   t0 A→B  from_idx=0, win=[A]           → (F, F) — cold, novel
+  //   t1 B→A  from_idx=1, win=[A,B]         → (T, T) — active recurring
+  //   t2 A→B  from_idx=2, win=[A,B,A]       → (T, F) — new committee member
+  //                                            (B has 1 prior, < K)
+  //   t3 B→C  from_idx=3, win=[B,A,B]       → (F, F)
+  //   t4 C→D  from_idx=4, win=[A,B,C]       → (F, F)
+  //   t5 D→E  from_idx=5, win=[B,C,D]       → (F, F)
+  //   t6 E→A  from_idx=6, win=[C,D,E]       → (F, T) — returning dormant
+  //                                            (A has 12 prior, >= K)
+  const rows = buildRows([
+    ['a@x.com', 11],
+    ['b@y.com', 1],
+    ['a@x.com', 1],
+    ['b@y.com', 1],
+    ['c@z.com', 1],
+    ['d@w.com', 1],
+    ['e@v.com', 1],
+    ['a@x.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: 'four-cell', history: rows });
+
+  assert.equal(out.tenure.length, 8);
+  assert.equal(out.transitions.length, 7);
+
+  const cells = out.transitions.map((t) => [
+    t.is_overlap_window_W3,
+    t.is_known_contributor_K10,
+  ]);
+  assert.deepEqual(cells, [
+    [false, false], // t0 A→B — cold handoff shape
+    [true,  true ], // t1 B→A — active recurring committee member
+    [true,  false], // t2 A→B — new committee member
+    [false, false], // t3 B→C
+    [false, false], // t4 C→D
+    [false, false], // t5 D→E
+    [false, true ], // t6 E→A — RETURNING DORMANT MAINTAINER (standout)
+  ]);
+
+  // Pin raw counts too — cell truth alone is not enough if a future bug
+  // shifted counts while booleans still happened to line up with K=10.
+  assert.deepEqual(
+    out.transitions.map((t) => t.prior_contribution_count),
+    [0, 11, 1, 0, 0, 0, 12],
+  );
+});
+
+test('known_contributor: determinism — permuted input produces byte-identical fields', () => {
+  // Close out 2e with the same determinism guard used for 2d: permute
+  // the input and confirm byte-identical output. The existing 2d
+  // determinism test already byte-compares the whole extract() output,
+  // but a 2e-scoped trace with nonzero counts is a clearer regression
+  // signal than a pass through the omnibus case.
+  const rows = buildRowsAbsolute([
+    ['a@x.com', 0],
+    ['a@x.com', 5 * DAY_MS],
+    ['a@x.com', 10 * DAY_MS],
+    ['b@y.com', 15 * DAY_MS],
+    ['a@x.com', 20 * DAY_MS],
+  ]);
+  const forward = publisher.extract({ packageName: 'known-det', history: rows });
+  const reversed = publisher.extract({
+    packageName: 'known-det',
+    history: rows.slice().reverse(),
+  });
+  assert.equal(JSON.stringify(forward), JSON.stringify(reversed));
+
+  // And a small sanity anchor so the determinism test also documents
+  // expected count for future readers.
+  assert.equal(forward.transitions.length, 2);
+  assert.equal(forward.transitions[1].to_identity, 'a <a@x.com>');
+  assert.equal(forward.transitions[1].prior_contribution_count, 3);
+  assert.equal(forward.transitions[1].is_known_contributor_K10, false);
+});
