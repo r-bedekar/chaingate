@@ -5,7 +5,6 @@ claude.md
 
 # Internal design docs (implementation context, not public)
 docs/V2_DESIGN.md
-docs/ALERTING_PLAN.md
 
 # Environment
 .env
