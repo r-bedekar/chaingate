@@ -71,6 +71,10 @@ Content-hash mismatch is the only active BLOCK gate.*
 
 Content hash mismatch is the only hard block by default. Everything else warns. You decide what to escalate.
 
+*Currently, only Content Hash is an active BLOCK gate. All other
+gates surface informational signals. Sequence-aware pattern
+detection (V2) will activate these as full gates.*
+
 ## Attack Coverage
 
 | Attack | How ChainGate catches it |
@@ -87,8 +91,11 @@ Content hash mismatch is the only hard block by default. Everything else warns. 
 Requires **Node.js 22+**.
 
 ```bash
-npm install -g chaingate
-chaingate init          # downloads seed DB, starts proxy, patches .npmrc
+# npm package not yet published — install from source
+git clone https://github.com/r-bedekar/chaingate.git
+cd chaingate && npm install
+npm link                # makes 'chaingate' command available
+chaingate init          # downloads signed seed DB, starts proxy, patches .npmrc
 npm install axios       # now routed through ChainGate
 chaingate status        # see what was observed
 chaingate why axios@1.7.9   # explain the gate decision
@@ -152,6 +159,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We welcome ecosystem conn
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
+
+## Contact
+
+Built by Rizwan Bedekar — feedback, questions, and collaboration welcome.  
+Email: rbedekar@zeroinsec.com  
+GitHub: [@r-bedekar](https://github.com/r-bedekar)
 
 ---
 
