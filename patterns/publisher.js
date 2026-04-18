@@ -499,7 +499,39 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
     }
   }
 
-  // --- Tier 3: zero-initialized; populated by step 4 of 2f.
+  // --- Tier 3: temporal summary ---
+  //
+  // Anchors severity numbers in calendar time. "Prior tenure of 147
+  // versions" means something different across 7 years vs. 7 months;
+  // the gate layer can multiply Tier 2 by Tier 3 context when tuning
+  // disposition thresholds. Integer-only math over already-integer
+  // published_at_ms — no Date.now, no float arithmetic, deterministic
+  // across machines.
+  //
+  // Empty history: every field is 0. A single-block single-version
+  // history: total_history_duration_ms=0, longest_tenure_versions=1,
+  // longest_tenure_duration_ms=0 (a one-version block has no span).
+  //
+  // Gap-filling policy (risk #4 decision): degraded rows are already
+  // dropped in normalizeAndFilter before tenure runs. A history like
+  // [A@day-0, A@day-1000, (null-row @day-500)] reports
+  // total_history_duration_ms = 1000 * DAY_MS — span of OBSERVED rows
+  // only. No interpolation. Missing rows are observability gaps.
+  let totalHistoryDurationMs = 0;
+  let longestTenureVersions = 0;
+  let longestTenureDurationMs = 0;
+  if (tenure.length > 0) {
+    totalHistoryDurationMs =
+      tenure[tenure.length - 1].last_published_at_ms - tenure[0].first_published_at_ms;
+    for (const block of tenure) {
+      if (block.version_count > longestTenureVersions) {
+        longestTenureVersions = block.version_count;
+      }
+      if (block.duration_ms > longestTenureDurationMs) {
+        longestTenureDurationMs = block.duration_ms;
+      }
+    }
+  }
 
   return {
     // Tier 1
@@ -515,10 +547,10 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
     returning_dormant_count: returningDormantCount,
     recurring_member_count: recurringMemberCount,
 
-    // Tier 3 — placeholders, step 4 of 2f will populate.
-    total_history_duration_ms: 0,
-    longest_tenure_versions: 0,
-    longest_tenure_duration_ms: 0,
+    // Tier 3
+    total_history_duration_ms: totalHistoryDurationMs,
+    longest_tenure_versions: longestTenureVersions,
+    longest_tenure_duration_ms: longestTenureDurationMs,
 
     // Pre-2f signals kept: these predate the tiered aggregation and are
     // still referenced by tests / future wiring.
