@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { openWitnessDB } from '../../witness/db.js';
+import { assertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -39,6 +40,12 @@ export default async function allow(args) {
     console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));
     return EXIT.ERROR;
   }
+
+  // Refuse to record an override if the installed chaingate fails integrity
+  // checks — writing policy exceptions from a compromised install defeats
+  // the whole point.
+  const gate = await assertIntegrity(paths, { command: 'allow' });
+  if (!gate.ok) return gate.exit;
 
   const db = openWitnessDB(paths.witnessDb);
   try {

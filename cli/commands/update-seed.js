@@ -1,10 +1,11 @@
-import { existsSync, renameSync, unlinkSync } from 'node:fs';
+import { existsSync, renameSync, unlinkSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { fetchSeedBundle } from '../seed-download.js';
 import { verifySeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
+import { assertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -24,6 +25,12 @@ export default async function updateSeed(args) {
     console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));
     return EXIT.ERROR;
   }
+
+  // Refuse to run if the installed chaingate + current seed don't pass
+  // self-witness / seed-signature checks. Fetching and swapping the witness
+  // on a tampered install would launder the attack.
+  const gate = await assertIntegrity(paths, { command: 'update-seed' });
+  if (!gate.ok) return gate.exit;
 
   // 1. Download + verify
   console.log('Downloading latest seed...');
@@ -89,6 +96,15 @@ export default async function updateSeed(args) {
     return EXIT.ERROR;
   }
   try { unlinkSync(backupPath); } catch { /* ok */ }
+
+  // Refresh persisted sig artifacts so doctor can re-verify the new bundle.
+  try {
+    copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
+    copyFileSync(bundle.sigPath, paths.witnessDbSig);
+  } catch (err) {
+    console.error(fmt.warn(`Seed swapped but sig artifacts not persisted: ${err.message}`));
+    console.error('  `chaingate doctor` seed-signature check will fail until next update-seed.');
+  }
 
   // 5. Report
   const updatedDb = openWitnessDB(paths.witnessDb, { readonly: true });

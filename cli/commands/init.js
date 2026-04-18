@@ -6,6 +6,7 @@ import { readPid, spawnProxy, isPortInUse, waitForPort } from '../proxy-control.
 import { fetchSeedBundle } from '../seed-download.js';
 import { verifySeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
+import { assertIntegrity } from '../integrity-gate.js';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_UPSTREAM, EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -77,6 +78,11 @@ export default async function init(args) {
     return EXIT.ERROR;
   }
 
+  // Refuse to re-init on top of a compromised install. No-op on first-run
+  // (no witnessDb yet → assertIntegrity short-circuits with skipped).
+  const gate = await assertIntegrity(paths, { command: 'init' });
+  if (!gate.ok) return gate.exit;
+
   // 2. Check for existing installation
   const existingPid = readPid(paths.pidFile);
   if (existingPid && !opts.force) {
@@ -94,10 +100,15 @@ export default async function init(args) {
       try {
         await verifySeed(opts.seedPath, sha256Path, sigPath);
       } catch (err) {
-        console.error(fmt.fail(`Seed verification failed: ${err.message}`));
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  This seed bundle cannot be trusted — it may be tampered or corrupted.');
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
         return EXIT.ERROR;
       }
       copyFileSync(opts.seedPath, paths.witnessDb);
+      // Persist sig artifacts so `chaingate doctor` can re-verify on every run.
+      copyFileSync(sha256Path, paths.witnessDbSha256);
+      copyFileSync(sigPath, paths.witnessDbSig);
       console.log(fmt.ok('Local seed verified and copied'));
     } else {
       // Download from GH Release
@@ -115,10 +126,14 @@ export default async function init(args) {
         const result = await verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
         console.log(fmt.ok(`Seed verified (${result.fingerprint})`));
       } catch (err) {
-        console.error(fmt.fail(`Seed verification failed: ${err.message}`));
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  This seed bundle cannot be trusted — it may be tampered or corrupted.');
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
         return EXIT.ERROR;
       }
       copyFileSync(bundle.dbPath, paths.witnessDb);
+      copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
+      copyFileSync(bundle.sigPath, paths.witnessDbSig);
     }
   } else if (existsSync(paths.witnessDb)) {
     console.log(fmt.ok('Existing witness database found'));

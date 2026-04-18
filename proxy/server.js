@@ -1,6 +1,7 @@
 import http from 'node:http';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 
 import { loadConfig } from './config.js';
@@ -17,6 +18,15 @@ import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
 import { rewritePackument } from '../gates/rewriter.js';
 import { createDepFetcher } from './dep-fetcher.js';
+
+// Read our own package version once at module-load — used by `/_chaingate/self`
+// so `chaingate doctor` can confirm the running proxy matches the installed CLI.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let PROXY_VERSION = 'unknown';
+try {
+  const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+  if (pkg?.version) PROXY_VERSION = pkg.version;
+} catch { /* fall through with 'unknown' */ }
 
 // Canonical package name form: decode %2F once so that /@babel/core and
 // /@babel%2Fcore collide on the same packages.package_name row and the
@@ -239,7 +249,9 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
 
   // Fail-LOUD on witness open. If the DB path is unwritable, corrupt, or
   // points at a missing parent dir we cannot auto-create, the proxy refuses
-  // to start rather than running degraded.
+  // to start rather than running degraded. At request time the witness path
+  // is fail-open (Section 7 item 2 of docs/V2_DESIGN.md) — see the
+  // observeAndSendPackument try/catch and the handler-level fallback below.
   let witness = null;
   let witnessDb = null;
   let depCache = null;
@@ -250,7 +262,17 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     } catch (err) {
       if (err.code !== 'EEXIST') throw err;
     }
-    witnessDb = openWitnessDB(config.witnessDbPath);
+    try {
+      witnessDb = openWitnessDB(config.witnessDbPath);
+    } catch (err) {
+      const msg =
+        `chaingate-proxy: failed to open witness DB at ${config.witnessDbPath}: ${err.message}\n` +
+        `  Fix: ensure the path is writable, or run \`chaingate init --force\` to recreate it,\n` +
+        `       or set CHAINGATE_WITNESS_DB to a different path.`;
+      const wrapped = new Error(msg);
+      wrapped.cause = err;
+      throw wrapped;
+    }
     depCache = new DepCache(witnessDb);
     // Background dep-first-publish fetcher for the scope-boundary gate.
     // Uses the same upstream fetchPackument helper as the main request path,
@@ -281,6 +303,19 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     }
 
     const url = new URL(req.url, 'http://internal');
+
+    // Internal self-attestation endpoint for `chaingate doctor` — lets the CLI
+    // confirm the running proxy matches the installed CLI. Bound to the same
+    // 127.0.0.1 interface as the rest of the proxy; exposes no secrets.
+    if (url.pathname === '/_chaingate/self') {
+      writeJson(res, 200, {
+        service: 'chaingate-proxy',
+        version: PROXY_VERSION,
+        pid: process.pid,
+      });
+      return;
+    }
+
     const route = classify(url.pathname);
 
     if (route.kind === 'unknown') {
@@ -320,7 +355,46 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         writeJson(res, 502, { error: 'upstream_unreachable', detail: err.message });
         return;
       }
-      writeJson(res, 500, { error: 'internal', detail: err.message });
+      // Fail-open (Section 7 item 2): an unexpected internal error must
+      // not break `npm install`. Log loudly, then attempt a raw upstream
+      // passthrough that bypasses the witness entirely. If headers are
+      // already sent we can't recover — just destroy the socket so the
+      // client sees a clean failure instead of a half-written response.
+      log?.warn?.(
+        `[proxy] internal error on ${req.method} ${req.url}: ${err.stack || err.message} (falling back to raw upstream)`,
+      );
+      if (res.headersSent) {
+        if (!res.writableEnded) res.destroy(err);
+        return;
+      }
+      try {
+        let upstream;
+        if (route.kind === 'packument') {
+          upstream = await fetchPackument(route.name, {
+            config,
+            requestHeaders: req.headers,
+          });
+        } else {
+          upstream = await fetchTarball(route.name, route.filename, {
+            config,
+            requestHeaders: req.headers,
+          });
+        }
+        await streamUpstream(res, upstream, upstream.statusCode);
+      } catch (fallbackErr) {
+        if (res.headersSent) {
+          if (!res.writableEnded) res.destroy(fallbackErr);
+          return;
+        }
+        if (fallbackErr instanceof UpstreamTimeoutError) {
+          writeJson(res, 504, { error: 'upstream_timeout', detail: fallbackErr.message });
+        } else {
+          writeJson(res, 502, {
+            error: 'upstream_unreachable',
+            detail: fallbackErr.message,
+          });
+        }
+      }
     }
   };
 

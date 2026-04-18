@@ -1,11 +1,46 @@
-import { existsSync, accessSync, constants as fsConstants } from 'node:fs';
-import { fmt, renderTable } from '../format.js';
+import { existsSync, accessSync, constants as fsConstants, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { npmrcPath } from '../npmrc.js';
 import { readPid, isPortInUse } from '../proxy-control.js';
 import { openWitnessDB } from '../../witness/db.js';
+import { verifySeed } from '../../witness/seed_verify.js';
+import { checkSelfWitness } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
-import { readFileSync } from 'node:fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let CLI_VERSION = 'unknown';
+try {
+  const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'));
+  if (pkg?.version) CLI_VERSION = pkg.version;
+} catch { /* keep 'unknown' */ }
+
+async function fetchProxySelf(host, port, timeoutMs = 1500) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(`http://${host}:${port}/_chaingate/self`, {
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Each check pushes { name, pass, detail, severity? } where severity is:
+//   'tamper'        — cryptographic disagreement, an attack signal (exit 5)
+//   'unverifiable'  — check could not complete (pre-publish, dev install) (exit 6)
+//   (absent)        — hard pass/fail in the pre-V2 operational sense (exit 0 or 1)
+function aggregateExit(checks) {
+  if (checks.some((c) => c.severity === 'tamper')) return EXIT.INTEGRITY_TAMPER;
+  if (checks.some((c) => !c.pass && !c.severity)) return EXIT.ERROR;
+  if (checks.some((c) => c.severity === 'unverifiable')) return EXIT.INTEGRITY_UNVERIFIABLE;
+  return EXIT.OK;
+}
 
 function parseArgs(args) {
   const opts = { scope: 'user', json: false };
@@ -84,48 +119,165 @@ export default async function doctor(args) {
     checks.push({ name: 'npmrc-block', pass, detail });
   }
 
-  // 6. Seed signature (quick check — verify pubkey fingerprint matches)
+  // 6. Seed signature — full Ed25519 re-verification against persisted artifacts.
+  //    `--no-seed` installs legitimately have no sig files; treat as unverifiable.
+  //    A hash/signature disagreement is a tamper signal (exit 5).
   {
-    let pass = false;
-    let detail = 'no seed metadata';
-    if (existsSync(paths.witnessDb)) {
+    if (!existsSync(paths.witnessDb)) {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: 'no witness database to verify',
+      });
+    } else if (!existsSync(paths.witnessDbSha256) || !existsSync(paths.witnessDbSig)) {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: 'no persisted .sha256/.sig (--no-seed install, or init pre-dates sig persistence)',
+      });
+    } else {
       try {
-        const db = openWitnessDB(paths.witnessDb, { readonly: true });
-        const fp = db.getSeedMetadata('signing_key_fingerprint');
-        db.close();
-        if (fp) {
-          const { CHAINGATE_SEED_PUBKEY_FINGERPRINT } = await import('../../witness/seed_verify.js');
-          pass = fp === CHAINGATE_SEED_PUBKEY_FINGERPRINT;
-          detail = pass ? `fingerprint matches (${fp})` : `fingerprint mismatch: db=${fp}`;
-        } else {
-          detail = 'no seed (observing from live traffic)';
-          pass = true; // --no-seed is valid
-        }
+        const result = await verifySeed(paths.witnessDb, paths.witnessDbSha256, paths.witnessDbSig);
+        checks.push({
+          name: 'seed-signature',
+          pass: true,
+          detail: `Ed25519 signature verified (${result.fingerprint})`,
+        });
       } catch (err) {
-        detail = err.message;
+        checks.push({
+          name: 'seed-signature',
+          pass: false,
+          severity: 'tamper',
+          detail: `${err.code ?? 'verify_failed'}: ${err.message}`,
+        });
       }
     }
-    checks.push({ name: 'seed-integrity', pass, detail });
+  }
+
+  // 7. Self-witness — installed chaingate integrity vs witness-recorded baseline.
+  //    Pre-publish: witness has no chaingate entry → unverifiable (exit 6).
+  //    Post-publish mismatch → tamper (exit 5). See cli/self-witness.js.
+  {
+    if (!existsSync(paths.witnessDb)) {
+      checks.push({
+        name: 'self-witness',
+        pass: false,
+        severity: 'unverifiable',
+        detail: 'no witness database',
+      });
+    } else {
+      let db = null;
+      try {
+        db = openWitnessDB(paths.witnessDb, { readonly: true });
+        const r = checkSelfWitness(db);
+        if (r.status === 'verified') {
+          checks.push({
+            name: 'self-witness',
+            pass: true,
+            detail: r.detail,
+          });
+        } else if (r.status === 'tamper') {
+          checks.push({
+            name: 'self-witness',
+            pass: false,
+            severity: 'tamper',
+            detail: r.detail,
+          });
+        } else {
+          checks.push({
+            name: 'self-witness',
+            pass: false,
+            severity: 'unverifiable',
+            detail: r.detail,
+          });
+        }
+      } catch (err) {
+        checks.push({
+          name: 'self-witness',
+          pass: false,
+          severity: 'unverifiable',
+          detail: `witness read failed: ${err.message}`,
+        });
+      } finally {
+        if (db) try { db.close(); } catch {}
+      }
+    }
+  }
+
+  // 8. Proxy identity — confirm the running proxy matches the installed CLI
+  //    (version + pid) via the loopback /_chaingate/self endpoint. A version
+  //    or pid mismatch means the running proxy is not the one just installed —
+  //    a tamper signal (exit 5). Unreachable when the proxy is down is not
+  //    a tamper signal; just skip.
+  {
+    const pidFromFile = readPid(paths.pidFile);
+    if (!pidFromFile) {
+      checks.push({
+        name: 'proxy-identity',
+        pass: true,
+        detail: 'proxy not running (skipped)',
+      });
+    } else {
+      try {
+        const self = await fetchProxySelf(DEFAULT_HOST, DEFAULT_PORT);
+        const versionMatch = self.version === CLI_VERSION;
+        const pidMatch = Number(self.pid) === Number(pidFromFile);
+        if (versionMatch && pidMatch) {
+          checks.push({
+            name: 'proxy-identity',
+            pass: true,
+            detail: `matches installed CLI (v${self.version}, pid ${self.pid})`,
+          });
+        } else {
+          checks.push({
+            name: 'proxy-identity',
+            pass: false,
+            severity: 'tamper',
+            detail: `mismatch — proxy version=${self.version} cli=${CLI_VERSION}; proxy pid=${self.pid} pidfile=${pidFromFile}`,
+          });
+        }
+      } catch (err) {
+        checks.push({
+          name: 'proxy-identity',
+          pass: false,
+          detail: `self-endpoint unreachable: ${err.message}`,
+        });
+      }
+    }
   }
 
   // Output
   if (opts.json) {
     console.log(JSON.stringify(checks, null, 2));
-    return checks.every((c) => c.pass) ? EXIT.OK : EXIT.ERROR;
+    return aggregateExit(checks);
   }
 
   console.log(fmt.bold('ChainGate Doctor\n'));
   for (const c of checks) {
-    const icon = c.pass ? fmt.ok(c.name) : fmt.fail(c.name);
+    let icon;
+    if (c.pass) icon = fmt.ok(c.name);
+    else if (c.severity === 'tamper') icon = fmt.fail(`${c.name} [TAMPER]`);
+    else if (c.severity === 'unverifiable') icon = fmt.warn(`${c.name} [unverifiable]`);
+    else icon = fmt.fail(c.name);
     console.log(`  ${icon}  ${fmt.dim(c.detail)}`);
   }
 
-  const failures = checks.filter((c) => !c.pass);
-  if (failures.length === 0) {
-    console.log(`\n${fmt.green('All checks passed.')}`);
-    return EXIT.OK;
+  const exitCode = aggregateExit(checks);
+  console.log('');
+  if (exitCode === EXIT.OK) {
+    console.log(fmt.green('All checks passed.'));
+  } else if (exitCode === EXIT.INTEGRITY_TAMPER) {
+    console.log(fmt.red('TAMPER signal — cryptographic checks disagree.'));
+    console.log(fmt.red('  Do not use this installation. Reinstall chaingate from a trusted source.'));
+  } else if (exitCode === EXIT.INTEGRITY_UNVERIFIABLE) {
+    console.log(fmt.yellow('Unverifiable — integrity checks could not complete.'));
+    console.log(fmt.dim('  Expected for pre-publish, dev, or --no-seed installs. See detail above.'));
+  } else {
+    const fails = checks.filter((c) => !c.pass).length;
+    console.log(fmt.red(`${fails} check(s) failed.`));
   }
 
-  console.log(`\n${fmt.red(`${failures.length} check(s) failed.`)}`);
-  return EXIT.ERROR;
+  return exitCode;
 }
