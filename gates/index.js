@@ -67,6 +67,8 @@ const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK']);
 //
 // Re-exported here for backward compatibility with existing callers that
 // import it from this module.
+// TODO: migrate callers to import directly from ../constants.js
+// (test/gates/runner.test.js is the remaining importer as of V2 sub-step 2f).
 export { MIN_HISTORY_DEPTH };
 const HISTORY_INDEPENDENT_GATES = new Set(['content-hash']);
 
@@ -190,9 +192,3 @@ export function createGateRunner({
   };
 }
 
-// Back-compat: a zero-module runner for code paths that haven't been
-// updated to createGateRunner yet. P5.5 wires proxy/server.js through
-// createGateRunner explicitly.
-export function runGates(_input) {
-  return { disposition: 'ALLOW', results: [], override: null };
-}

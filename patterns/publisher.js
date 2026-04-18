@@ -105,7 +105,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 2f — signals aggregation (max_prior_tenure etc.)
 //   sub-step 3  — identity_profile (domain/provider/similarity) + shape
 //   sub-step 4  — calibrate.js (derive K, W from seed) + corpus validation
 //   sub-step 5  — cross-package campaign detection (STRETCH)
@@ -585,10 +584,9 @@ export default {
     extractKnownContributor(transitions, tenure);
     const signals = extractSignals(sorted, tenure, transitions, skipped);
 
-    // Sub-step 2f step 2 (Tier 1) lands here. identity_profile / shape
-    // keep the locked contract shape from sub-step 1 and are filled in
-    // by step 3. Tier 2 (severity extrema + 2×2 cell histogram) lands
-    // in step 3 of 2f; Tier 3 (temporal summary) in step 4 of 2f.
+    // Sub-step 2f steps 2-4 (Tiers 1/2/3 of signals) land in
+    // extractSignals above. identity_profile / shape keep the locked
+    // contract shape from sub-step 1 and are filled in by sub-step 3.
     return {
       tenure,
       transitions,

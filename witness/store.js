@@ -1,24 +1,40 @@
 // Orchestration layer between the proxy, the witness DB, and the gate runner.
 //
 // Contract:
-//   const witness = createWitness({ db, runGates, config });
+//   const witness = createWitness({ db, runGates, config, logger });
 //   const result  = witness.observePackument(packageName, packument);
-//     → { decisions: Map<version, disposition>, newBaselines, versionsSeen }
+//     → {
+//         decisions: Map<version, { disposition, results }>,
+//         newBaselines: number,
+//         versionsSeen: number,
+//       }
+//     The map value is an OBJECT, not a bare disposition string.
+//     `results` is the per-gate array as returned by runGates (already
+//     normalized); on runner-threw fallback it is the synthetic
+//     [{ gate: 'runner_error', result: 'SKIP', ... }] entry.
+//
 //   const result  = witness.observeTarball(packageName, filename);
-//     → { disposition: 'ALLOW' }   // Day 4 stub; Day 5 adds blocked-version check
+//     → { disposition: 'ALLOW' }
+//     Pass-through by design. Tarball-level blocking is performed in
+//     proxy/server.js via db.getLatestDecision on the version extracted
+//     from the filename; the store does not duplicate that lookup.
 //
-// Day 4 guarantees:
+// Guarantees:
 //   - parses every version in the packument via witness/baseline.js
-//   - opens ONE transaction per observePackument call
-//   - per-version errors are caught so one bad entry can't abort the whole run
-//   - first-seen: recordBaseline + insert ALLOW gate_decision (first-seen)
-//   - second-seen: baseline is idempotent no-op; bumpLastSeen handled by db.recordBaseline
-//   - state-change logging: only writes a new gate_decisions row when disposition
-//     differs from the latest prior decision for (pkg, version)
-//   - runGates() is called inside the transaction for every version; errors per
-//     version are caught and logged as a synthetic WARN "runner_error"
+//   - opens ONE better-sqlite3 transaction per observePackument call
+//   - per-version errors are caught inside the txn so one bad entry cannot
+//     roll back the whole batch (throwing would abort the entire txn)
+//   - first-seen: recordBaseline + insert a gate_decisions row with a
+//     synthetic first-seen ALLOW entry prepended to the gate results
+//   - re-observe: recordBaseline is idempotent; a new gate_decisions row
+//     is written ONLY when the disposition differs from the latest prior
+//     decision for (pkg, version) — state-change logging, not append-on-observe
+//   - runGates() is called inside the transaction for every version;
+//     runner-level throws surface as a synthetic runner_error SKIP result
+//     with disposition ALLOW (fail-open)
 //
-// The store does NOT mutate the packument. Rewriting is Day 5 (gates/rewriter.js).
+// The store does NOT mutate the packument. Packument rewriting lives in
+// gates/rewriter.js and is driven from proxy/server.js.
 
 import { parseVersionsFromPackument } from './baseline.js';
 
@@ -127,9 +143,10 @@ export function createWitness({ db, runGates, config, logger }) {
   }
 
   function observeTarball(_packageName, _filename) {
-    // Day 4 stub. Day 5 checks gate_decisions for a BLOCK disposition on
-    // (pkg, version extracted from filename) and returns { disposition:'BLOCK' }
-    // so the proxy can return 403.
+    // Pass-through by design. Tarball-level blocking is performed in
+    // proxy/server.js via db.getLatestDecision on the version extracted
+    // from the filename — keeping the lookup at the proxy layer avoids
+    // re-parsing the filename here and double-reading the decisions table.
     return { disposition: 'ALLOW' };
   }
 
