@@ -380,3 +380,202 @@ test('tenure: out-of-order input produces same tenure as sorted input', () => {
   assert.equal(forward.tenure[0].version_count, 3);
   assert.equal(forward.tenure[1].version_count, 2);
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 2c: transitions with prior_tenure + gap
+//
+// Each transition is a boundary between adjacent tenure blocks, carrying
+// enough numeric context for the downstream gate to tell apart four
+// shapes that all look identical to a simple "publisher_changed" boolean.
+//
+// Fixture matrix:
+//   A — single handoff (event-stream class)       → 1 transition
+//   B — 40 rotating committee singletons          → 39 transitions
+//   C — 100 versions, one identity                → 0 transitions
+//   D — dormancy revive (5 active, 730d silent,    → 1 transition, huge gap
+//       then new identity) — the shape behind
+//       multiple 2024–2026 takeover campaigns
+//       (note: NOT the real faker incident, which
+//        was intentional self-sabotage, not a
+//        takeover — the name is generic on purpose)
+//   E — rapid unannounced handoff (10 active,      → 1 transition, 1h gap
+//       new identity publishes 1 hour later)
+//   A/B/A reappearance (from 2b fixture)           → 2 transitions
+// ---------------------------------------------------------------------------
+
+test('transitions: empty history → empty transitions', () => {
+  const out = publisher.extract({ packageName: 'empty', history: [] });
+  assert.deepEqual(out.transitions, []);
+  assert.equal(out.signals.transition_count, 0);
+});
+
+test('transitions: single tenure block → zero transitions', () => {
+  const rows = buildRows([['solo@example.com', 1]]);
+  const out = publisher.extract({ packageName: 'solo', history: rows });
+  assert.equal(out.tenure.length, 1);
+  assert.equal(out.transitions.length, 0);
+  assert.equal(out.signals.transition_count, 0);
+});
+
+test('fixture A (event-stream class): exactly 1 transition with tenure-weighted fields', () => {
+  const rows = buildRows([
+    ['dominictarr@example.com', 27],
+    ['right9ctrl@example.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'event-stream', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  assert.equal(out.signals.transition_count, 1);
+
+  const [t] = out.transitions;
+  assert.equal(t.from_identity, 'dominictarr <dominictarr@example.com>');
+  assert.equal(t.to_identity, 'right9ctrl <right9ctrl@example.com>');
+  assert.equal(t.at_version, '1.0.27');
+  assert.equal(t.prior_tenure_versions, 27);
+  assert.equal(t.prior_tenure_duration_ms, 26 * DAY_MS);
+  assert.equal(t.gap_ms, DAY_MS);
+  assert.equal(t.from_index, 0);
+});
+
+test('fixture B (committee): 40 rotating identities → 39 transitions of uniform shape', () => {
+  const spec = [];
+  for (let i = 0; i < 40; i += 1) {
+    spec.push([`maintainer${i}@example.com`, 1]);
+  }
+  const rows = buildRows(spec);
+  const out = publisher.extract({ packageName: 'committee', history: rows });
+
+  assert.equal(out.transitions.length, 39);
+  assert.equal(out.signals.transition_count, 39);
+
+  for (const t of out.transitions) {
+    // Every committee hop: previous block held one version, zero
+    // duration, and the gap is the uniform stride. The gate's job is
+    // to recognize this shape as ALLOW — none of the numeric features
+    // individually say "attack".
+    assert.equal(t.prior_tenure_versions, 1);
+    assert.equal(t.prior_tenure_duration_ms, 0);
+    assert.equal(t.gap_ms, DAY_MS);
+  }
+  // from_index is monotonic 0..38
+  for (let i = 0; i < out.transitions.length; i += 1) {
+    assert.equal(out.transitions[i].from_index, i);
+  }
+});
+
+test('fixture C (long solo tenure): 100 same-identity versions → 0 transitions', () => {
+  const rows = buildRows([['faisalman@example.com', 100]]);
+  const out = publisher.extract({ packageName: 'ua-parser-js', history: rows });
+
+  // Negative test: even 100 consecutive versions under the same
+  // identity must NOT fabricate a transition. This is the
+  // ua-parser-js-class case (token theft, same publisher) — the
+  // publisher pattern must stay silent so other patterns (content
+  // hash, install scripts, scope boundary) can carry the signal.
+  assert.equal(out.transitions.length, 0);
+  assert.equal(out.signals.transition_count, 0);
+});
+
+test('fixture D (dormancy-revive): 5 active → 730-day silence → 1 by new identity', () => {
+  // Shape behind multiple 2024–2026 abandoned-package takeovers.
+  // A short original tenure followed by multi-year silence and a
+  // sudden revive under a new identity is the canonical strong
+  // signal: the gap itself IS the takeover tell. Without gap_ms,
+  // this is indistinguishable from committee rotation.
+  const rows = buildRowsAbsolute([
+    ['orig@example.com', 0],
+    ['orig@example.com', 25 * DAY_MS],
+    ['orig@example.com', 50 * DAY_MS],
+    ['orig@example.com', 75 * DAY_MS],
+    ['orig@example.com', 100 * DAY_MS],
+    ['newowner@example.com', 830 * DAY_MS],
+  ]);
+  const out = publisher.extract({ packageName: 'dormancy-revive', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+  assert.equal(out.transitions.length, 1);
+
+  const [t] = out.transitions;
+  assert.equal(t.from_identity, 'orig <orig@example.com>');
+  assert.equal(t.to_identity, 'newowner <newowner@example.com>');
+  assert.equal(t.prior_tenure_versions, 5);
+  assert.equal(t.prior_tenure_duration_ms, 100 * DAY_MS);
+  assert.equal(t.gap_ms, 730 * DAY_MS);
+  assert.equal(t.from_index, 0);
+});
+
+test('fixture E (rapid unannounced handoff): 10 active, new identity 1h later', () => {
+  // Shape: established contributor, no announcement, new identity
+  // publishes an hour after the last legitimate release. The 1-hour
+  // gap alongside 10 versions of prior tenure is what distinguishes
+  // this from committee rotation (where gap IS typical) and from
+  // takeover-after-dormancy (where the gap is enormous).
+  const spec = [];
+  for (let i = 0; i < 10; i += 1) {
+    spec.push(['orig@example.com', i * DAY_MS]);
+  }
+  spec.push(['attacker@example.com', 9 * DAY_MS + HOUR_MS]);
+  const rows = buildRowsAbsolute(spec);
+  const out = publisher.extract({ packageName: 'rapid-handoff', history: rows });
+
+  assert.equal(out.transitions.length, 1);
+  const [t] = out.transitions;
+  assert.equal(t.prior_tenure_versions, 10);
+  assert.equal(t.prior_tenure_duration_ms, 9 * DAY_MS);
+  assert.equal(t.gap_ms, HOUR_MS);
+});
+
+test('transitions: A/B/A reappearance yields 2 transitions with correct from_index sequence', () => {
+  const rows = buildRows([
+    ['a@x.com', 2],
+    ['b@y.com', 1],
+    ['a@x.com', 3],
+  ]);
+  const out = publisher.extract({ packageName: 'aba', history: rows });
+
+  assert.equal(out.transitions.length, 2);
+  assert.equal(out.transitions[0].from_identity, 'a <a@x.com>');
+  assert.equal(out.transitions[0].to_identity, 'b <b@y.com>');
+  assert.equal(out.transitions[0].prior_tenure_versions, 2);
+  assert.equal(out.transitions[0].from_index, 0);
+
+  assert.equal(out.transitions[1].from_identity, 'b <b@y.com>');
+  assert.equal(out.transitions[1].to_identity, 'a <a@x.com>');
+  assert.equal(out.transitions[1].prior_tenure_versions, 1);
+  assert.equal(out.transitions[1].prior_tenure_duration_ms, 0);
+  assert.equal(out.transitions[1].from_index, 1);
+});
+
+test('transitions: invariant — length equals max(tenure.length - 1, 0)', () => {
+  const cases = [
+    { history: [], expectedTenure: 0, expectedTransitions: 0 },
+    { history: buildRows([['a@x.com', 1]]), expectedTenure: 1, expectedTransitions: 0 },
+    { history: buildRows([['a@x.com', 3]]), expectedTenure: 1, expectedTransitions: 0 },
+    { history: buildRows([['a@x.com', 1], ['b@y.com', 1]]), expectedTenure: 2, expectedTransitions: 1 },
+    {
+      history: buildRows([
+        ['a@x.com', 2], ['b@y.com', 1], ['c@z.com', 4], ['d@w.com', 1],
+      ]),
+      expectedTenure: 4,
+      expectedTransitions: 3,
+    },
+  ];
+  for (const { history, expectedTenure, expectedTransitions } of cases) {
+    const out = publisher.extract({ packageName: 'invariant', history });
+    assert.equal(out.tenure.length, expectedTenure);
+    assert.equal(out.transitions.length, expectedTransitions);
+    assert.equal(out.signals.transition_count, expectedTransitions);
+  }
+});
+
+test('transitions: determinism — permuted input produces byte-identical transitions', () => {
+  const rows = buildRowsAbsolute([
+    ['a@x.com', 0],
+    ['a@x.com', 10 * DAY_MS],
+    ['b@y.com', 20 * DAY_MS],
+    ['a@x.com', 30 * DAY_MS],
+  ]);
+  const forward = publisher.extract({ packageName: 'perm', history: rows });
+  const reversed = publisher.extract({ packageName: 'perm', history: rows.slice().reverse() });
+  assert.equal(JSON.stringify(forward.transitions), JSON.stringify(reversed.transitions));
+});
