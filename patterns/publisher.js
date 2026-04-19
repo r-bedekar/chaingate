@@ -171,7 +171,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 3c — 3a/3b fixture matrix + determinism + invariants
 //   sub-step 4  — calibrate.js (derive K, W, MIN_VERIFIED_VERSIONS,
 //                  CHURNING_WINDOW from seed) + corpus validation +
 //                  identity_profile.similarity (domain-similarity /
