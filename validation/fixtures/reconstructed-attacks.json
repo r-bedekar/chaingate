@@ -14,7 +14,7 @@
       "package_name": "axios",
       "version": "1.14.1",
       "reconstructed": true,
-      "reconstruction_notes": "Unpublished from npm registry on 2026-03-31 after ~3h live window. Packument 'time' map retains publish timestamp; versions subtree no longer contains the body. Package.json dependency delta inferred from Datadog + Elastic postmortems plus legitimate adjacent version 1.14.0 retrieved from the registry.",
+      "reconstruction_notes": "Unpublished from npm registry on 2026-03-31 after ~3h live window. Packument 'time' map retains publish timestamp; versions subtree no longer contains the body. Package.json dependency delta inferred from Datadog + Elastic postmortems plus legitimate adjacent version 1.14.0 retrieved from the registry. axios@1.14.0 baseline data verified live against npm registry on 2026-04-19 (scripts list in citation is an exact 18/18 key match; no install/preinstall/postinstall hooks present).",
       "fields": {
         "package_name": {
           "value": "axios",
