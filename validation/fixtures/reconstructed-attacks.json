@@ -1,0 +1,700 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-19",
+  "purpose": "Canonical supply-chain attack versions required for publisher-pattern validation (sub-step 4). These versions were unpublished from the npm registry so they cannot be collected by the VPS crawler. Reconstructed from public postmortems. Every data field carries one or more source citations with URL + direct quote. Ground rules from 2026-04-19 review apply: per-field citation, source hierarchy (registry_data > direct_quote > corroboration > inference_weaker), no general knowledge without citation, null for unavailable with UNAVAILABLE source noting why.",
+  "source_type_legend": {
+    "registry_data": "Direct observation from https://registry.npmjs.org packument (authoritative)",
+    "direct_quote": "Verbatim quote from a named postmortem page, accessed 2026-04-19",
+    "corroboration": "Independent second postmortem source stating the same fact",
+    "inference_weaker": "Inferred from a source rather than stated (flag per review rule #2)",
+    "unavailable": "Field value is null because no public source states it; reason documented"
+  },
+  "records": [
+    {
+      "package_name": "axios",
+      "version": "1.14.1",
+      "reconstructed": true,
+      "reconstruction_notes": "Unpublished from npm registry on 2026-03-31 after ~3h live window. Packument 'time' map retains publish timestamp; versions subtree no longer contains the body. Package.json dependency delta inferred from Datadog + Elastic postmortems plus legitimate adjacent version 1.14.0 retrieved from the registry.",
+      "fields": {
+        "package_name": {
+          "value": "axios",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/axios",
+              "quote": "packument returned for this name",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "version": {
+          "value": "1.14.1",
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "Malicious axios@1.14.1 published from the jasonsaayman account",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "published_at_ms": {
+          "value": 1774916518168,
+          "iso8601": "2026-03-31T00:21:58.168Z",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/axios",
+              "quote": "time map: \"1.14.1\":\"2026-03-31T00:21:58.168Z\"",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "2026-03-31T00:21:58.168Z",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_name": {
+          "value": "jasonsaayman",
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "Malicious axios@1.14.1 published from the jasonsaayman account",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all",
+              "quote": "axios@1.14.1 published by compromised account",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_email": {
+          "value": "ifstap@proton.me",
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "the attacker's email address: ifstap@proton.me (as shown in the maintainers list snapshot)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all",
+              "quote": "the maintainer email shifted from jasonsaayman@gmail[.]com to this address for version 1.14.1",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "integrity_hash": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/axios",
+              "quote": "1.14.1 absent from versions subtree (unpublished); dist.integrity not retrievable",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "has_install_scripts": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "page discusses the postinstall script only for plain-crypto-js@4.2.1, not for axios@1.14.1 itself — absence of affirmative statement about axios's own scripts",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "provenance_present": {
+          "value": false,
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "For 1.14.1 the trustedPublisher field is absent. This version was published directly from the jasonsaayman account session, not through the GitHub Actions workflow",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all",
+              "quote": "Direct CLI publish — None (no provenance attestations)",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "dependencies": {
+          "value": {
+            "form-data": "^4.0.5",
+            "proxy-from-env": "^2.1.0",
+            "follow-redirects": "^1.15.11",
+            "plain-crypto-js": "^4.2.1"
+          },
+          "sources": [
+            {
+              "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
+              "quote": "The only meaningful change to package.json was a new dependency: \"plain-crypto-js\": \"^4.2.1\"",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/axios/1.14.0",
+              "quote": "dependencies: form-data ^4.0.5, proxy-from-env ^2.1.0, follow-redirects ^1.15.11 (baseline legitimate 1.14.0; Datadog states only plain-crypto-js was added)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "package_name": "event-stream",
+      "version": "3.3.6",
+      "reconstructed": true,
+      "reconstruction_notes": "Unpublished after discovery in November 2018. Packument 'time' map retains publish timestamp; versions subtree no longer contains the body. publisher_email on the malicious version is not directly observable (unpublished) — inferred from registry-observed email on adjacent versions plus postmortem statement that right9ctrl (same account) published 3.3.6. Attack mechanism was require-time execution of minified code in flatmap-stream, not npm install hooks.",
+      "fields": {
+        "package_name": {
+          "value": "event-stream",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/event-stream",
+              "quote": "packument returned for this name",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "version": {
+          "value": "3.3.6",
+          "sources": [
+            {
+              "url": "https://snyk.io/blog/a-post-mortem-of-the-malicious-event-stream-backdoor/",
+              "quote": "September 9, 2018: created a new minor event-stream release 3.3.6",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "published_at_ms": {
+          "value": 1536481739503,
+          "iso8601": "2018-09-09T08:28:59.503Z",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/event-stream",
+              "quote": "time map: \"3.3.6\":\"2018-09-09T08:28:59.503Z\"",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident",
+              "quote": "This package was added as a direct dependency of the event-stream package by a new maintainer on September 9, 2018, in version 3.3.6 (date corroboration only; ms precision from registry)",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_name": {
+          "value": "right9ctrl",
+          "sources": [
+            {
+              "url": "https://github.com/dominictarr/event-stream/issues/116",
+              "quote": "@right9ctrl ... After he adds it at almost the exact same time the injection is added to flatmap-stream, he bumps the version and publishes",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident",
+              "quote": "new maintainer ... on September 9, 2018, in version 3.3.6",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_email": {
+          "value": "right9ctrl@outlook.com",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/event-stream/3.3.5",
+              "quote": "_npmUser: {name: right9ctrl, email: right9ctrl@outlook.com} on legitimate adjacent version 3.3.5 (4 days before 3.3.6)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/event-stream/4.0.0",
+              "quote": "_npmUser: {name: right9ctrl, email: right9ctrl@outlook.com} on adjacent version 4.0.0 (post-takeover) — same account, same email",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident",
+              "quote": "right9ctrl ... took over maintainership (confirms same-account takeover path; exact email on the unpublished 3.3.6 body is not directly observable)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "integrity_hash": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/event-stream",
+              "quote": "3.3.6 absent from versions subtree (unpublished); dist.integrity not retrievable",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "has_install_scripts": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://snyk.io/blog/a-post-mortem-of-the-malicious-event-stream-backdoor/",
+              "quote": "flatmap-stream version 0.1.1 included the malicious attack in its minified source code (attack triggered at require-time in the dependency, not via install hooks of event-stream itself; postmortems do not directly assert whether event-stream 3.3.6's own package.json contained install scripts)",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "provenance_present": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/event-stream",
+              "quote": "3.3.6 absent from versions subtree; provenance field not retrievable. npm provenance attestation feature (_attestations / trustedPublisher) was introduced in April 2023 — post-dates the 2018 incident — so the field was not observable on any 2018 publish by design",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "dependencies": {
+          "value": {
+            "duplexer": "^0.1.1",
+            "from": "^0.1.7",
+            "map-stream": "0.0.7",
+            "pause-stream": "^0.0.11",
+            "split": "^1.0.1",
+            "stream-combiner": "^0.2.2",
+            "through": "^2.3.8",
+            "flatmap-stream": "0.1.1"
+          },
+          "sources": [
+            {
+              "url": "https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident",
+              "quote": "The malicious package was version 0.1.1 of flatmap-stream. This package was added as a direct dependency of the event-stream package by a new maintainer on September 9, 2018, in version 3.3.6",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/event-stream/3.3.5",
+              "quote": "dependencies: duplexer ^0.1.1, from ^0.1.7, map-stream 0.0.7, pause-stream ^0.0.11, split ^1.0.1, stream-combiner ^0.2.2, through ^2.3.8 (baseline legitimate 3.3.5, published 4 days before 3.3.6; flatmap-stream was the added dep per npm blog)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "package_name": "ua-parser-js",
+      "version": "0.7.29",
+      "reconstructed": true,
+      "reconstruction_notes": "Unpublished on 2021-10-22 after ~4h live window. Attack was same-account takeover (maintainer 'faisalman' npm account hijacked); per the GATE CONTRACT this package is a deliberate NEGATIVE fixture — publisher-pattern signals should NOT fire because publisher identity is unchanged. publisher_email inferred from registry-observed email on adjacent legitimate versions (0.7.28 pre-attack, 0.7.30 post-fix) plus postmortem statement that the maintainer's own account was hijacked.",
+      "fields": {
+        "package_name": {
+          "value": "ua-parser-js",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "packument returned for this name",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "version": {
+          "value": "0.7.29",
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "embedded malicious crypto miner code injected across three versions (0.7.29, 0.8.0, 1.0.0)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "published_at_ms": {
+          "value": 1634905521378,
+          "iso8601": "2021-10-22T12:15:21.378Z",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "time map: \"0.7.29\":\"2021-10-22T12:15:21.378Z\"",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://www.rapid7.com/blog/post/2021/10/25/npm-library-ua-parser-js-hijacked-what-you-need-to-know/",
+              "quote": "starting on October 22, 2021, at 12:15 PM GMT (date/hour-minute corroboration only; ms precision from registry)",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_name": {
+          "value": "faisalman",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version 0.7.28",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account (same-account takeover confirms malicious publish used 'faisalman' identity)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_email": {
+          "value": "fyzlman@gmail.com",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version 0.7.28",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.30",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate post-fix version 0.7.30 — same account, same email",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account (exact email on the unpublished 0.7.29 body is not directly observable)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "integrity_hash": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "0.7.29 absent from versions subtree (unpublished); dist.integrity not retrievable",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "has_install_scripts": {
+          "value": true,
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "malicious code reads browser user data files, exports OS credentials copies the cookies DB file from the browser (via preinstall scripts)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "provenance_present": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "0.7.29 absent from versions subtree; provenance field not retrievable. npm provenance attestation feature was introduced in April 2023 — post-dates the October 2021 incident — so the field was not observable on any 2021 publish by design",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "dependencies": {
+          "value": {},
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "dependencies: {} on legitimate pre-attack version 0.7.28",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.30",
+              "quote": "dependencies: {} on legitimate post-fix version 0.7.30 — dep set unchanged across the attack window",
+              "type": "corroboration",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "Snyk advisory lists no added-dependency vector; attack delivered via preinstall script only (no npm dep added)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "package_name": "ua-parser-js",
+      "version": "0.8.0",
+      "reconstructed": true,
+      "reconstruction_notes": "Unpublished on 2021-10-22 in the same attack burst as 0.7.29 and 1.0.0. Same-account takeover (faisalman). Published 45 seconds after 0.7.29. NEGATIVE fixture — publisher-pattern signals should NOT fire.",
+      "fields": {
+        "package_name": {
+          "value": "ua-parser-js",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "packument returned for this name",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "version": {
+          "value": "0.8.0",
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "embedded malicious crypto miner code injected across three versions (0.7.29, 0.8.0, 1.0.0)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "published_at_ms": {
+          "value": 1634905566877,
+          "iso8601": "2021-10-22T12:16:06.877Z",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "time map: \"0.8.0\":\"2021-10-22T12:16:06.877Z\"",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_name": {
+          "value": "faisalman",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version (same account hijacked for 0.8.0 per Snyk)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_email": {
+          "value": "fyzlman@gmail.com",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account (exact email on the unpublished 0.8.0 body is not directly observable)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "integrity_hash": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "0.8.0 absent from versions subtree (unpublished); dist.integrity not retrievable",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "has_install_scripts": {
+          "value": true,
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "malicious code ... via preinstall scripts (Snyk advisory covers all three malicious versions 0.7.29/0.8.0/1.0.0)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "provenance_present": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "0.8.0 absent from versions subtree; provenance not retrievable; feature post-dates October 2021",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "dependencies": {
+          "value": {},
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.8.1",
+              "quote": "dependencies: {} on post-fix 0.8.1 (dep set unchanged across attack window)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "attack delivered via preinstall script only (no npm dep added)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "package_name": "ua-parser-js",
+      "version": "1.0.0",
+      "reconstructed": true,
+      "reconstruction_notes": "Unpublished on 2021-10-22 in the same attack burst as 0.7.29 and 0.8.0. Same-account takeover (faisalman). Published 58 seconds after 0.7.29. NEGATIVE fixture — publisher-pattern signals should NOT fire.",
+      "fields": {
+        "package_name": {
+          "value": "ua-parser-js",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "packument returned for this name",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "version": {
+          "value": "1.0.0",
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "embedded malicious crypto miner code injected across three versions (0.7.29, 0.8.0, 1.0.0)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "published_at_ms": {
+          "value": 1634905579726,
+          "iso8601": "2021-10-22T12:16:19.726Z",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "time map: \"1.0.0\":\"2021-10-22T12:16:19.726Z\"",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_name": {
+          "value": "faisalman",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version (same account hijacked for 1.0.0 per Snyk)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "publisher_email": {
+          "value": "fyzlman@gmail.com",
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/0.7.28",
+              "quote": "_npmUser: {name: faisalman, email: fyzlman@gmail.com} on legitimate pre-attack version",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "A hijack in the maintainer's NPM account (exact email on the unpublished 1.0.0 body is not directly observable)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "integrity_hash": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "1.0.0 absent from versions subtree (unpublished); dist.integrity not retrievable",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "has_install_scripts": {
+          "value": true,
+          "sources": [
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "malicious code ... via preinstall scripts (Snyk advisory covers all three malicious versions 0.7.29/0.8.0/1.0.0)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "provenance_present": {
+          "value": null,
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js",
+              "quote": "1.0.0 absent from versions subtree; provenance not retrievable; feature post-dates October 2021",
+              "type": "unavailable",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        },
+        "dependencies": {
+          "value": {},
+          "sources": [
+            {
+              "url": "https://registry.npmjs.org/ua-parser-js/1.0.1",
+              "quote": "dependencies: {} on post-fix 1.0.1 (dep set unchanged across attack window)",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://security.snyk.io/vuln/SNYK-JS-UAPARSERJS-1766952",
+              "quote": "attack delivered via preinstall script only (no npm dep added)",
+              "type": "inference_weaker",
+              "accessed_at": "2026-04-19"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
