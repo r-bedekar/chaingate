@@ -71,6 +71,64 @@
 //
 //   UNSAFE to shortcut: has_overlap_transition — OR across
 //     heterogeneous transitions, misleads on mixed packages.
+//
+// PROVIDER CLASSIFICATION (sub-step 3a — supplementary signal).
+//
+//   Addition 1: provider is a severity modifier, NOT a disposition
+//   driver. The gate MUST NOT BLOCK solely on provider alone. On the
+//   cold-handoff cell (false, false), a privacy-provider to-identity
+//   bumps severity incrementally; an unverified-domain to-identity
+//   bumps severity incrementally. The combination (privacy + unverified)
+//   is the strongest provider-derived signal and is appropriate to push
+//   toward BLOCK only when prior_tenure is already high.
+//
+//   Reason: privacy-provider emails are overrepresented in takeover
+//   attacks but are also legitimate choices for real maintainers.
+//   Unverified domains are suspicious by construction but legitimate
+//   contributors create new domains all the time. Each signal alone
+//   is too weak to drive disposition.
+//
+//   5-class taxonomy and precedence are documented in patterns/provider.js.
+//   The per-block provider field consumes these classes; identity_profile
+//   aggregates them at the package level.
+//
+// DOMAIN STABILITY (sub-step 3a — package-level context modifier).
+//
+//   Addition 2: identity_profile.domain_stability summarizes how this
+//   package's email history looks:
+//
+//     stable    — single or two-domain history, long-standing
+//     mixed     — multi-domain history (committee/corporate teams)
+//     churning  — a new domain landed in the final CHURNING_WINDOW=5
+//                  rows (rule: at least one non-null domain in the
+//                  window does NOT appear in any earlier row)
+//
+//   The gate SHOULD consult domain_stability as one of several context
+//   modifiers when deciding severity on the cold-handoff cell. A
+//   churning package is more tolerant of new domains (they happen all
+//   the time in that package). A stable package is less tolerant of
+//   new domains (when this package sees a new domain, it's unusual).
+//
+//   domain_stability MUST NOT drive disposition on the other three
+//   2×2 cells.
+//
+// SHAPE (sub-step 3b — severity modifier on the cold-handoff cell).
+//
+//   Addition 3 (documentation-only until 3b lands): shape modulates
+//   disposition only on the cold-handoff cell:
+//
+//     solo        + (false, false) + high prior_tenure  → BLOCK
+//     committee   + (false, false)                       → WARN unless
+//                                                           prior_tenure
+//                                                           exceptional
+//     alternating + (false, false)                       → same as
+//                                                           committee
+//     shape === 'unknown'                                → treat as solo
+//                                                           (conservative)
+//
+//   shape MUST NOT drive disposition on the other three cells. A
+//   committee-shaped package with a recurring-member transition is
+//   ALLOW regardless of shape.
 // =====================================================================
 //
 // Why this matters (competitive positioning):
@@ -105,13 +163,18 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 3  — identity_profile (domain/provider/similarity) + shape
-//   sub-step 4  — calibrate.js (derive K, W from seed) + corpus validation
+//   sub-step 3b — shape classification (solo/alternating/committee)
+//   sub-step 3c — 3a/3b fixture matrix + determinism + invariants
+//   sub-step 4  — calibrate.js (derive K, W, MIN_VERIFIED_VERSIONS,
+//                  CHURNING_WINDOW from seed) + corpus validation +
+//                  identity_profile.similarity (domain-similarity /
+//                  homograph scoring — deferred from 3a)
 //   sub-step 5  — cross-package campaign detection (STRETCH)
 //   step 3      — V2 publisher-identity gate wiring
 
-import { MIN_HISTORY_DEPTH } from '../constants.js';
+import { CHURNING_WINDOW, MIN_HISTORY_DEPTH } from '../constants.js';
 import { normalizeIdentity } from './identity.js';
+import { classifyProvider, extractDomain } from './provider.js';
 import { compareSemver } from './semver.js';
 
 // Window size for overlap detection (sub-step 2d, definition (a)).
@@ -567,6 +630,92 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
   };
 }
 
+// Sub-step 3a: annotate each tenure block with domain/provider/
+// first_seen_in_package_ms based on the package-wide domain footprint.
+// The domain-version-count map drives the verified-corporate vs
+// unverified distinction; the earliest-ts map means the two acme blocks
+// in a reintroduction pattern (acme, beta, acme) share the SAME
+// first_seen_in_package_ms — the gate can distinguish "returning known
+// domain" from "never seen before" without re-scanning history.
+//
+// Returns the per-row domain array, reused by buildIdentityProfile to
+// compute domain_stability without re-extracting.
+function annotateTenureWithIdentityProfile(sortedRows, tenure) {
+  const rowDomains = sortedRows.map((r) => extractDomain(r.identity));
+
+  // Build domain → total version count AND domain → first-seen ts in
+  // one pass. sortedRows is ts-ascending, so the first occurrence of
+  // each domain IS its earliest appearance.
+  const domainVersionCounts = new Map();
+  const domainFirstSeen = new Map();
+  for (let i = 0; i < sortedRows.length; i += 1) {
+    const d = rowDomains[i];
+    if (d === null) continue;
+    domainVersionCounts.set(d, (domainVersionCounts.get(d) ?? 0) + 1);
+    if (!domainFirstSeen.has(d)) {
+      domainFirstSeen.set(d, sortedRows[i].published_at_ms);
+    }
+  }
+
+  for (const block of tenure) {
+    const domain = extractDomain(block.identity);
+    block.domain = domain;
+    block.provider = classifyProvider(domain, domainVersionCounts);
+    block.first_seen_in_package_ms =
+      domain === null ? null : domainFirstSeen.get(domain);
+  }
+
+  return rowDomains;
+}
+
+// Sub-step 3a: package-level aggregate derived from the annotated
+// tenure blocks + per-row domain array.
+//
+// domain_stability uses the new-to-window rule: a non-null domain
+// appears in the final CHURNING_WINDOW rows but NOT in any earlier row.
+// Null domains (bare-name, malformed identities) are excluded from the
+// count — stability is a signal about domain churn, not about identity
+// completeness.
+function buildIdentityProfile(rowDomains, tenure) {
+  const providers = new Set();
+  let hasPrivacy = false;
+  let hasUnverified = false;
+  for (const block of tenure) {
+    providers.add(block.provider);
+    if (block.provider === 'privacy') hasPrivacy = true;
+    if (block.provider === 'unverified') hasUnverified = true;
+  }
+
+  return {
+    providers_seen: [...providers].sort(),
+    has_privacy_provider: hasPrivacy,
+    has_unverified_domain: hasUnverified,
+    domain_stability: computeDomainStability(rowDomains),
+  };
+}
+
+function computeDomainStability(rowDomains) {
+  const n = rowDomains.length;
+  if (n === 0) return 'stable';
+
+  const windowStart = Math.max(0, n - CHURNING_WINDOW);
+  const earlierDomains = new Set();
+  for (let i = 0; i < windowStart; i += 1) {
+    if (rowDomains[i] !== null) earlierDomains.add(rowDomains[i]);
+  }
+
+  for (let i = windowStart; i < n; i += 1) {
+    const d = rowDomains[i];
+    if (d !== null && !earlierDomains.has(d)) return 'churning';
+  }
+
+  const allDomains = new Set();
+  for (const d of rowDomains) {
+    if (d !== null) allDomains.add(d);
+  }
+  return allDomains.size >= 3 ? 'mixed' : 'stable';
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -584,13 +733,16 @@ export default {
     extractKnownContributor(transitions, tenure);
     const signals = extractSignals(sorted, tenure, transitions, skipped);
 
-    // Sub-step 2f steps 2-4 (Tiers 1/2/3 of signals) land in
-    // extractSignals above. identity_profile / shape keep the locked
-    // contract shape from sub-step 1 and are filled in by sub-step 3.
+    // Sub-step 3a: annotate tenure blocks with domain/provider/
+    // first_seen_in_package_ms and build the identity_profile aggregate.
+    // shape stays stubbed until sub-step 3b.
+    const rowDomains = annotateTenureWithIdentityProfile(sorted, tenure);
+    const identity_profile = buildIdentityProfile(rowDomains, tenure);
+
     return {
       tenure,
       transitions,
-      identity_profile: {},
+      identity_profile,
       shape: 'unknown',
       signals,
     };
