@@ -114,8 +114,8 @@
 //
 // SHAPE (sub-step 3b — severity modifier on the cold-handoff cell).
 //
-//   Addition 3 (documentation-only until 3b lands): shape modulates
-//   disposition only on the cold-handoff cell:
+//   Addition 3: shape modulates disposition only on the cold-handoff
+//   cell:
 //
 //     solo        + (false, false) + high prior_tenure  → BLOCK
 //     committee   + (false, false)                       → WARN unless
@@ -129,6 +129,14 @@
 //   shape MUST NOT drive disposition on the other three cells. A
 //   committee-shaped package with a recurring-member transition is
 //   ALLOW regardless of shape.
+//
+//   Shape computation (see computeShape() below for the full comment):
+//   5-step cascade over tenure — insufficient history → 'unknown';
+//   U==1 → 'solo'; vmax/total >= SOLO_DOMINANCE (constants.js, 0.80)
+//   → 'solo' (dominance override); U==2 → 'alternating'; else →
+//   'committee'. Shape is computed over ALL observed tenure, not a
+//   recency window — it answers "what kind of package is this," a
+//   property that shouldn't flap per-release.
 // =====================================================================
 //
 // Why this matters (competitive positioning):
@@ -163,7 +171,6 @@
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 3b — shape classification (solo/alternating/committee)
 //   sub-step 3c — 3a/3b fixture matrix + determinism + invariants
 //   sub-step 4  — calibrate.js (derive K, W, MIN_VERIFIED_VERSIONS,
 //                  CHURNING_WINDOW from seed) + corpus validation +
@@ -172,7 +179,11 @@
 //   sub-step 5  — cross-package campaign detection (STRETCH)
 //   step 3      — V2 publisher-identity gate wiring
 
-import { CHURNING_WINDOW, MIN_HISTORY_DEPTH } from '../constants.js';
+import {
+  CHURNING_WINDOW,
+  MIN_HISTORY_DEPTH,
+  SOLO_DOMINANCE,
+} from '../constants.js';
 import { normalizeIdentity } from './identity.js';
 import { classifyProvider, extractDomain } from './provider.js';
 import { compareSemver } from './semver.js';
@@ -716,6 +727,67 @@ function computeDomainStability(rowDomains) {
   return allDomains.size >= 3 ? 'mixed' : 'stable';
 }
 
+// Sub-step 3b: multi-maintainer shape classification from tenure blocks.
+//
+// Decision cascade — 5 steps, short-circuit on first match. Future
+// additions (e.g., a "lead-with-deputies" refinement, or collapsing
+// alternating into committee after corpus validation in sub-step 4)
+// MUST slot into this order so the branch semantics stay explicit:
+//
+//   1. !hasSufficientHistory              → 'unknown'
+//        Conservative gate stance: insufficient history means shape is
+//        not statistically meaningful. The gate treats 'unknown' as
+//        solo on the cold-handoff cell (GATE CONTRACT Addition 3).
+//
+//   2. U == 1                             → 'solo'
+//        Single identity across all tenure blocks — the unambiguous
+//        case, no threshold needed.
+//
+//   3. vmax / total >= SOLO_DOMINANCE     → 'solo' (dominance override)
+//        Dominant-maintainer packages where secondary contributors
+//        exist but account for < (1 - SOLO_DOMINANCE) of releases.
+//        See constants.js for the 0.80 tradeoff analysis.
+//
+//   4. U == 2                             → 'alternating'
+//        Two-identity packages below the dominance threshold —
+//        corporate A/B release pipelines, maintainer + release-engineer
+//        splits. Kept distinct from 'committee' for decision-log
+//        explainability though consumption is identical on the
+//        cold-handoff cell.
+//
+//   5. else (U >= 3, no dominance)        → 'committee'
+//        Multi-maintainer packages with distributed release load.
+//
+// Shape is a function of identity counts only — interleaving /
+// adjacency does not affect the answer. This is deliberate: shape
+// describes the package's release-participation structure, not the
+// sequencing of releases.
+function computeShape(tenure, hasSufficientHistory) {
+  if (!hasSufficientHistory) return 'unknown';
+
+  const identityCounts = new Map();
+  let total = 0;
+  for (const block of tenure) {
+    identityCounts.set(
+      block.identity,
+      (identityCounts.get(block.identity) ?? 0) + block.version_count,
+    );
+    total += block.version_count;
+  }
+
+  const U = identityCounts.size;
+  if (U === 1) return 'solo';
+
+  let vmax = 0;
+  for (const c of identityCounts.values()) {
+    if (c > vmax) vmax = c;
+  }
+  if (total > 0 && vmax / total >= SOLO_DOMINANCE) return 'solo';
+
+  if (U === 2) return 'alternating';
+  return 'committee';
+}
+
 export default {
   name: 'publisher',
   version: 1,
@@ -735,15 +807,16 @@ export default {
 
     // Sub-step 3a: annotate tenure blocks with domain/provider/
     // first_seen_in_package_ms and build the identity_profile aggregate.
-    // shape stays stubbed until sub-step 3b.
+    // Sub-step 3b: classify multi-maintainer shape from tenure.
     const rowDomains = annotateTenureWithIdentityProfile(sorted, tenure);
     const identity_profile = buildIdentityProfile(rowDomains, tenure);
+    const shape = computeShape(tenure, signals.has_sufficient_history);
 
     return {
       tenure,
       transitions,
       identity_profile,
-      shape: 'unknown',
+      shape,
       signals,
     };
   },

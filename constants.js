@@ -81,3 +81,25 @@ export const MIN_VERIFIED_VERSIONS = 2;
 // false-positives on natural rotating committees. See patterns/publisher.js
 // GATE CONTRACT addition 2 for the consumption semantics.
 export const CHURNING_WINDOW = 5;
+
+// Fraction of a package's total versions attributable to its single
+// most-active identity beyond which we classify the package as 'solo'
+// even when secondary contributors exist. Starter value — 0.80 catches
+// dominant-maintainer packages (e.g., lodash, chalk pre-2025) while
+// leaving genuine 60/40 alternating packages and 3-way committees
+// outside.
+//
+// Tradeoff: may false-classify large committee projects where the
+// primary contributor happens to do 80%+ of releases (a common pattern
+// in projects with one lead + many drive-by contributors). The
+// classification error is bounded — shape modulates severity only on
+// the cold-handoff cell (publisher.js GATE CONTRACT addition 3), so a
+// mislabeled-solo committee with ongoing recurring-member transitions
+// is still ALLOWed on those transitions. Calibrated in sub-step 4
+// against the seed corpus; raise if the dominant-maintainer false-
+// positive rate is high.
+//
+// Consumed by:
+//   patterns/publisher.js — computeShape() cascade step 3 (dominance
+//                            override: vmax/total >= SOLO_DOMINANCE).
+export const SOLO_DOMINANCE = 0.80;
