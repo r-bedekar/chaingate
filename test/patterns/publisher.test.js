@@ -1905,3 +1905,141 @@ test('identity_profile: determinism — shuffled input produces identical output
     }))),
   );
 });
+
+// =====================================================================
+// Sub-step 3b fixtures: multi-maintainer shape classification.
+//
+// shape ∈ { 'solo', 'alternating', 'committee', 'unknown' }
+// Decision cascade:
+//   1. !has_sufficient_history              → 'unknown'
+//   2. U == 1                               → 'solo'
+//   3. vmax / total >= SOLO_DOMINANCE (0.80) → 'solo'
+//   4. U == 2                               → 'alternating'
+//   5. otherwise                            → 'committee'
+//
+// Each fixture locks a cascade branch. 3b-I sits below MIN_HISTORY_DEPTH
+// and is a regression guard — it already passes under the stub (stub
+// returns 'unknown'); post-GREEN it must continue to return 'unknown'
+// via branch 1 of the cascade, not via the stub.
+// =====================================================================
+
+test('fixture 3b-A: single identity × 9 → shape solo (U=1)', () => {
+  const rows = buildRows([['solo@acme.com', 9]]);
+  const out = publisher.extract({ packageName: '3b-A', history: rows });
+  assert.equal(out.shape, 'solo');
+});
+
+test('fixture 3b-B: 8× dev1 + 1× dev2 (88%/12%) → solo via dominance override', () => {
+  // U=2 but vmax/total = 8/9 ≈ 0.889 ≥ 0.80 → dominance rule wins
+  const rows = buildRows([['dev1@acme.com', 8], ['dev2@acme.com', 1]]);
+  const out = publisher.extract({ packageName: '3b-B', history: rows });
+  assert.equal(out.shape, 'solo');
+});
+
+test('fixture 3b-C: 7× dev1 + 2× dev2 (77%/22%) → alternating (just below dominance)', () => {
+  // vmax/total = 7/9 ≈ 0.778 < 0.80 → cascade falls through to U==2 branch
+  const rows = buildRows([['dev1@acme.com', 7], ['dev2@acme.com', 2]]);
+  const out = publisher.extract({ packageName: '3b-C', history: rows });
+  assert.equal(out.shape, 'alternating');
+});
+
+test('fixture 3b-D: 5× dev1 + 4× dev2 (56%/44%) → alternating (balanced U=2)', () => {
+  const rows = buildRows([['dev1@acme.com', 5], ['dev2@acme.com', 4]]);
+  const out = publisher.extract({ packageName: '3b-D', history: rows });
+  assert.equal(out.shape, 'alternating');
+});
+
+test('fixture 3b-E: strict A-B-A-B-A-B-A-B-A interleave (5A+4B) → alternating', () => {
+  // Interleaving does not change shape (shape is over identity counts,
+  // not block adjacency). U=2, vmax=5, total=9, dom=0.556 → alternating.
+  const rows = buildRows([
+    ['dev1@acme.com', 1], ['dev2@acme.com', 1],
+    ['dev1@acme.com', 1], ['dev2@acme.com', 1],
+    ['dev1@acme.com', 1], ['dev2@acme.com', 1],
+    ['dev1@acme.com', 1], ['dev2@acme.com', 1],
+    ['dev1@acme.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3b-E', history: rows });
+  assert.equal(out.shape, 'alternating');
+});
+
+test('fixture 3b-F: 3× A + 3× B + 3× C interleaved → committee + locked domain_stability', () => {
+  // Independence lock: shape is computed from identity counts (U=3,
+  // vmax/total = 3/9 = 0.333 → committee), domain_stability is computed
+  // from per-row domain sequencing (3 distinct non-null domains across
+  // history, no new-to-window arrival → mixed). The two axes must
+  // compute independently; any future refactor that couples them
+  // breaks this fixture.
+  const rows = buildRows([
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3b-F', history: rows });
+  assert.equal(out.shape, 'committee');
+  assert.equal(out.identity_profile.domain_stability, 'mixed');
+});
+
+test('fixture 3b-G: 5× A + 2× B + 2× C (55%/22%/22%) → committee', () => {
+  // vmax/total = 5/9 ≈ 0.556 < 0.80, U=3 → cascade lands on committee
+  const rows = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const out = publisher.extract({ packageName: '3b-G', history: rows });
+  assert.equal(out.shape, 'committee');
+});
+
+test('fixture 3b-H: 8× A + 1× B + 1× C (80% exact) → solo (dominance at threshold, ≥)', () => {
+  // vmax/total = 8/10 = 0.80 exactly → ≥ comparison wins → solo
+  // Pins the boundary: flipping the operator to > would break this.
+  const rows = buildRows([
+    ['a@alpha.com', 8], ['b@beta.com', 1], ['c@gamma.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3b-H', history: rows });
+  assert.equal(out.shape, 'solo');
+});
+
+test('fixture 3b-I: 5 versions (below MIN_HISTORY_DEPTH) → unknown', () => {
+  // Even with U=2 and clear alternation, below-threshold history means
+  // shape is not statistically meaningful. Cascade branch 1 returns
+  // 'unknown'. Regression guard: must land via the cascade after GREEN,
+  // not via the pre-3b stub.
+  const rows = buildRows([['a@acme.com', 3], ['b@acme.com', 2]]);
+  const out = publisher.extract({ packageName: '3b-I', history: rows });
+  assert.equal(out.shape, 'unknown');
+  assert.equal(out.signals.has_sufficient_history, false);
+});
+
+test('fixture 3b-J: 4× A + 4× B + 1× C (44%/44%/11%) → committee (U=3 wins despite split)', () => {
+  // Two-way tie at the top would not be enough for dominance (8/9 would
+  // be), and since U=3 the cascade skips the alternating branch. The
+  // third contributor flips the classification even at 11%.
+  const rows = buildRows([
+    ['a@alpha.com', 4], ['b@beta.com', 4], ['c@gamma.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3b-J', history: rows });
+  assert.equal(out.shape, 'committee');
+});
+
+test('shape: determinism — re-extraction produces byte-identical shape', () => {
+  const rows = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const input = { packageName: 'det-3b-1', history: rows };
+  const a = publisher.extract(input);
+  const b = publisher.extract(input);
+  assert.equal(a.shape, b.shape);
+});
+
+test('shape: determinism — shuffled input produces identical shape after sort', () => {
+  // Shape is a function of sorted tenure counts; input order must not
+  // change the answer. Trivially passes under the stub ('unknown' ===
+  // 'unknown'); meaningful once GREEN computes real values.
+  const rows = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const reversed = [...rows].reverse();
+  const forward = publisher.extract({ packageName: 'det-3b-2', history: rows });
+  const reverse = publisher.extract({ packageName: 'det-3b-2', history: reversed });
+  assert.equal(forward.shape, reverse.shape);
+});

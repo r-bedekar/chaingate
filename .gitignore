@@ -6,6 +6,7 @@ claude.md
 # Internal design docs (implementation context, not public)
 docs/V2_DESIGN.md
 docs/3a_REVISED_PLAN.md
+docs/3b_PLAN.md
 
 # Environment
 .env
