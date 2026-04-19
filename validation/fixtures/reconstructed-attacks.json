@@ -40,7 +40,6 @@
         },
         "published_at_ms": {
           "value": 1774916518168,
-          "iso8601": "2026-03-31T00:21:58.168Z",
           "sources": [
             {
               "url": "https://registry.npmjs.org/axios",
@@ -78,13 +77,13 @@
           "sources": [
             {
               "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
-              "quote": "the attacker's email address: ifstap@proton.me (as shown in the maintainers list snapshot)",
-              "type": "direct_quote",
+              "quote": "preserved _npmUser excerpt from the unpublished 1.14.1 packument body: {\"name\": \"jasonsaayman\", \"email\": \"ifstap@proton.me\"} (also reproduced in .versions[\"1.14.1\"].maintainers array alongside unchanged entries)",
+              "type": "registry_data",
               "accessed_at": "2026-04-19"
             },
             {
               "url": "https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all",
-              "quote": "the maintainer email shifted from jasonsaayman@gmail[.]com to this address for version 1.14.1",
+              "quote": "The maintainer email changed from jasonsaayman@gmail[.]com — present on all prior legitimate releases — to ifstap@proton[.]me on the malicious versions",
               "type": "corroboration",
               "accessed_at": "2026-04-19"
             }
@@ -102,12 +101,24 @@
           ]
         },
         "has_install_scripts": {
-          "value": null,
+          "value": false,
           "sources": [
             {
               "url": "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/",
-              "quote": "page discusses the postinstall script only for plain-crypto-js@4.2.1, not for axios@1.14.1 itself — absence of affirmative statement about axios's own scripts",
-              "type": "unavailable",
+              "quote": "The 1.14.1 source code is identical to 1.14.0. The only meaningful change to package.json was a new dependency: \"plain-crypto-js\": \"^4.2.1\"",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/axios/1.14.0",
+              "quote": "scripts object on baseline 1.14.0 contains only lifecycle/tooling entries (test, build, lint, prepare, preversion, version, examples, start, fix, test:vitest, test:module:cjs, test:module:esm, test:smoke:cjs:vitest, test:smoke:esm:vitest, test:vitest:unit, test:vitest:watch, test:vitest:browser, test:vitest:browser:headless) — no install, preinstall, or postinstall keys",
+              "type": "registry_data",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all",
+              "quote": "The analysis centers on the dropper's behavior within the dependency's postinstall hook, not axios's own configuration (attack path is plain-crypto-js@4.2.1's postinstall, not any axios-native script)",
+              "type": "corroboration",
               "accessed_at": "2026-04-19"
             }
           ]
@@ -183,7 +194,6 @@
         },
         "published_at_ms": {
           "value": 1536481739503,
-          "iso8601": "2018-09-09T08:28:59.503Z",
           "sources": [
             {
               "url": "https://registry.npmjs.org/event-stream",
@@ -251,12 +261,18 @@
           ]
         },
         "has_install_scripts": {
-          "value": null,
+          "value": false,
           "sources": [
             {
               "url": "https://snyk.io/blog/a-post-mortem-of-the-malicious-event-stream-backdoor/",
-              "quote": "flatmap-stream version 0.1.1 included the malicious attack in its minified source code (attack triggered at require-time in the dependency, not via install hooks of event-stream itself; postmortems do not directly assert whether event-stream 3.3.6's own package.json contained install scripts)",
-              "type": "unavailable",
+              "quote": "flatmap-stream version 0.1.1 included the malicious attack in its minified source code (attack triggered at require-time in the dependency's JS, not via any install/preinstall/postinstall hook on event-stream itself)",
+              "type": "direct_quote",
+              "accessed_at": "2026-04-19"
+            },
+            {
+              "url": "https://registry.npmjs.org/event-stream/3.3.5",
+              "quote": "scripts object on legitimate adjacent version 3.3.5 (published 4 days before 3.3.6): {prepublish, test, test_tap} — no install, preinstall, or postinstall keys. Snyk confirms the takeover modified only the dependency list, and npm blog confirms flatmap-stream was the only added dep",
+              "type": "registry_data",
               "accessed_at": "2026-04-19"
             }
           ]
@@ -330,7 +346,6 @@
         },
         "published_at_ms": {
           "value": 1634905521378,
-          "iso8601": "2021-10-22T12:15:21.378Z",
           "sources": [
             {
               "url": "https://registry.npmjs.org/ua-parser-js",
@@ -474,7 +489,6 @@
         },
         "published_at_ms": {
           "value": 1634905566877,
-          "iso8601": "2021-10-22T12:16:06.877Z",
           "sources": [
             {
               "url": "https://registry.npmjs.org/ua-parser-js",
@@ -600,7 +614,6 @@
         },
         "published_at_ms": {
           "value": 1634905579726,
-          "iso8601": "2021-10-22T12:16:19.726Z",
           "sources": [
             {
               "url": "https://registry.npmjs.org/ua-parser-js",
