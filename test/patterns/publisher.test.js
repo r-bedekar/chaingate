@@ -1586,3 +1586,322 @@ test('invariants: has_sufficient_history boundary at MIN_HISTORY_DEPTH=8', () =>
   });
   assert.equal(at9.signals.has_sufficient_history, true);
 });
+
+// ---------------------------------------------------------------------------
+// Sub-step 3a: identity_profile — RED lock (3a-A … 3a-J + 2 determinism)
+//
+// Fills the locked-but-stubbed identity_profile contract slot. Each
+// tenure block gains three new fields:
+//   domain                    — extracted email domain, lowercased (or null)
+//   provider                  — verified-corporate | free-webmail |
+//                                privacy | unverified | unknown
+//   first_seen_in_package_ms  — earliest ts this domain appears in package
+//                                (same value across all blocks sharing
+//                                 the domain)
+//
+// The extract() return's identity_profile aggregate becomes:
+//   providers_seen           — unique sorted provider classes
+//   has_privacy_provider     — any block's provider === 'privacy'
+//   has_unverified_domain    — any block's provider === 'unverified'
+//   domain_stability         — 'stable' | 'mixed' | 'churning'
+//
+// Provider precedence (first match wins):
+//   1. unknown            — domain is null
+//   2. privacy            — domain in PRIVACY_PROVIDER_DOMAINS
+//   3. free-webmail       — domain in FREE_WEBMAIL_DOMAINS
+//   4. verified-corporate — domain spans >= MIN_VERIFIED_VERSIONS (=2)
+//                            versions in this package
+//   5. unverified         — fallback for non-free, non-privacy, thin
+//
+// domain_stability (new-to-window rule; null domains excluded):
+//   churning — >=1 non-null domain appears in final CHURNING_WINDOW=5
+//              rows but NOT in any earlier row
+//   mixed    — not churning AND >= 3 unique non-null domains in history
+//   stable   — otherwise
+//
+// RED-lock discipline continues L/M/N (2e), F/H/I (2d), P/Q/empty (2f).
+// Tests assert against new fields; all fail until the sub-step 3a GREEN
+// impl lands.
+// ---------------------------------------------------------------------------
+
+test('fixture 3a-A: solo corporate (9 × acme.com) → verified-corporate, stable', () => {
+  const rows = buildRows([['dev@acme.com', 9]]);
+  const out = publisher.extract({ packageName: '3a-A', history: rows });
+
+  assert.equal(out.tenure.length, 1);
+  assert.equal(out.tenure[0].domain, 'acme.com');
+  assert.equal(out.tenure[0].provider, 'verified-corporate');
+  assert.equal(out.tenure[0].first_seen_in_package_ms, rows[0].published_at_ms);
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3a-B: cold handoff to unverified domain (8 acme + 1 new) → churning', () => {
+  const rows = buildRows([['dev@acme.com', 8], ['newuser@somerandom.io', 1]]);
+  const out = publisher.extract({ packageName: '3a-B', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+
+  // acme.com has 8 versions → above MIN_VERIFIED_VERSIONS → verified-corporate
+  assert.equal(out.tenure[0].domain, 'acme.com');
+  assert.equal(out.tenure[0].provider, 'verified-corporate');
+  assert.equal(out.tenure[0].first_seen_in_package_ms, rows[0].published_at_ms);
+
+  // somerandom.io has 1 version → below threshold → unverified
+  assert.equal(out.tenure[1].domain, 'somerandom.io');
+  assert.equal(out.tenure[1].provider, 'unverified');
+  assert.equal(out.tenure[1].first_seen_in_package_ms, rows[8].published_at_ms);
+
+  // providers_seen is a unique sorted list
+  assert.deepEqual(out.identity_profile.providers_seen, ['unverified', 'verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, true);
+  // somerandom.io is new-to-window (not in rows 0-3) → churning
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3a-C: axios-class privacy handoff (8 gmail + 1 protonmail) → churning', () => {
+  const rows = buildRows([['jason@gmail.com', 8], ['ifstap@protonmail.me', 1]]);
+  const out = publisher.extract({ packageName: '3a-C', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+
+  assert.equal(out.tenure[0].domain, 'gmail.com');
+  assert.equal(out.tenure[0].provider, 'free-webmail');
+
+  // protonmail.me → privacy (precedence wins over unverified)
+  assert.equal(out.tenure[1].domain, 'protonmail.me');
+  assert.equal(out.tenure[1].provider, 'privacy');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['free-webmail', 'privacy']);
+  assert.equal(out.identity_profile.has_privacy_provider, true);
+  // protonmail.me is privacy, NOT unverified (precedence)
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3a-D: legitimate company switch (8 gmail + 1 new acme) → unverified on final', () => {
+  // Maintainer moves from personal gmail to company acme — only ONE visible
+  // version under the new corporate email. Below MIN_VERIFIED_VERSIONS →
+  // unverified. The gate layer uses is_known_contributor + overlap to
+  // keep this WARN, not BLOCK. Documents the "unverified alone is not
+  // BLOCK" contract rule.
+  const rows = buildRows([['dev@gmail.com', 8], ['dev@acme.com', 1]]);
+  const out = publisher.extract({ packageName: '3a-D', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+  assert.equal(out.tenure[0].provider, 'free-webmail');
+
+  assert.equal(out.tenure[1].domain, 'acme.com');
+  assert.equal(out.tenure[1].provider, 'unverified');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['free-webmail', 'unverified']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, true);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3a-E: privacy-first solo (9 × protonmail) → privacy + stable, MUST NOT BLOCK', () => {
+  // Legitimate maintainer who uses protonmail as their long-standing
+  // publisher email. Single block, no cold handoff. Locks the
+  // "privacy alone is not BLOCK" contract rule.
+  const rows = buildRows([['maintainer@protonmail.com', 9]]);
+  const out = publisher.extract({ packageName: '3a-E', history: rows });
+
+  assert.equal(out.tenure.length, 1);
+  assert.equal(out.tenure[0].domain, 'protonmail.com');
+  assert.equal(out.tenure[0].provider, 'privacy');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['privacy']);
+  assert.equal(out.identity_profile.has_privacy_provider, true);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3a-F: bare-name identities (no emails) → all unknown, stable', () => {
+  // 9 rows of publisher_name only — no email. normalizeIdentity returns
+  // the bare name; domain extraction returns null; provider is 'unknown'.
+  const startMs = 1_700_000_000_000;
+  const rows = [];
+  for (let i = 0; i < 9; i += 1) {
+    rows.push({
+      version: `1.0.${i}`,
+      publisher_email: '',
+      publisher_name: 'dev',
+      published_at_ms: startMs + i * DAY_MS,
+    });
+  }
+  const out = publisher.extract({ packageName: '3a-F', history: rows });
+
+  assert.equal(out.tenure.length, 1);
+  assert.equal(out.tenure[0].domain, null);
+  assert.equal(out.tenure[0].provider, 'unknown');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['unknown']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  // Zero non-null domains → not churning; <=2 unique non-null domains → stable
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3a-G: malformed email in one row → unknown for that block, no crash', () => {
+  // 8 clean acme rows + 1 row with publisher_email='not-an-email' (no @).
+  // The malformed identity creates a separate block whose domain is null
+  // and provider is 'unknown'. Other blocks classify normally.
+  const rows = buildRows([['dev@acme.com', 8]]);
+  const lastTs = rows[rows.length - 1].published_at_ms;
+  rows.push({
+    version: '1.0.8',
+    publisher_email: 'not-an-email',
+    publisher_name: 'bad',
+    published_at_ms: lastTs + DAY_MS,
+  });
+  const out = publisher.extract({ packageName: '3a-G', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+
+  assert.equal(out.tenure[0].domain, 'acme.com');
+  assert.equal(out.tenure[0].provider, 'verified-corporate');
+
+  assert.equal(out.tenure[1].domain, null);
+  assert.equal(out.tenure[1].provider, 'unknown');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['unknown', 'verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  // 'unknown' is NOT 'unverified'
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  // Final 5 rows: 4 × acme + 1 × null. acme appears in earlier rows; null
+  // excluded from stability. No new-to-window domain → not churning.
+  // Full history has 1 unique non-null domain → stable.
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3a-H: 3-domain committee rotating (a,b,c × 3) → all verified-corporate, mixed', () => {
+  // Perfect rotation: each of 3 domains appears 3 times → each clears
+  // MIN_VERIFIED_VERSIONS=2 → verified-corporate. Final 5 rows contain
+  // domains that ALL appear in earlier rows (no new-to-window) → not
+  // churning. Full history has 3 unique non-null domains → mixed.
+  const rows = buildRows([
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3a-H', history: rows });
+
+  assert.equal(out.tenure.length, 9);
+  for (const block of out.tenure) {
+    assert.equal(block.provider, 'verified-corporate');
+  }
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'mixed');
+});
+
+test('fixture 3a-I: corporate domain reintroduction (acme×5, beta×3, acme×1) → both verified-corporate, churning', () => {
+  // acme.com appears in 6 versions total (blocks 0 and 2) → verified-corporate
+  // for BOTH acme.com blocks — the package-context rule recognizes the
+  // domain by its total footprint, not by block identity.
+  // beta.io has 3 versions → verified-corporate.
+  // first_seen_in_package_ms is the same value for the two acme blocks.
+  // Final 5 rows: [acme, beta, beta, beta, acme]. beta.io does NOT appear
+  // in rows 0-3 (which are all acme) → new-to-window → churning.
+  const rows = buildRows([
+    ['dev1@acme.com', 5],
+    ['dev2@beta.io', 3],
+    ['dev1@acme.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3a-I', history: rows });
+
+  assert.equal(out.tenure.length, 3);
+
+  assert.equal(out.tenure[0].domain, 'acme.com');
+  assert.equal(out.tenure[0].provider, 'verified-corporate');
+  assert.equal(out.tenure[0].first_seen_in_package_ms, rows[0].published_at_ms);
+
+  assert.equal(out.tenure[1].domain, 'beta.io');
+  assert.equal(out.tenure[1].provider, 'verified-corporate');
+  assert.equal(out.tenure[1].first_seen_in_package_ms, rows[5].published_at_ms);
+
+  // Reintroduced acme block carries the ORIGINAL first_seen_in_package_ms,
+  // not the block's own first_published_at_ms. Key for the gate layer to
+  // distinguish "never seen this domain before" from "known domain returns".
+  assert.equal(out.tenure[2].domain, 'acme.com');
+  assert.equal(out.tenure[2].provider, 'verified-corporate');
+  assert.equal(out.tenure[2].first_seen_in_package_ms, rows[0].published_at_ms);
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3a-J: canonical attacker shape (acme×8 + protonmail×1) → privacy + churning, BLOCK candidate', () => {
+  // Combined signals fire in the same direction: cold-handoff cell (from
+  // the 2×2 matrix), high prior_tenure (8 verified-corporate versions),
+  // privacy provider on the to-identity, churning stability. This is the
+  // axios-class fixture for the 3a provider signals — the gate reads
+  // every provider-derived flag lit up alongside the overlap/known
+  // matrix to land at BLOCK.
+  const rows = buildRows([['dev@acme.com', 8], ['ifstap@protonmail.me', 1]]);
+  const out = publisher.extract({ packageName: '3a-J', history: rows });
+
+  assert.equal(out.tenure.length, 2);
+  assert.equal(out.tenure[0].provider, 'verified-corporate');
+  assert.equal(out.tenure[1].provider, 'privacy');
+
+  assert.deepEqual(out.identity_profile.providers_seen, ['privacy', 'verified-corporate']);
+  assert.equal(out.identity_profile.has_privacy_provider, true);
+  // protonmail.me is privacy (precedence), NOT unverified
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('identity_profile: determinism — re-extraction produces byte-identical output', () => {
+  const rows = buildRows([
+    ['dev1@acme.com', 5],
+    ['dev2@beta.io', 3],
+    ['dev1@acme.com', 1],
+  ]);
+  const input = { packageName: 'det-3a-1', history: rows };
+  const a = publisher.extract(input);
+  const b = publisher.extract(input);
+
+  assert.equal(JSON.stringify(a.identity_profile), JSON.stringify(b.identity_profile));
+  assert.equal(a.tenure.length, b.tenure.length);
+  for (let i = 0; i < a.tenure.length; i += 1) {
+    assert.equal(a.tenure[i].domain, b.tenure[i].domain);
+    assert.equal(a.tenure[i].provider, b.tenure[i].provider);
+    assert.equal(a.tenure[i].first_seen_in_package_ms, b.tenure[i].first_seen_in_package_ms);
+  }
+});
+
+test('identity_profile: determinism — shuffled input produces identical output after sort', () => {
+  const rows = buildRows([
+    ['dev1@acme.com', 5],
+    ['dev2@beta.io', 3],
+    ['dev1@acme.com', 1],
+  ]);
+  const reversed = [...rows].reverse();
+
+  const forward = publisher.extract({ packageName: 'det-3a-2', history: rows });
+  const reverse = publisher.extract({ packageName: 'det-3a-2', history: reversed });
+
+  assert.deepEqual(forward.identity_profile, reverse.identity_profile);
+  assert.equal(
+    JSON.stringify(forward.tenure.map((t) => ({
+      domain: t.domain,
+      provider: t.provider,
+      first_seen_in_package_ms: t.first_seen_in_package_ms,
+    }))),
+    JSON.stringify(reverse.tenure.map((t) => ({
+      domain: t.domain,
+      provider: t.provider,
+      first_seen_in_package_ms: t.first_seen_in_package_ms,
+    }))),
+  );
+});
