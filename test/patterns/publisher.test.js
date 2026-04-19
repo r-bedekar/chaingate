@@ -2043,3 +2043,386 @@ test('shape: determinism — shuffled input produces identical shape after sort'
   const reverse = publisher.extract({ packageName: 'det-3b-2', history: reversed });
   assert.equal(forward.shape, reverse.shape);
 });
+
+// =====================================================================
+// Sub-step 3c: invariants + cross-axis regression locks.
+//
+// Test-only sub-step. No production-code changes. 3c locks:
+//   - I1–I9: single-axis invariants (3a provider/domain, 3b shape)
+//   - I10–I11: cross-axis independence (shape/domain, stability/identity)
+//   - 3c-A…3c-G: combination fixtures (shape × provider × stability)
+//   - 3c-det-1/2: full-output determinism across the whole extract()
+//
+// Discipline: every 3c test must pass against current code on first
+// write. A failing invariant means either the invariant was wrong or
+// there's a real bug — not a RED/GREEN cycle.
+// =====================================================================
+
+// Invariant probe table. Each entry targets a distinct edge case so the
+// parameterized invariant tests below don't accidentally skip a branch:
+//
+//   empty                 — zero-row history; every per-block invariant
+//                            passes vacuously, but I8 (shape ∈ value
+//                            domain) and I7 (insufficient → unknown)
+//                            still apply.
+//   single-row            — one-row history, below MIN_HISTORY_DEPTH;
+//                            primary trigger for I7 (insufficient → unknown).
+//   all-null-domains      — 9 bare-name rows → 1 block with domain=null;
+//                            exercises I1/I2 nullity side of the
+//                            biconditionals.
+//   mixed-null            — bare-name row sandwiched between two blocks
+//                            of the same non-null domain; forces I3
+//                            (shared first_seen across same-domain blocks)
+//                            onto a non-vacuous input.
+//   solo-sufficient       — 9× one identity, sufficient history;
+//                            primary trigger for I9 (U=1 ⇒ solo).
+//   committee-sufficient  — 3 corporate domains rotating; mixed providers
+//                            set, exercises I4/I5/I6 on non-trivial
+//                            providers_seen.
+//
+// If a future invariant needs an edge case not covered here, add the
+// entry — the probe table is the edge-case manifest for 3c.
+function makeBareNameRows(count, startMs = 1_700_000_000_000) {
+  const rows = [];
+  for (let i = 0; i < count; i += 1) {
+    rows.push({
+      version: `1.0.${i}`,
+      publisher_email: '',
+      publisher_name: 'dev',
+      published_at_ms: startMs + i * DAY_MS,
+    });
+  }
+  return rows;
+}
+
+function makeMixedNullRows(startMs = 1_700_000_000_000) {
+  // 4× dev1@acme, 1× bare-name, 4× dev2@acme. Both non-null blocks share
+  // 'acme.com' → I3 has a non-vacuous shared-domain group to check.
+  const rows = [];
+  let t = startMs;
+  let patch = 0;
+  const push = (email, name) => {
+    rows.push({
+      version: `1.0.${patch++}`,
+      publisher_email: email,
+      publisher_name: name,
+      published_at_ms: t,
+    });
+    t += DAY_MS;
+  };
+  for (let i = 0; i < 4; i += 1) push('dev1@acme.com', 'dev1');
+  push('', 'bare');
+  for (let i = 0; i < 4; i += 1) push('dev2@acme.com', 'dev2');
+  return rows;
+}
+
+const INVARIANT_PROBE_TABLE = [
+  { label: 'empty', rows: [] },
+  { label: 'single-row', rows: buildRows([['solo@acme.com', 1]]) },
+  { label: 'all-null-domains', rows: makeBareNameRows(9) },
+  { label: 'mixed-null', rows: makeMixedNullRows() },
+  { label: 'solo-sufficient', rows: buildRows([['solo@acme.com', 9]]) },
+  {
+    label: 'committee-sufficient',
+    rows: buildRows([
+      ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+      ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+      ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+    ]),
+  },
+];
+
+test('3c-inv-1: 3a single-axis invariants (I1–I6) hold across probe table', () => {
+  for (const probe of INVARIANT_PROBE_TABLE) {
+    const out = publisher.extract({ packageName: `inv1-${probe.label}`, history: probe.rows });
+
+    // I1: domain === null ⇔ provider === 'unknown'
+    // I2: first_seen_in_package_ms === null ⇔ domain === null
+    for (const block of out.tenure) {
+      assert.equal(
+        block.domain === null,
+        block.provider === 'unknown',
+        `[${probe.label}] I1: domain===null must equal provider==='unknown' (block ${block.identity})`,
+      );
+      assert.equal(
+        block.first_seen_in_package_ms === null,
+        block.domain === null,
+        `[${probe.label}] I2: first_seen_in_package_ms===null must equal domain===null (block ${block.identity})`,
+      );
+    }
+
+    // I3: blocks sharing a non-null domain share first_seen_in_package_ms
+    const domainFirstSeen = new Map();
+    for (const block of out.tenure) {
+      if (block.domain === null) continue;
+      if (!domainFirstSeen.has(block.domain)) {
+        domainFirstSeen.set(block.domain, block.first_seen_in_package_ms);
+      } else {
+        assert.equal(
+          block.first_seen_in_package_ms,
+          domainFirstSeen.get(block.domain),
+          `[${probe.label}] I3: blocks sharing domain ${block.domain} must share first_seen_in_package_ms`,
+        );
+      }
+    }
+
+    // I4/I5: identity_profile boolean flags mirror tenure.some(...)
+    assert.equal(
+      out.identity_profile.has_privacy_provider,
+      out.tenure.some((b) => b.provider === 'privacy'),
+      `[${probe.label}] I4: has_privacy_provider must mirror tenure.some(privacy)`,
+    );
+    assert.equal(
+      out.identity_profile.has_unverified_domain,
+      out.tenure.some((b) => b.provider === 'unverified'),
+      `[${probe.label}] I5: has_unverified_domain must mirror tenure.some(unverified)`,
+    );
+
+    // I6: providers_seen is the sorted unique set of block.provider
+    const expectedProviders = [...new Set(out.tenure.map((b) => b.provider))].sort();
+    assert.deepEqual(
+      out.identity_profile.providers_seen,
+      expectedProviders,
+      `[${probe.label}] I6: providers_seen must be sorted unique set of tenure providers`,
+    );
+  }
+});
+
+test('3c-inv-2: 3b single-axis invariants (I7–I9) hold across probe table', () => {
+  const VALID_SHAPES = new Set(['solo', 'alternating', 'committee', 'unknown']);
+
+  for (const probe of INVARIANT_PROBE_TABLE) {
+    const out = publisher.extract({ packageName: `inv2-${probe.label}`, history: probe.rows });
+
+    // I8: shape value domain
+    assert.ok(
+      VALID_SHAPES.has(out.shape),
+      `[${probe.label}] I8: shape '${out.shape}' must be in {solo, alternating, committee, unknown}`,
+    );
+
+    // I7: !has_sufficient_history ⇒ shape === 'unknown'
+    if (!out.signals.has_sufficient_history) {
+      assert.equal(
+        out.shape,
+        'unknown',
+        `[${probe.label}] I7: insufficient history must produce shape 'unknown'`,
+      );
+    }
+
+    // I9: has_sufficient_history && U === 1 ⇒ shape === 'solo'
+    const uniqueIdentities = new Set(out.tenure.map((b) => b.identity));
+    if (out.signals.has_sufficient_history && uniqueIdentities.size === 1) {
+      assert.equal(
+        out.shape,
+        'solo',
+        `[${probe.label}] I9: sufficient history with U=1 must produce shape 'solo'`,
+      );
+    }
+  }
+});
+
+test('3c-inv-3: I10 — shape depends only on identity distribution, not email domains', () => {
+  // Same identity-count distribution (5 of A, 2 of B, 2 of C) under two
+  // disjoint domain sets. If shape changes between the two, shape and
+  // provider classification have become coupled.
+  const setA = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const setB = buildRows([
+    ['a@acme.com', 5], ['b@gmail.com', 2], ['c@protonmail.me', 2],
+  ]);
+
+  const outA = publisher.extract({ packageName: 'inv3-A', history: setA });
+  const outB = publisher.extract({ packageName: 'inv3-B', history: setB });
+
+  assert.equal(
+    outA.shape,
+    outB.shape,
+    'shape must depend only on identity distribution, not email domains. '
+      + 'If this fails, shape and provider classification have been coupled — '
+      + 'this is a design regression per 3c invariant I10. See docs/3b_PLAN.md §2 '
+      + '(shape computation is a function of identity counts only).',
+  );
+});
+
+test('3c-inv-4: I11 — domain_stability depends only on rowDomains, not identity partitioning', () => {
+  // Same per-row domain sequence, different identity partitioning:
+  //   Pair 1: dev1@alpha × 5, dev2@beta × 4  → rowDomains = [alpha×5, beta×4]
+  //   Pair 2: devA@alpha × 3, devB@alpha × 2, devC@beta × 4
+  //                                           → rowDomains = [alpha×5, beta×4]
+  // If domain_stability differs between the two, stability has become
+  // coupled to identity partitioning — a design regression.
+  const pair1 = buildRows([
+    ['dev1@alpha.com', 5], ['dev2@beta.com', 4],
+  ]);
+  const pair2 = buildRows([
+    ['devA@alpha.com', 3], ['devB@alpha.com', 2], ['devC@beta.com', 4],
+  ]);
+
+  const out1 = publisher.extract({ packageName: 'inv4-1', history: pair1 });
+  const out2 = publisher.extract({ packageName: 'inv4-2', history: pair2 });
+
+  assert.equal(
+    out1.identity_profile.domain_stability,
+    out2.identity_profile.domain_stability,
+    'domain_stability must depend only on the per-row domain sequence, not '
+      + 'on how identities partition those rows. If this fails, stability and '
+      + 'identity classification have been coupled — this is a design regression '
+      + 'per 3c invariant I11. See patterns/publisher.js::computeDomainStability '
+      + '(rule operates on rowDomains, not on tenure).',
+  );
+});
+
+// ----- Combination fixtures ----------------------------------------------
+
+test('fixture 3c-A: alternating + verified-corporate + stable (corporate A/B pipeline)', () => {
+  // Two engineers sharing one corporate domain. U=2, vmax/total=5/9≈0.556
+  // → alternating. Single non-null domain → stable.
+  const rows = buildRows([
+    ['dev1@acme.com', 5], ['dev2@acme.com', 4],
+  ]);
+  const out = publisher.extract({ packageName: '3c-A', history: rows });
+
+  assert.equal(out.shape, 'alternating');
+  for (const block of out.tenure) {
+    assert.equal(block.provider, 'verified-corporate');
+  }
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3c-B: alternating + free-webmail + stable (two-person indie)', () => {
+  // Strict A/B interleave across two free-webmail domains — both domains
+  // appear in the pre-window rows so no churning. Locks that free-webmail
+  // + alternating can coexist with stable (no churning false-positive).
+  const rows = buildRows([
+    ['dev1@gmail.com', 1], ['dev2@yahoo.com', 1],
+    ['dev1@gmail.com', 1], ['dev2@yahoo.com', 1],
+    ['dev1@gmail.com', 1], ['dev2@yahoo.com', 1],
+    ['dev1@gmail.com', 1], ['dev2@yahoo.com', 1],
+    ['dev1@gmail.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3c-B', history: rows });
+
+  assert.equal(out.shape, 'alternating');
+  for (const block of out.tenure) {
+    assert.equal(block.provider, 'free-webmail');
+  }
+  assert.equal(out.identity_profile.domain_stability, 'stable');
+});
+
+test('fixture 3c-C: committee + verified-corporate + mixed (express-class 3-corp committee)', () => {
+  // Reuses the 3a-H interleave structure. 3a-H locks provider + stability;
+  // 3c-C additionally locks shape on the same input, making the triple-axis
+  // output a single-fixture regression target.
+  const rows = buildRows([
+    ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+    ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+    ['a@alpha.com', 1], ['b@beta.com', 1], ['c@gamma.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3c-C', history: rows });
+
+  assert.equal(out.shape, 'committee');
+  for (const block of out.tenure) {
+    assert.equal(block.provider, 'verified-corporate');
+  }
+  assert.equal(out.identity_profile.has_privacy_provider, false);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'mixed');
+});
+
+test('fixture 3c-D: committee + privacy contributor + mixed (legit distributed team)', () => {
+  // Committee shape with one protonmail contributor. Privacy presence on a
+  // committee-shaped package must NOT imply attacker shape — that's 3c-F.
+  // Layout ensures all 3 domains appear in the pre-window rows (no churning).
+  const rows = buildRows([
+    ['devA@alpha.com', 1], ['devB@beta.com', 1], ['user@protonmail.me', 1],
+    ['devA@alpha.com', 1], ['devB@beta.com', 1], ['devA@alpha.com', 1],
+    ['user@protonmail.me', 1], ['devB@beta.com', 1], ['devA@alpha.com', 1],
+    ['devB@beta.com', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3c-D', history: rows });
+
+  assert.equal(out.shape, 'committee');
+  assert.equal(out.identity_profile.has_privacy_provider, true);
+  assert.equal(out.identity_profile.has_unverified_domain, false);
+  assert.equal(out.identity_profile.domain_stability, 'mixed');
+});
+
+test('fixture 3c-E: committee + unverified drive-by + churning (lead + recent newcomer)', () => {
+  // 5 alpha + 3 beta interleaved so beta appears in pre-window, then a new
+  // unverified domain lands as the final row. Third identity flips shape to
+  // committee (U=3); new domain in the final window flips stability to
+  // churning; new domain below MIN_VERIFIED_VERSIONS classifies as unverified.
+  const rows = buildRows([
+    ['a@alpha.com', 1], ['a@alpha.com', 1], ['b@beta.com', 1],
+    ['a@alpha.com', 1], ['b@beta.com', 1], ['a@alpha.com', 1],
+    ['b@beta.com', 1], ['a@alpha.com', 1], ['newcontrib@random.xyz', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3c-E', history: rows });
+
+  assert.equal(out.shape, 'committee');
+  assert.equal(out.identity_profile.has_unverified_domain, true);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3c-F: solo + privacy + churning (axios-class attacker signature)', () => {
+  // Same input shape as 3a-J; 3c-F additionally asserts shape === 'solo' to
+  // lock the three-axis attacker signature (dominant-maintainer + privacy
+  // handoff + new domain in final window) as a single regression target.
+  const rows = buildRows([
+    ['jason@gmail.com', 8], ['ifstap@protonmail.me', 1],
+  ]);
+  const out = publisher.extract({ packageName: '3c-F', history: rows });
+
+  // U=2 but vmax/total = 8/9 ≈ 0.889 ≥ 0.80 → solo via dominance override.
+  assert.equal(out.shape, 'solo');
+  assert.equal(out.identity_profile.has_privacy_provider, true);
+  assert.equal(out.identity_profile.domain_stability, 'churning');
+});
+
+test('fixture 3c-G: unknown shape fires regardless of provider/stability signals', () => {
+  // 5 rows with 5 distinct providers across the class space. Below
+  // MIN_HISTORY_DEPTH → shape must be 'unknown' via cascade branch 1, even
+  // though downstream provider/stability signals look "interesting."
+  // Locks that cascade short-circuiting doesn't leak between stages.
+  const rows = buildRowsAbsolute([
+    ['a@acme.com', 0],
+    ['b@gmail.com', DAY_MS],
+    ['c@protonmail.me', 2 * DAY_MS],
+    ['d@random.xyz', 3 * DAY_MS],
+    ['e@acme.com', 4 * DAY_MS],
+  ]);
+  const out = publisher.extract({ packageName: '3c-G', history: rows });
+
+  assert.equal(out.signals.has_sufficient_history, false);
+  assert.equal(out.shape, 'unknown');
+  // Downstream signals still computed — cascade branch 1 short-circuits
+  // shape only, not the whole extract.
+  assert.ok(out.identity_profile.providers_seen.length > 0);
+});
+
+// ----- Full-output determinism locks -------------------------------------
+
+test('3c-det-1: full extract() output is byte-identical across re-extraction', () => {
+  // Covers the whole return object (tenure + transitions + identity_profile
+  // + shape + signals). Existing 3a-det-* and 3b-det-* lock individual
+  // slices; this lock catches regressions in any field the slice tests
+  // don't cover (e.g., a new field added in sub-step 4).
+  const rows = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const input = { packageName: 'det-3c-1', history: rows };
+  const a = publisher.extract(input);
+  const b = publisher.extract(input);
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
+});
+
+test('3c-det-2: full extract() output is byte-identical across shuffled input', () => {
+  const rows = buildRows([
+    ['a@alpha.com', 5], ['b@beta.com', 2], ['c@gamma.com', 2],
+  ]);
+  const reversed = [...rows].reverse();
+  const forward = publisher.extract({ packageName: 'det-3c-2', history: rows });
+  const reverse = publisher.extract({ packageName: 'det-3c-2', history: reversed });
+  assert.equal(JSON.stringify(forward), JSON.stringify(reverse));
+});
