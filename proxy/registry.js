@@ -85,9 +85,9 @@ export async function fetchPackument(rawName, { config, requestHeaders = {} } = 
   const encoded = encodePackageName(rawName);
   const url = buildUrl(config.upstream, encoded);
   const relay = pickRelayHeaders(requestHeaders, RELAY_REQUEST_HEADERS);
-  // Force identity encoding so the proxy can parse JSON without decompressing.
-  // Day 4 needs in-proxy parsing for the witness pipeline; localhost bandwidth
-  // savings from gzip are negligible compared to the code simplification.
+  // Force identity encoding so the witness pipeline can parse the packument
+  // JSON without decompressing. Localhost bandwidth savings from gzip are
+  // negligible compared to the code simplification.
   relay['accept-encoding'] = 'identity';
   return upstreamRequest(url, { headers: relay, config });
 }

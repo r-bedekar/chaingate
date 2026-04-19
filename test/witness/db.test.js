@@ -12,7 +12,7 @@ function tmpDbPath() {
 }
 
 // Hand-built axios@1.7.9 fixture — shape matches the output of
-// witness/baseline.js (Day 4). Enough to exercise every column group.
+// witness/baseline.js. Enough to exercise every column group.
 function axiosFixture(version = '1.7.9') {
   return {
     published_at: '2024-12-23T00:00:00.000Z',

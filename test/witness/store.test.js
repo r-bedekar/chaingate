@@ -142,7 +142,7 @@ test('getHistory called exactly once per observePackument', () => {
   }
 });
 
-test('observeTarball returns ALLOW (Day 4 stub)', () => {
+test('observeTarball returns ALLOW (pass-through; tarball blocking lives in proxy)', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
