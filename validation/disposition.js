@@ -57,11 +57,13 @@
 //      other three cells.
 //
 //   5. DOMAIN STABILITY — context modifier on cold-handoff only, when
-//      the incoming domain is new. churning packages are more tolerant
-//      of new domains (de-escalate BLOCK → WARN on non-solo shapes).
-//      stable packages are less tolerant (escalate WARN → BLOCK on
-//      non-solo shapes). mixed is no-op. Stability MUST NOT drive
-//      disposition on the other three cells.
+//      the incoming domain is new. On non-solo shapes, churning
+//      packages are more tolerant of new domains and de-escalate
+//      BLOCK → WARN. Stability MUST NOT escalate on its own — a
+//      non-solo BLOCK requires an active co-signal (Addition 3); a
+//      "stable" package absent any co-signal is a legitimate
+//      long-serving committee, not an attack. mixed is no-op.
+//      Stability MUST NOT drive disposition on the other three cells.
 //
 // Package disposition = max (BLOCK > WARN > ALLOW) across transitions.
 //
@@ -273,15 +275,21 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
     // packages don't have that excuse — a solo package seeing a new
     // domain IS the event.
     //
+    // Stability is DE-ESCALATION-ONLY on non-solo shapes. A previous
+    // revision escalated stability=stable + new-domain cold handoffs
+    // from WARN → BLOCK, but Addition 3 makes co-signal the sole
+    // non-solo escalation path — a long-serving committee with no
+    // co-signal firing is a legitimate handoff, not an attack. The
+    // baseline train run caught 5 committee/alternating FPs driven
+    // by this escalation (fs-extra, ioredis, style-loader, ws,
+    // eslint-plugin-import). Keep this a one-way valve.
+    //
     // If you're touching this guard, verify 3c-F still BLOCKs:
     //   node --test test/validation/disposition.test.js
     if (effectiveShape !== 'solo') {
       if (stability === 'churning' && d === 'BLOCK') {
         d = 'WARN';
         parts.push('stability=churning (de-escalated)');
-      } else if (stability === 'stable' && d === 'WARN') {
-        d = 'BLOCK';
-        parts.push('stability=stable (escalated)');
       }
     }
   }

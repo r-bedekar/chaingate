@@ -244,14 +244,21 @@ test('cell (F,F) cold_handoff + solo + HIGH prior_tenure → BLOCK (event-stream
   assert.match(verdict.reasons[0], /prior_tenure=27/);
 });
 
-test('cell (F,F) cold_handoff + committee + EXCEPTIONAL prior_tenure → BLOCK', () => {
+test('cell (F,F) cold_handoff + committee + EXCEPTIONAL prior_tenure WITHOUT co-signal → WARN', () => {
   // 20-version tenure on a committee-shaped package. Per GATE CONTRACT
-  // Addition 3: committee + (F,F) WARNs unless exceptional.
+  // Addition 3: committee + (F,F) at EXCEPTIONAL tenure BLOCKs ONLY
+  // with at least one co-signal (new privacy/unverified domain,
+  // provenance break, or short gap). No co-signal here — b.com is a
+  // verified-corporate new domain (>=MIN_VERIFIED_VERSIONS because B+C
+  // total 10 releases), provenance is absent on both sides so no
+  // "break" is emitted, and buildRows spaces releases at DAY_MS so
+  // gap_ms == SHORT_GAP_MS (strict <). Disposition lands at WARN.
   //
-  // B and C share b.com so the package has 2 unique domains and no
-  // new-to-final-5 domain — stability=stable. A third (non-b.com)
-  // domain in the final window would flip to churning and mask the
-  // exceptional-tenure escalation with a de-escalation.
+  // A previous revision escalated this to BLOCK via stability=stable.
+  // Removed (validation/disposition.js header axis 5) — non-solo
+  // escalation is co-signal-only. Committees with long-serving leads
+  // handing off to a stable-domain colleague are a legitimate pattern
+  // (see date-fns 1.1.1, fs-extra 2.1.0 in the train baseline).
   assert.equal(__thresholds.EXCEPTIONAL_PRIOR_TENURE, 20);
   const rows = buildRows([
     ['A@a.com', 20], ['B@b.com', 5], ['C@b.com', 5],
@@ -259,9 +266,10 @@ test('cell (F,F) cold_handoff + committee + EXCEPTIONAL prior_tenure → BLOCK',
   const { extracted, verdict } = extractDisposition(rows);
   assert.equal(extracted.shape, 'committee');
   assert.equal(extracted.identity_profile.domain_stability, 'stable');
-  assert.equal(verdict.disposition, 'BLOCK');
+  assert.equal(verdict.disposition, 'WARN');
   assert.match(verdict.reasons[0], /shape=committee/);
   assert.match(verdict.reasons[0], /prior_tenure=20/);
+  assert.match(verdict.reasons[0], /no co-signal/);
 });
 
 test('cell (F,F) cold_handoff + committee + HIGH but not exceptional → WARN', () => {
@@ -369,10 +377,18 @@ test('stability=churning de-escalates BLOCK → WARN on non-solo exceptional col
   assert.match(verdict.reasons[0], /stability=churning \(de-escalated\)/);
 });
 
-test('stability=stable escalates WARN → BLOCK on non-solo HIGH cold handoff with new domain', () => {
+test('stability=stable does NOT escalate WARN → BLOCK on non-solo HIGH cold handoff without co-signal', () => {
   // Committee with only 2 domains (acme + newco) and newco first seen
   // at the A→B transition. Layout places newco block early so it falls
   // outside the final-5 window — stability=stable, not churning.
+  //
+  // Previous disposition revision had stability=stable escalate to
+  // BLOCK here. Removed: Addition 3 reserves non-solo BLOCK for the
+  // co-signal path. A stable-history committee handoff with no
+  // co-signal is a legitimate long-serving committee; a 5-version
+  // prior tenure is below EXCEPTIONAL regardless. Fixture produces
+  // prior_tenure=5 → base path returns WARN (HIGH ≤ 5 < EXCEPTIONAL),
+  // and stability cannot push it further.
   const rows = buildRows([
     ['dev1@acme.com', 5],
     ['dev2@newco.com', 3],
@@ -382,8 +398,97 @@ test('stability=stable escalates WARN → BLOCK on non-solo HIGH cold handoff wi
   const { extracted, verdict } = extractDisposition(rows);
   assert.equal(extracted.shape, 'committee');
   assert.equal(extracted.identity_profile.domain_stability, 'stable');
+  assert.equal(verdict.disposition, 'WARN');
+  assert.doesNotMatch(verdict.reasons[0], /escalated/);
+});
+
+test('stability=stable + co-signal on committee EXCEPTIONAL cold handoff → BLOCK', () => {
+  // Stable domain history does not by itself escalate, but an active
+  // co-signal (short gap) on the same transition does: EXCEPTIONAL
+  // prior tenure (>=20) + short gap (<24h) + stable → BLOCK. The
+  // gap_ms co-signal is the load-bearing signal, not stability.
+  //
+  // Shape must be committee, so dominance must stay < SOLO_DOMINANCE
+  // (0.80). Layout: dev1×22 (dominant lead) + dev2×1 (short-gap cold
+  // handoff) + dev3×5 + dev4×5. 22/33 = 0.667 → committee. All four
+  // share acme.com so stability=stable and no new-domain modifier
+  // interferes.
+  const START = 1_700_000_000_000;
+  let idx = 0;
+  const at = (i) => START + i * DAY_MS;
+  const rows = [
+    // 22 dev1 releases at 1/day cadence.
+    ...Array.from({ length: 22 }, () => {
+      const v = `1.0.${idx}`;
+      const row = {
+        version: v,
+        publisher_email: 'dev1@acme.com',
+        publisher_name: 'dev1',
+        published_at_ms: at(idx),
+      };
+      idx += 1;
+      return row;
+    }),
+    // dev2 publishes 3h after dev1's last release — short-gap co-signal.
+    (() => {
+      const row = {
+        version: `1.0.${idx}`,
+        publisher_email: 'dev2@acme.com',
+        publisher_name: 'dev2',
+        published_at_ms: at(idx - 1) + 3 * 3_600_000,
+      };
+      idx += 1;
+      return row;
+    })(),
+    // Tail: dev3 × 5, dev4 × 5 at 1/day cadence to dilute dominance.
+    ...Array.from({ length: 5 }, () => {
+      const row = {
+        version: `1.0.${idx}`,
+        publisher_email: 'dev3@acme.com',
+        publisher_name: 'dev3',
+        published_at_ms: at(idx),
+      };
+      idx += 1;
+      return row;
+    }),
+    ...Array.from({ length: 5 }, () => {
+      const row = {
+        version: `1.0.${idx}`,
+        publisher_email: 'dev4@acme.com',
+        publisher_name: 'dev4',
+        published_at_ms: at(idx),
+      };
+      idx += 1;
+      return row;
+    }),
+  ];
+  const { extracted, verdict } = extractDisposition(rows);
+  assert.equal(extracted.shape, 'committee');
+  assert.equal(extracted.identity_profile.domain_stability, 'stable');
+  const t = extracted.transitions.find((x) => x.at_version === '1.0.22');
+  assert.equal(t.prior_tenure_versions, 22);
+  assert.equal(t.is_overlap_window_W3, false);
+  assert.equal(t.is_known_contributor_K10, false);
   assert.equal(verdict.disposition, 'BLOCK');
-  assert.match(verdict.reasons[0], /stability=stable \(escalated\)/);
+  const reason = verdict.reasons.find((r) => /1\.0\.22/.test(r));
+  assert.match(reason, /co-signal: gap_ms=/);
+});
+
+test('solo HIGH cold handoff BLOCKs regardless of stability (carve-out unchanged)', () => {
+  // Solo shape reaches BLOCK via the unconditional solo path at HIGH
+  // tenure. Stability=stable (same-domain tail) still lands BLOCK —
+  // the solo carve-out sits above the stability modifier. This test
+  // pins the invariant after the stable-escalation removal: nothing
+  // on the solo path changed.
+  const rows = buildRows([
+    ['solo@acme.com', 10], // long solo tenure (prior_tenure=10 ≥ HIGH=5)
+    ['newbie@acme.com', 2], // same domain → stability=stable, cold_handoff
+    ['solo@acme.com', 2], // tail returns to dominant maintainer
+  ]);
+  const { extracted, verdict } = extractDisposition(rows);
+  assert.equal(extracted.shape, 'solo');
+  assert.equal(extracted.identity_profile.domain_stability, 'stable');
+  assert.equal(verdict.disposition, 'BLOCK');
 });
 
 test('modifier precedence: provider combo escalates, then stability de-escalates (WARN wins)', () => {

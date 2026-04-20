@@ -20,11 +20,11 @@
   "aggregates": {
     "attack_packages_detected": 0,
     "attack_packages_missed": 3,
-    "clean_packages_blocked": 35,
-    "clean_packages_warned": 39,
+    "clean_packages_blocked": 30,
+    "clean_packages_warned": 44,
     "clean_packages_allowed": 17,
     "recall_packages_point": 0,
-    "false_positive_rate_point": 0.3846,
+    "false_positive_rate_point": 0.3297,
     "precision_packages_point": 0,
     "attack_labels_total": 7,
     "attack_labels_detected": 0,
@@ -487,13 +487,13 @@
     {
       "package": "eslint-plugin-import",
       "attack_labeled": false,
-      "disposition": "BLOCK",
+      "disposition": "WARN",
       "shape": "alternating",
       "observed_versions_count": 132,
       "has_sufficient_history": true,
       "transitions": 3,
-      "block_transitions": 1,
-      "warn_transitions": 0
+      "block_transitions": 0,
+      "warn_transitions": 1
     },
     {
       "package": "events",
@@ -531,13 +531,13 @@
     {
       "package": "fs-extra",
       "attack_labeled": false,
-      "disposition": "BLOCK",
+      "disposition": "WARN",
       "shape": "committee",
       "observed_versions_count": 96,
       "has_sufficient_history": true,
       "transitions": 4,
-      "block_transitions": 1,
-      "warn_transitions": 2
+      "block_transitions": 0,
+      "warn_transitions": 3
     },
     {
       "package": "glob",
@@ -586,13 +586,13 @@
     {
       "package": "ioredis",
       "attack_labeled": false,
-      "disposition": "BLOCK",
+      "disposition": "WARN",
       "shape": "committee",
       "observed_versions_count": 247,
       "has_sufficient_history": true,
       "transitions": 4,
-      "block_transitions": 1,
-      "warn_transitions": 1
+      "block_transitions": 0,
+      "warn_transitions": 2
     },
     {
       "package": "jest",
@@ -993,13 +993,13 @@
     {
       "package": "style-loader",
       "attack_labeled": false,
-      "disposition": "BLOCK",
+      "disposition": "WARN",
       "shape": "committee",
       "observed_versions_count": 76,
       "has_sufficient_history": true,
       "transitions": 5,
-      "block_transitions": 1,
-      "warn_transitions": 1
+      "block_transitions": 0,
+      "warn_transitions": 2
     },
     {
       "package": "supertest",
@@ -1169,13 +1169,13 @@
     {
       "package": "ws",
       "attack_labeled": false,
-      "disposition": "BLOCK",
+      "disposition": "WARN",
       "shape": "committee",
       "observed_versions_count": 173,
       "has_sufficient_history": true,
       "transitions": 3,
-      "block_transitions": 1,
-      "warn_transitions": 2
+      "block_transitions": 0,
+      "warn_transitions": 3
     },
     {
       "package": "yargs",
