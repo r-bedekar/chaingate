@@ -121,6 +121,9 @@
 //     committee   + (false, false)                       → WARN unless
 //                                                           prior_tenure
 //                                                           exceptional
+//                                                           AND at least
+//                                                           one co-signal
+//                                                           (see below)
 //     alternating + (false, false)                       → same as
 //                                                           committee
 //     shape === 'unknown'                                → treat as solo
@@ -129,6 +132,38 @@
 //   shape MUST NOT drive disposition on the other three cells. A
 //   committee-shaped package with a recurring-member transition is
 //   ALLOW regardless of shape.
+//
+//   CO-SIGNAL REQUIREMENT (non-solo shapes only). A long prior_tenure
+//   on a committee-shaped package is not, on its own, an attack
+//   signature — committee members accumulate long tenures through
+//   many releases as a matter of course. Express's dougwilson is the
+//   canonical example: 150-version tenure on a committee-shaped
+//   package handing off to a new committee member (ulisesgascon) is
+//   celebrated governance, not a takeover.
+//
+//   For non-solo shapes, (false, false) with prior_tenure >=
+//   EXCEPTIONAL_PRIOR_TENURE escalates to BLOCK only when at least
+//   one of the following co-signals is present on the transition:
+//
+//     a. Incoming identity introduces a NEW privacy or unverified
+//        provider domain. (Not free-webmail — free-webmail addresses
+//        are common for legitimate committee members.)
+//     b. Provenance method break: prior block's last row carried
+//        provenance_present=true and the incoming block's first row
+//        does not. A package that had established a provenance
+//        baseline and then loses it on a maintainer change is the
+//        strongest non-identity attack signal available at the
+//        publisher layer.
+//     c. Short gap: incoming first release within SHORT_GAP_MS
+//        (validation/disposition.js — currently 24h) of the prior
+//        block's last release. Legitimate committee handoffs almost
+//        always have days of coordination lag; a sub-24h handoff is
+//        the axios/shai-hulud shape.
+//
+//   Solo shapes do NOT require a co-signal: a solo package by
+//   construction has one ownership anchor, and a (F,F) cold handoff
+//   with a long prior_tenure IS the ownership change. Weakening the
+//   solo path would ALLOW the event-stream signature.
 //
 //   Shape computation (see computeShape() below for the full comment):
 //   5-step cascade over tenure — insufficient history → 'unknown';
@@ -249,7 +284,22 @@ function normalizeAndFilter(history) {
     // reads r.email rather than parsing it back out of r.identity.
     const email =
       typeof raw?.publisher_email === 'string' ? raw.publisher_email.trim().toLowerCase() : '';
-    rows.push({ version, identity, email, published_at_ms: ts });
+    // Provenance: npm's `_npmUser`-attested publish method flag
+    // (provenance_present = 1 when the release carries a signed
+    // provenance statement; 0 when it was published without one; null
+    // when the collector never observed it — legacy releases and packages
+    // outside the collector's provenance scope). Threaded onto each row
+    // so disposition.js can detect a method-break co-signal on the
+    // cold-handoff cell (GATE CONTRACT Addition 3). Normalized to
+    // {true, false, null} rather than 1/0/undefined so the truth check
+    // downstream is unambiguous.
+    let provenance_present = null;
+    if (raw?.provenance_present === 1 || raw?.provenance_present === true) {
+      provenance_present = true;
+    } else if (raw?.provenance_present === 0 || raw?.provenance_present === false) {
+      provenance_present = false;
+    }
+    rows.push({ version, identity, email, provenance_present, published_at_ms: ts });
   }
   return { rows, skipped };
 }
@@ -310,6 +360,14 @@ function extractTenure(sortedRows) {
       current = {
         identity: row.identity,
         email: row.email,
+        // first_/last_provenance_present capture the provenance state
+        // at the block's boundaries so disposition.js can detect a
+        // method-break co-signal (GATE CONTRACT Addition 3):
+        // "prior block ended with provenance, incoming block starts
+        // without." Tracked per-block, not per-row, so the gate reads
+        // O(1) per transition rather than re-scanning rows.
+        first_provenance_present: row.provenance_present,
+        last_provenance_present: row.provenance_present,
         version_count: 1,
         first_version: row.version,
         last_version: row.version,
@@ -320,6 +378,7 @@ function extractTenure(sortedRows) {
     } else {
       current.version_count += 1;
       current.last_version = row.version;
+      current.last_provenance_present = row.provenance_present;
       current.last_published_at_ms = row.published_at_ms;
       current.duration_ms = row.published_at_ms - current.first_published_at_ms;
     }

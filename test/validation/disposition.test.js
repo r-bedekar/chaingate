@@ -345,20 +345,27 @@ test('provider combo (privacy incoming + has_unverified_domain) escalates WARN �
 });
 
 test('stability=churning de-escalates BLOCK → WARN on non-solo exceptional cold handoff', () => {
-  // A@a.com×20 hands off to B@b.com (exceptional prior_tenure on a
-  // committee) → base disposition BLOCK. Final 5 rows include C@random.xyz
-  // which is new-to-window → stability=churning. Churning de-escalates
-  // BLOCK→WARN on committee/alternating (GATE CONTRACT Addition 2).
+  // A@a.com×20 hands off to B@protonmail.me (exceptional prior_tenure
+  // on a committee + new-privacy-domain co-signal) → base disposition
+  // BLOCK under the co-signal rule (GATE CONTRACT Addition 3). Final 5
+  // rows include C@random.xyz which is new-to-window → stability=
+  // churning. Churning de-escalates BLOCK→WARN on committee/alternating
+  // (GATE CONTRACT Addition 2).
+  //
+  // The incoming privacy domain is what lets this fixture reach BLOCK
+  // in the first place — without it, committee + prior_tenure=20 alone
+  // stays at WARN (no escalation without co-signal) and the
+  // de-escalation path is never exercised. Using protonmail.me ensures
+  // the A→B transition has co-signal=true so the BLOCK base is
+  // produced, then the stability-churning guard can de-escalate it.
   const rows = buildRows([
-    ['A@a.com', 20], ['B@b.com', 5], ['C@random.xyz', 5],
+    ['A@a.com', 20], ['B@protonmail.me', 5], ['C@random.xyz', 5],
   ]);
   const { extracted, verdict } = extractDisposition(rows);
   assert.equal(extracted.shape, 'committee');
   assert.equal(extracted.identity_profile.domain_stability, 'churning');
-  // Without churning this would be BLOCK; with churning de-escalation
-  // fires only on first transition (A→B, exceptional), so package lands
-  // at WARN.
   assert.equal(verdict.disposition, 'WARN');
+  assert.match(verdict.reasons[0], /co-signal: new privacy domain protonmail\.me/);
   assert.match(verdict.reasons[0], /stability=churning \(de-escalated\)/);
 });
 
@@ -437,6 +444,144 @@ test('modifiers do NOT fire on non-cold-handoff cells', () => {
   assert.equal(last.is_overlap_window_W3, true);
   assert.equal(last.is_known_contributor_K10, true);
   assert.match(verdict.reasons.at(-1), /^ALLOW: recurring_member/);
+});
+
+// ---------------------------------------------------------------------------
+// CO-SIGNAL REQUIREMENT on non-solo cold-handoff escalation.
+// See patterns/publisher.js GATE CONTRACT Addition 3 and
+// validation/disposition.js::hasCoSignal. Committee / alternating
+// shapes at EXCEPTIONAL_PRIOR_TENURE stay at WARN unless at least one
+// of (new privacy/unverified domain, provenance break, short gap) is
+// present on the transition. Solo shapes are unchanged and BLOCK at
+// HIGH_PRIOR_TENURE regardless.
+// ---------------------------------------------------------------------------
+
+test('co-signal: committee + (F,F) + prior_tenure=150 + no co-signal → WARN (express dougwilson case)', () => {
+  // express handoff class — dougwilson (150-version committee tenure)
+  // → ulisesgascon on a verified-corporate gmail-ish domain, no
+  // provenance history, multi-day gap. Under the co-signal rule, a
+  // celebrated committee handoff of any length alone must NOT BLOCK.
+  // Layout: A's block is the load-bearing 150-version tenure; B and C
+  // trail with enough volume that A's dominance stays under
+  // SOLO_DOMINANCE=0.80 so the shape cascade lands on committee, not
+  // solo. 150/(150+20+20) ≈ 0.789 < 0.80.
+  const rows = buildRows([
+    ['A@a.com', 150], ['B@b.com', 20], ['C@c.com', 20],
+  ]);
+  const { extracted, verdict } = extractDisposition(rows, 'express-class');
+  assert.equal(extracted.shape, 'committee');
+  const t0 = extracted.transitions[0];
+  assert.equal(t0.prior_tenure_versions, 150);
+  assert.equal(t0.is_overlap_window_W3, false);
+  assert.equal(t0.is_known_contributor_K10, false);
+  assert.match(verdict.reasons[0], /^WARN: /);
+  assert.match(verdict.reasons[0], /no co-signal/);
+});
+
+test('co-signal: committee + (F,F) + prior_tenure=50 + new privacy domain → BLOCK', () => {
+  // Co-signal (a): incoming identity on a new privacy provider domain
+  // after an exceptional committee tenure. The privacy class on the
+  // incoming block is the axios-shape escalation criterion.
+  // 50/(50+15+15) ≈ 0.625 < SOLO_DOMINANCE → committee.
+  const rows = buildRows([
+    ['A@a.com', 50], ['B@protonmail.me', 15], ['C@c.com', 15],
+  ]);
+  const { extracted, verdict } = extractDisposition(rows, 'co-signal-privacy');
+  assert.equal(extracted.shape, 'committee');
+  assert.equal(extracted.transitions[0].prior_tenure_versions, 50);
+  assert.equal(verdict.disposition, 'BLOCK');
+  assert.match(verdict.reasons[0], /^BLOCK: cold_handoff/);
+  assert.match(verdict.reasons[0], /co-signal: new privacy domain protonmail\.me/);
+});
+
+test('co-signal: committee + (F,F) + prior_tenure=50 + provenance break → BLOCK', () => {
+  // Co-signal (b): prior block's last row carried provenance=true,
+  // incoming block's first row does not. The "OIDC lost after
+  // consistent history" case — strongest non-identity signal
+  // available at this layer.
+  //
+  // Hand-built input: buildRows does not emit provenance_present, so
+  // we construct rows directly. 50 prior + 5 incoming + 5 trailing,
+  // each under a distinct login to drive committee shape.
+  const rows = [];
+  const start = 1_700_000_000_000;
+  for (let i = 0; i < 50; i += 1) {
+    rows.push({
+      version: `1.0.${i}`,
+      publisher_email: 'a@a.com',
+      publisher_name: 'a',
+      published_at_ms: start + i * DAY_MS,
+      provenance_present: 1,  // baseline established
+    });
+  }
+  for (let i = 0; i < 15; i += 1) {
+    rows.push({
+      version: `1.0.${50 + i}`,
+      publisher_email: 'b@b.com',
+      publisher_name: 'b',
+      published_at_ms: start + (50 + i) * DAY_MS,
+      provenance_present: 0,  // incoming block drops provenance
+    });
+  }
+  for (let i = 0; i < 15; i += 1) {
+    rows.push({
+      version: `1.0.${65 + i}`,
+      publisher_email: 'c@c.com',
+      publisher_name: 'c',
+      published_at_ms: start + (65 + i) * DAY_MS,
+      provenance_present: 0,
+    });
+  }
+  const { extracted, verdict } = extractDisposition(rows, 'co-signal-provenance');
+  assert.equal(extracted.shape, 'committee');
+  assert.equal(extracted.transitions[0].prior_tenure_versions, 50);
+  assert.equal(extracted.tenure[0].last_provenance_present, true);
+  assert.equal(extracted.tenure[1].first_provenance_present, false);
+  assert.equal(verdict.disposition, 'BLOCK');
+  assert.match(verdict.reasons[0], /^BLOCK: cold_handoff/);
+  assert.match(verdict.reasons[0], /co-signal: provenance break/);
+});
+
+test('co-signal: committee + (F,F) + prior_tenure=50 + gap_ms=1h → BLOCK', () => {
+  // Co-signal (c): incoming first release within SHORT_GAP_MS of the
+  // prior block's last release. 1h gap is well under the 24h window.
+  // Build via buildRowsAbsolute so we can force an exact sub-24h
+  // offset between blocks.
+  const HOUR_MS = 60 * 60 * 1000;
+  const spec = [];
+  // 50 versions under A, each 1 day apart
+  for (let i = 0; i < 50; i += 1) spec.push(['a@a.com', i * DAY_MS]);
+  // Incoming B starts 1 hour after A's last release
+  const afterA = 49 * DAY_MS + HOUR_MS;
+  for (let i = 0; i < 15; i += 1) spec.push(['b@b.com', afterA + i * DAY_MS]);
+  // Trailing C to secure committee shape (dominance < 0.80)
+  const afterB = afterA + 15 * DAY_MS;
+  for (let i = 0; i < 15; i += 1) spec.push(['c@c.com', afterB + i * DAY_MS]);
+  const rows = buildRowsAbsolute(spec);
+
+  const { extracted, verdict } = extractDisposition(rows, 'co-signal-short-gap');
+  assert.equal(extracted.shape, 'committee');
+  assert.equal(extracted.transitions[0].prior_tenure_versions, 50);
+  assert.equal(extracted.transitions[0].gap_ms, HOUR_MS);
+  assert.equal(verdict.disposition, 'BLOCK');
+  assert.match(verdict.reasons[0], /^BLOCK: cold_handoff/);
+  assert.match(verdict.reasons[0], /co-signal: gap_ms=3600000/);
+});
+
+test('co-signal rule does NOT apply to solo shape (prior_tenure=5 + no co-signal → BLOCK)', () => {
+  // Solo carve-out: a solo package changing hands after a HIGH tenure
+  // IS the ownership event. Must BLOCK regardless of co-signal. This
+  // is the event-stream / axios protection floor.
+  const rows = buildRows([['solo@a.com', 10], ['new@b.com', 1]]);
+  const { extracted, verdict } = extractDisposition(rows, 'solo-no-cosignal');
+  assert.equal(extracted.shape, 'solo');
+  assert.equal(extracted.transitions[0].prior_tenure_versions, 10);
+  assert.equal(verdict.disposition, 'BLOCK');
+  assert.match(verdict.reasons[0], /shape=solo/);
+  // Reason must NOT contain the "no co-signal" note — solo never
+  // checks co-signals.
+  assert.ok(!verdict.reasons[0].includes('no co-signal'),
+    `solo should not emit no-co-signal reason, got: ${verdict.reasons[0]}`);
 });
 
 // ---------------------------------------------------------------------------

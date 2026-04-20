@@ -37,7 +37,14 @@
 //      escalate. At or above HIGH, shape drives the base: solo (or
 //      unknown, treated conservatively as solo) → BLOCK; committee
 //      or alternating → WARN. Committee/alternating upgrade to BLOCK
-//      only at EXCEPTIONAL_PRIOR_TENURE.
+//      only at EXCEPTIONAL_PRIOR_TENURE *and* with at least one
+//      co-signal on the transition — see CO-SIGNAL REQUIREMENT
+//      (publisher.js GATE CONTRACT Addition 3) and hasCoSignal()
+//      below. Committee members accumulate long tenures as a matter
+//      of course (e.g., express's dougwilson 150-version block), so
+//      prior_tenure alone is not a reliable attack signal on
+//      committee shapes — the co-signal requirement closes that gap
+//      without weakening the solo (event-stream / axios) path.
 //
 //   4. PROVIDER MODIFIER — supplementary, on cold-handoff only, and
 //      only when the incoming block introduces a NEW domain (domain's
@@ -79,6 +86,18 @@
 const HIGH_PRIOR_TENURE = 5;
 const EXCEPTIONAL_PRIOR_TENURE = 20;
 
+// Co-signal: short handoff gap. A cold handoff within this window of
+// the prior block's last release is itself a co-signal — legitimate
+// committee handoffs almost always have >1 day between releases
+// (planning, review, coordination). An incoming maintainer publishing
+// within hours of gaining ownership is the axios / shai-hulud shape.
+// 24h is the coarsest threshold that still separates the observed
+// attack cadence from legitimate committee coordination; narrower
+// windows (1h, 6h) would still catch the known-attack cases but
+// risk false positives on automated release pipelines that batch a
+// handoff and a follow-up patch.
+const SHORT_GAP_MS = 24 * 60 * 60 * 1000;
+
 const ORDER = { ALLOW: 0, WARN: 1, BLOCK: 2 };
 
 function escalate(current, next) {
@@ -106,6 +125,69 @@ function incomingIntroducesNewDomain(incoming) {
   );
 }
 
+// Co-signal detector for the non-solo cold-handoff cell. Returns
+// { present: boolean, labels: string[] } so the caller can both gate
+// the disposition and append a reason annotation. Order of checks
+// matches the three classes documented in GATE CONTRACT Addition 3
+// (a = new domain class, b = provenance break, c = short gap); any
+// one is sufficient to escalate, all observed are labeled.
+//
+// Why these three and not others:
+//   - The (F,F) + long prior_tenure combination is already the
+//     strongest per-event identity signal available at this layer.
+//     The co-signals are the three independent axes that the
+//     publisher pattern observes — domain class, provenance state,
+//     release cadence. Each fires on a published-observable feature,
+//     none requires a live network call, and each on its own has
+//     been empirically sufficient to flag a known attack in the
+//     validation corpus (axios: short gap + privacy domain; shai-hulud:
+//     short gap; ua-parser-js: unverified domain after baseline).
+//   - free-webmail is deliberately NOT a co-signal: legitimate
+//     committee members frequently use gmail addresses, and treating
+//     gmail-as-new-domain as escalation would fire on express's
+//     celebrated dougwilson → ulisesgascon handoff.
+function hasCoSignal(t, prior, incoming, identityProfile) {
+  const labels = [];
+
+  // (a) New domain class — privacy or unverified. Free-webmail and
+  //     verified-corporate are NOT co-signals here.
+  if (incoming && incomingIntroducesNewDomain(incoming)) {
+    const p = incoming.provider;
+    if (p === 'privacy' || p === 'unverified') {
+      labels.push(`co-signal: new ${p} domain ${incoming.domain}`);
+    }
+  }
+
+  // (b) Provenance method break. Strictest reading: the package had
+  //     established a provenance baseline (prior block's last release
+  //     carried provenance=true) and the incoming block's first
+  //     release drops it (anything other than true — false or
+  //     unobserved). This is the "OIDC lost after consistent history"
+  //     case. Two null-vs-null blocks do NOT fire — no break if no
+  //     baseline existed.
+  if (
+    prior &&
+    incoming &&
+    prior.last_provenance_present === true &&
+    incoming.first_provenance_present !== true
+  ) {
+    labels.push('co-signal: provenance break');
+  }
+
+  // (c) Short handoff gap. See SHORT_GAP_MS for rationale.
+  if (typeof t.gap_ms === 'number' && t.gap_ms < SHORT_GAP_MS) {
+    labels.push(`co-signal: gap_ms=${t.gap_ms} (<${SHORT_GAP_MS})`);
+  }
+
+  // identityProfile reserved for future co-signals that cross
+  // individual transitions (e.g., per-package privacy-provider
+  // density). Unused today; kept in the signature so callers don't
+  // need to refactor their call sites when it becomes load-bearing.
+  void identityProfile;
+
+  return { present: labels.length > 0, labels };
+}
+
 function evaluateTransition(t, tenure, shape, identityProfile) {
   const cell = classifyCell(t);
   if (cell !== 'cold_handoff') {
@@ -124,14 +206,6 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
 
   // shape='unknown' is conservative-as-solo per GATE CONTRACT Addition 3.
   const effectiveShape = shape === 'unknown' ? 'solo' : shape;
-  let d;
-  if (effectiveShape === 'solo') {
-    d = 'BLOCK';
-  } else if (priorTenure >= EXCEPTIONAL_PRIOR_TENURE) {
-    d = 'BLOCK';
-  } else {
-    d = 'WARN';
-  }
 
   const parts = [
     `cold_handoff @ ${t.at_version}`,
@@ -139,8 +213,32 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
     `prior_tenure=${priorTenure}`,
   ];
 
+  const prior = tenure[t.from_index];
   const incoming = tenure[t.from_index + 1];
   const newDomain = incomingIntroducesNewDomain(incoming);
+
+  // Base disposition. On non-solo shapes at EXCEPTIONAL prior_tenure,
+  // escalating from WARN → BLOCK requires a co-signal (GATE CONTRACT
+  // Addition 3 — committee members accumulate long tenures through
+  // legitimate activity; tenure length alone is not a reliable attack
+  // signal for committees). Solo shapes escalate unconditionally at
+  // HIGH: a solo package changing hands after a long tenure IS the
+  // ownership event and has no legitimate committee-churn reading.
+  let d;
+  if (effectiveShape === 'solo') {
+    d = 'BLOCK';
+  } else if (priorTenure >= EXCEPTIONAL_PRIOR_TENURE) {
+    const co = hasCoSignal(t, prior, incoming, identityProfile);
+    if (co.present) {
+      d = 'BLOCK';
+      for (const label of co.labels) parts.push(label);
+    } else {
+      d = 'WARN';
+      parts.push('no co-signal (committee tenure alone does not BLOCK)');
+    }
+  } else {
+    d = 'WARN';
+  }
 
   if (newDomain) {
     const provider = incoming.provider;
