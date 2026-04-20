@@ -250,13 +250,13 @@ test('fixture A (event-stream class): 27 → 3 produces 2 tenure blocks', () => 
   assert.equal(out.tenure.length, 2);
 
   const [first, second] = out.tenure;
-  assert.equal(first.identity, 'dominictarr <dominictarr@example.com>');
+  assert.equal(first.identity, 'dominictarr');
   assert.equal(first.version_count, 27);
   assert.equal(first.first_version, '1.0.0');
   assert.equal(first.last_version, '1.0.26');
   assert.equal(first.duration_ms, 26 * DAY_MS);
 
-  assert.equal(second.identity, 'right9ctrl <right9ctrl@example.com>');
+  assert.equal(second.identity, 'right9ctrl');
   assert.equal(second.version_count, 3);
   assert.equal(second.first_version, '1.0.27');
   assert.equal(second.last_version, '1.0.29');
@@ -286,7 +286,7 @@ test('fixture C (ua-parser-js class): 100 versions same identity → 1 block', (
 
   assert.equal(out.tenure.length, 1);
   const [only] = out.tenure;
-  assert.equal(only.identity, 'faisalman <faisalman@example.com>');
+  assert.equal(only.identity, 'faisalman');
   assert.equal(only.version_count, 100);
   assert.equal(only.first_version, '1.0.0');
   assert.equal(only.last_version, '1.0.99');
@@ -318,11 +318,11 @@ test('tenure: A/B/A pattern yields 3 distinct blocks (not deduped across gaps)',
   const out = publisher.extract({ packageName: 'aba', history: rows });
 
   assert.equal(out.tenure.length, 3);
-  assert.equal(out.tenure[0].identity, 'a <a@x.com>');
+  assert.equal(out.tenure[0].identity, 'a');
   assert.equal(out.tenure[0].version_count, 2);
-  assert.equal(out.tenure[1].identity, 'b <b@y.com>');
+  assert.equal(out.tenure[1].identity, 'b');
   assert.equal(out.tenure[1].version_count, 1);
-  assert.equal(out.tenure[2].identity, 'a <a@x.com>');
+  assert.equal(out.tenure[2].identity, 'a');
   assert.equal(out.tenure[2].version_count, 3);
 });
 
@@ -428,8 +428,8 @@ test('fixture A (event-stream class): exactly 1 transition with tenure-weighted 
   assert.equal(out.signals.transition_count, 1);
 
   const [t] = out.transitions;
-  assert.equal(t.from_identity, 'dominictarr <dominictarr@example.com>');
-  assert.equal(t.to_identity, 'right9ctrl <right9ctrl@example.com>');
+  assert.equal(t.from_identity, 'dominictarr');
+  assert.equal(t.to_identity, 'right9ctrl');
   assert.equal(t.at_version, '1.0.27');
   assert.equal(t.prior_tenure_versions, 27);
   assert.equal(t.prior_tenure_duration_ms, 26 * DAY_MS);
@@ -496,8 +496,8 @@ test('fixture D (dormancy-revive): 5 active → 730-day silence → 1 by new ide
   assert.equal(out.transitions.length, 1);
 
   const [t] = out.transitions;
-  assert.equal(t.from_identity, 'orig <orig@example.com>');
-  assert.equal(t.to_identity, 'newowner <newowner@example.com>');
+  assert.equal(t.from_identity, 'orig');
+  assert.equal(t.to_identity, 'newowner');
   assert.equal(t.prior_tenure_versions, 5);
   assert.equal(t.prior_tenure_duration_ms, 100 * DAY_MS);
   assert.equal(t.gap_ms, 730 * DAY_MS);
@@ -534,13 +534,13 @@ test('transitions: A/B/A reappearance yields 2 transitions with correct from_ind
   const out = publisher.extract({ packageName: 'aba', history: rows });
 
   assert.equal(out.transitions.length, 2);
-  assert.equal(out.transitions[0].from_identity, 'a <a@x.com>');
-  assert.equal(out.transitions[0].to_identity, 'b <b@y.com>');
+  assert.equal(out.transitions[0].from_identity, 'a');
+  assert.equal(out.transitions[0].to_identity, 'b');
   assert.equal(out.transitions[0].prior_tenure_versions, 2);
   assert.equal(out.transitions[0].from_index, 0);
 
-  assert.equal(out.transitions[1].from_identity, 'b <b@y.com>');
-  assert.equal(out.transitions[1].to_identity, 'a <a@x.com>');
+  assert.equal(out.transitions[1].from_identity, 'b');
+  assert.equal(out.transitions[1].to_identity, 'a');
   assert.equal(out.transitions[1].prior_tenure_versions, 1);
   assert.equal(out.transitions[1].prior_tenure_duration_ms, 0);
   assert.equal(out.transitions[1].from_index, 1);
@@ -900,8 +900,8 @@ test('fixture L (K-boundary INSIDE, 10 prior versions): known_contributor fires'
   assert.equal(out.transitions.length, 2);
 
   const returnTransition = out.transitions[1];
-  assert.equal(returnTransition.from_identity, 'b <b@y.com>');
-  assert.equal(returnTransition.to_identity, 'a <a@x.com>');
+  assert.equal(returnTransition.from_identity, 'b');
+  assert.equal(returnTransition.to_identity, 'a');
   assert.equal(
     returnTransition.prior_contribution_count,
     10,
@@ -930,7 +930,7 @@ test('fixture M (K-boundary OUTSIDE, 9 prior versions): known_contributor does N
   assert.equal(out.transitions.length, 2);
 
   const returnTransition = out.transitions[1];
-  assert.equal(returnTransition.to_identity, 'a <a@x.com>');
+  assert.equal(returnTransition.to_identity, 'a');
   assert.equal(
     returnTransition.prior_contribution_count,
     9,
@@ -969,25 +969,25 @@ test('fixture N (returning dormant maintainer): cell (false, true) fires — the
   // (false, false) cell, where disposition depends on prior_tenure
   // (t0's prior_tenure=15 would be escalated by the gate; t1/t2's
   // prior_tenure=5 would not).
-  assert.equal(out.transitions[0].to_identity, 'b <b@y.com>');
+  assert.equal(out.transitions[0].to_identity, 'b');
   assert.equal(out.transitions[0].is_overlap_window_W3, false);
   assert.equal(out.transitions[0].prior_contribution_count, 0);
   assert.equal(out.transitions[0].is_known_contributor_K10, false);
 
-  assert.equal(out.transitions[1].to_identity, 'c <c@z.com>');
+  assert.equal(out.transitions[1].to_identity, 'c');
   assert.equal(out.transitions[1].is_overlap_window_W3, false);
   assert.equal(out.transitions[1].prior_contribution_count, 0);
   assert.equal(out.transitions[1].is_known_contributor_K10, false);
 
-  assert.equal(out.transitions[2].to_identity, 'd <d@w.com>');
+  assert.equal(out.transitions[2].to_identity, 'd');
   assert.equal(out.transitions[2].is_overlap_window_W3, false);
   assert.equal(out.transitions[2].prior_contribution_count, 0);
   assert.equal(out.transitions[2].is_known_contributor_K10, false);
 
   // The standout transition — cell (false, true).
   const returnT = out.transitions[3];
-  assert.equal(returnT.from_identity, 'd <d@w.com>');
-  assert.equal(returnT.to_identity, 'a <a@x.com>');
+  assert.equal(returnT.from_identity, 'd');
+  assert.equal(returnT.to_identity, 'a');
   assert.equal(
     returnT.is_overlap_window_W3,
     false,
@@ -1209,7 +1209,7 @@ test('known_contributor: determinism — permuted input produces byte-identical 
   // And a small sanity anchor so the determinism test also documents
   // expected count for future readers.
   assert.equal(forward.transitions.length, 2);
-  assert.equal(forward.transitions[1].to_identity, 'a <a@x.com>');
+  assert.equal(forward.transitions[1].to_identity, 'a');
   assert.equal(forward.transitions[1].prior_contribution_count, 3);
   assert.equal(forward.transitions[1].is_known_contributor_K10, false);
 });
@@ -1683,13 +1683,21 @@ test('fixture 3a-C: axios-class privacy handoff (8 gmail + 1 protonmail) → chu
   assert.equal(out.identity_profile.domain_stability, 'churning');
 });
 
-test('fixture 3a-D: legitimate company switch (8 gmail + 1 new acme) → unverified on final', () => {
-  // Maintainer moves from personal gmail to company acme — only ONE visible
-  // version under the new corporate email. Below MIN_VERIFIED_VERSIONS →
-  // unverified. The gate layer uses is_known_contributor + overlap to
-  // keep this WARN, not BLOCK. Documents the "unverified alone is not
-  // BLOCK" contract rule.
-  const rows = buildRows([['dev@gmail.com', 8], ['dev@acme.com', 1]]);
+test('fixture 3a-D: maintainer handoff with unverified final domain (8 gmail + 1 new acme)', () => {
+  // Founding maintainer on personal gmail hands off to a new-company
+  // hire on an acme corporate address. Only ONE visible version under
+  // the incoming maintainer → acme.com is below MIN_VERIFIED_VERSIONS
+  // → classified unverified. The gate layer uses is_known_contributor
+  // and overlap to keep this WARN rather than BLOCK — this fixture
+  // documents the "unverified alone is not BLOCK" contract rule.
+  //
+  // Under the current identity model (npm account login as the key,
+  // see patterns/identity.js), the transition is visible because the
+  // two publishers are distinct npm accounts, not because the email
+  // rotates. A single account changing its email does NOT produce a
+  // tenure boundary — that behavior is locked by fixture 3a-D's own
+  // data shape (distinct logins, not same login with new email).
+  const rows = buildRows([['founder@gmail.com', 8], ['newhire@acme.com', 1]]);
   const out = publisher.extract({ packageName: '3a-D', history: rows });
 
   assert.equal(out.tenure.length, 2);
@@ -1785,9 +1793,9 @@ test('fixture 3a-H: 3-domain committee rotating (a,b,c × 3) → all verified-co
   // domains that ALL appear in earlier rows (no new-to-window) → not
   // churning. Full history has 3 unique non-null domains → mixed.
   const rows = buildRows([
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
   ]);
   const out = publisher.extract({ packageName: '3a-H', history: rows });
 
@@ -1971,9 +1979,9 @@ test('fixture 3b-F: 3× A + 3× B + 3× C interleaved → committee + locked dom
   // compute independently; any future refactor that couples them
   // breaks this fixture.
   const rows = buildRows([
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
-    ['dev@alpha.com', 1], ['dev@beta.com', 1], ['dev@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
+    ['alice@alpha.com', 1], ['bob@beta.com', 1], ['carol@gamma.com', 1],
   ]);
   const out = publisher.extract({ packageName: '3b-F', history: rows });
   assert.equal(out.shape, 'committee');

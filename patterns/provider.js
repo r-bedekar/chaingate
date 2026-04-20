@@ -28,24 +28,22 @@ import {
   MIN_VERIFIED_VERSIONS,
 } from '../constants.js';
 
-// Extract the email domain from a normalized identity string produced by
-// patterns/identity.js::normalizeIdentity. Shapes handled:
+// Extract the email domain from a raw email string. Returns the domain
+// lowercased, or null if the input is not a string, is empty, contains
+// no '@', or has nothing after the final '@'.
 //
-//   "name <email@host>"  → "host" (lowercased)
-//   "<email@host>"       → "host" (lowercased)
-//   "name"               → null   (bare-name identity)
-//   "name <not-an-email>"→ null   (malformed: no '@' in bracketed section)
-//   null / empty / non-string → null
-export function extractDomain(identity) {
-  if (typeof identity !== 'string' || identity.length === 0) return null;
-  const open = identity.lastIndexOf('<');
-  const close = identity.lastIndexOf('>');
-  if (open < 0 || close < open) return null;
-  const emailPart = identity.slice(open + 1, close);
-  const at = emailPart.lastIndexOf('@');
+// Signature takes an email directly (not an identity string) because
+// the identity key produced by patterns/identity.js is the npm account
+// login when present and no longer encodes the email. The raw email is
+// threaded separately through patterns/publisher.js::normalizeAndFilter
+// onto each row and onto each tenure block, so domain extraction has
+// the value it needs without parsing it back out of an opaque key.
+export function extractDomain(email) {
+  if (typeof email !== 'string' || email.length === 0) return null;
+  const at = email.lastIndexOf('@');
   if (at < 0) return null;
-  const domain = emailPart.slice(at + 1);
-  return domain.length > 0 ? domain.toLowerCase() : null;
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  return domain.length > 0 ? domain : null;
 }
 
 // Classify a domain given the package's domain → version-count map.

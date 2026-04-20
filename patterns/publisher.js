@@ -243,7 +243,13 @@ function normalizeAndFilter(history) {
       skipped += 1;
       continue;
     }
-    rows.push({ version, identity, published_at_ms: ts });
+    // Thread the raw email alongside the identity key. The identity is
+    // the npm account login when present (see patterns/identity.js) and
+    // no longer encodes the email, so downstream domain extraction
+    // reads r.email rather than parsing it back out of r.identity.
+    const email =
+      typeof raw?.publisher_email === 'string' ? raw.publisher_email.trim().toLowerCase() : '';
+    rows.push({ version, identity, email, published_at_ms: ts });
   }
   return { rows, skipped };
 }
@@ -294,8 +300,16 @@ function extractTenure(sortedRows) {
   for (const row of sortedRows) {
     if (current === null || row.identity !== current.identity) {
       if (current !== null) tenure.push(current);
+      // Block.email is the email seen on the FIRST row of the block.
+      // Subsequent rows under the same identity may carry a different
+      // email (e.g. an account owner rotating their registered address)
+      // but the block-level domain reflects the block's starting state,
+      // matching first_seen_in_package_ms semantics. Intra-block email
+      // changes are intentionally invisible at this layer — identity is
+      // the tamper-resistant anchor, not the email.
       current = {
         identity: row.identity,
+        email: row.email,
         version_count: 1,
         first_version: row.version,
         last_version: row.version,
@@ -651,7 +665,7 @@ function extractSignals(rows, tenure, transitions, skippedVersionsCount) {
 // Returns the per-row domain array, reused by buildIdentityProfile to
 // compute domain_stability without re-extracting.
 function annotateTenureWithIdentityProfile(sortedRows, tenure) {
-  const rowDomains = sortedRows.map((r) => extractDomain(r.identity));
+  const rowDomains = sortedRows.map((r) => extractDomain(r.email));
 
   // Build domain → total version count AND domain → first-seen ts in
   // one pass. sortedRows is ts-ascending, so the first occurrence of
@@ -668,7 +682,7 @@ function annotateTenureWithIdentityProfile(sortedRows, tenure) {
   }
 
   for (const block of tenure) {
-    const domain = extractDomain(block.identity);
+    const domain = extractDomain(block.email);
     block.domain = domain;
     block.provider = classifyProvider(domain, domainVersionCounts);
     block.first_seen_in_package_ms =

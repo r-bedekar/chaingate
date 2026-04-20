@@ -3,25 +3,28 @@ import assert from 'node:assert/strict';
 
 import { normalizeIdentity } from '../../patterns/identity.js';
 
-test('normalizeIdentity: email + name → "name <email>"', () => {
+test('normalizeIdentity: name present → name wins (email ignored)', () => {
+  // The npm account login (publisher_name from _npmUser.name) is the
+  // tamper-resistant anchor. When it is present, it IS the identity
+  // key — the email is carried separately by the caller and does not
+  // enter the key.
   assert.equal(
     normalizeIdentity('dominic.tarr@gmail.com', 'Dominic Tarr'),
-    'Dominic Tarr <dominic.tarr@gmail.com>',
+    'Dominic Tarr',
   );
 });
 
-test('normalizeIdentity: email is lowercased, name preserved as-is', () => {
-  assert.equal(
-    normalizeIdentity('FOO@BAR.COM', 'Foo Bar'),
-    'Foo Bar <foo@bar.com>',
-  );
+test('normalizeIdentity: name preserved as-is, email does not appear in key', () => {
+  // Email casing is irrelevant when a name is present — the name is
+  // the whole key. This is the load-bearing property: an attacker
+  // rotating the email on a compromised account cannot stage a fake
+  // cold handoff because the identity key is unaffected.
+  assert.equal(normalizeIdentity('FOO@BAR.COM', 'Foo Bar'), 'Foo Bar');
 });
 
 test('normalizeIdentity: whitespace trimmed on both fields', () => {
-  assert.equal(
-    normalizeIdentity('  foo@bar.com  ', '  Foo Bar  '),
-    'Foo Bar <foo@bar.com>',
-  );
+  assert.equal(normalizeIdentity('  foo@bar.com  ', '  Foo Bar  '), 'Foo Bar');
+  assert.equal(normalizeIdentity('  foo@bar.com  ', ''), '<foo@bar.com>');
 });
 
 test('normalizeIdentity: email only → "<email>"', () => {
