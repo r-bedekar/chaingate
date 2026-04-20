@@ -158,6 +158,25 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
     // privacy domain after HIGH tenure is the attacker signature and
     // MUST NOT de-escalate.
     const stability = identityProfile.domain_stability;
+    // LOAD-BEARING CARVE-OUT — do not remove the non-solo guard.
+    //
+    // On the cold-handoff cell, shape=solo + new privacy domain +
+    // prior_tenure>=HIGH IS the axios-class attacker signature
+    // (fixture 3c-F). The package's domain history inevitably reads
+    // as 'churning' because the NEW privacy domain lands in the final
+    // CHURNING_WINDOW rows — churning is a mechanical consequence of
+    // the attack, not an exonerating context signal. Letting
+    // stability=churning de-escalate BLOCK→WARN here would ALLOW the
+    // exact attack this function was built to catch.
+    //
+    // The de-escalation is reserved for committee / alternating
+    // shapes where churning genuinely means "this package rotates
+    // domains as a matter of course, a new one isn't news." Solo
+    // packages don't have that excuse — a solo package seeing a new
+    // domain IS the event.
+    //
+    // If you're touching this guard, verify 3c-F still BLOCKs:
+    //   node --test test/validation/disposition.test.js
     if (effectiveShape !== 'solo') {
       if (stability === 'churning' && d === 'BLOCK') {
         d = 'WARN';

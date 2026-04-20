@@ -379,6 +379,50 @@ test('stability=stable escalates WARN → BLOCK on non-solo HIGH cold handoff wi
   assert.match(verdict.reasons[0], /stability=stable \(escalated\)/);
 });
 
+test('modifier precedence: provider combo escalates, then stability de-escalates (WARN wins)', () => {
+  // Exact interaction: committee + (F,F) + prior_tenure=10 +
+  // new privacy domain + has_unverified_domain + churning stability.
+  //
+  // Walk-through:
+  //   base    = WARN  (committee + HIGH ≤ 10 < EXCEPTIONAL)
+  //   combo   = WARN → BLOCK  (privacy incoming + has_unverified_domain)
+  //   stable? = BLOCK → WARN  (churning, non-solo, de-escalate)
+  //   final   = WARN
+  //
+  // This test locks the ORDER of modifier application. A refactor that
+  // applied stability before provider, or that removed the non-solo
+  // stability guard, would land this case at BLOCK and fail here —
+  // exactly the regression we want to catch before calibration.
+  const rows = buildRows([
+    ['B@random.xyz', 1],      // unverified domain, 1 version
+    ['A@a.com', 10],           // long tenure (prior_tenure=10 at next transition)
+    ['D@protonmail.me', 1],    // privacy incoming, NEW domain
+    ['C@c.com', 3],            // trailing block so c.com lands in final-5 → churning
+  ]);
+  const { extracted, verdict } = extractDisposition(rows, 'modifier-precedence');
+  assert.equal(extracted.shape, 'committee');
+  assert.equal(extracted.identity_profile.has_unverified_domain, true);
+  assert.equal(extracted.identity_profile.has_privacy_provider, true);
+  assert.equal(extracted.identity_profile.domain_stability, 'churning');
+
+  const t1 = extracted.transitions[1]; // A → D
+  assert.equal(t1.is_overlap_window_W3, false);
+  assert.equal(t1.is_known_contributor_K10, false);
+  assert.equal(t1.prior_tenure_versions, 10);
+
+  assert.equal(verdict.disposition, 'WARN');
+  // Both modifiers must have fired, and in this order.
+  assert.match(verdict.reasons[1], /privacy\+unverified combo/);
+  assert.match(verdict.reasons[1], /stability=churning \(de-escalated\)/);
+  assert.match(verdict.reasons[1], /^WARN: /);
+  // Sanity: the combo note must appear BEFORE the stability note in
+  // the reason string — ordering is the disposition question here.
+  const comboIdx = verdict.reasons[1].indexOf('privacy+unverified combo');
+  const stabIdx = verdict.reasons[1].indexOf('stability=churning');
+  assert.ok(comboIdx > 0 && stabIdx > comboIdx,
+    `expected combo before stability in reason, got: ${verdict.reasons[1]}`);
+});
+
 test('modifiers do NOT fire on non-cold-handoff cells', () => {
   // Recurring_member transition with a protonmail incoming identity —
   // provider must NOT escalate because modifiers are scoped to the
