@@ -104,27 +104,67 @@
 //   baseline" (weaker signal — same human who may legitimately
 //   revert to CLI). This flag feeds escalator (d) below.
 //
-// DISPOSITION INTERACTION TABLE (axes: publisher cell × provenance
-// state at version T):
+// DISPOSITION INTERACTION TABLE (axes: incoming-identity relationship
+// to prior history × provenance state at version T).
 //
-//   publisher cell                        | in_scope=false | in_scope=true,      | in_scope=true,
-//                                         |                | no regression       | regression
-//   ------------------------------------- | -------------- | ------------------- | --------------------------
-//   no transition (same identity)         | ALLOW          | ALLOW               | WARN, or BLOCK if any
-//                                         |                |                     | escalator (a,b,c,d)
-//   recurring_member (T,T)                | ALLOW          | ALLOW               | WARN, or BLOCK if any
-//                                         |                |                     | escalator (a,b,c,d)
-//   new_committee (T,F)                   | ALLOW          | ALLOW               | WARN
-//   returning_dormant (F,T)               | ALLOW          | ALLOW               | WARN
-//   cold_handoff (F,F), solo, high tenure | BLOCK          | BLOCK (publisher)   | BLOCK (reinforced)
-//   cold_handoff (F,F), non-solo          | WARN (unless   | WARN                | BLOCK — regression is one
-//                                         | co-signals)    |                     | of the three accepted
-//                                         |                |                     | co-signals per publisher.js
-//                                         |                |                     | GATE CONTRACT Addition 3
-//                                         |                |                     | (privacy/unverified domain,
-//                                         |                |                     | provenance break, short gap)
-//                                         |                |                     | — meets escalation bar for
-//                                         |                |                     | non-solo cold_handoff BLOCK
+//   incoming identity                 | in_scope=false | in_scope=true, | in_scope=true,
+//                                     |                | no regression  | regression
+//   --------------------------------- | -------------- | -------------- | -----------------
+//   same as any prior identity        | ALLOW          | ALLOW          | WARN, BLOCK if
+//   (login matches prior block)       |                |                | any escalator
+//                                     |                |                | (a,b,c,d) fires
+//   --------------------------------- | -------------- | -------------- | -----------------
+//   new identity, committee shape     | ALLOW          | ALLOW          | WARN
+//   --------------------------------- | -------------- | -------------- | -----------------
+//   new identity, solo cold handoff,  | BLOCK          | BLOCK          | BLOCK (reinforced)
+//   high prior tenure                 | (publisher)    | (publisher)    |
+//   --------------------------------- | -------------- | -------------- | -----------------
+//   new identity, non-solo cold       | WARN (unless   | WARN           | BLOCK — regression
+//   handoff                           | co-signals)    |                | is Addition-3
+//                                     |                |                | co-signal
+//
+// AMENDED 2026-04-21. Previously the table keyed on publisher's 2×2
+// cell classification (recurring_member / new_committee_member /
+// returning_dormant / cold_handoff). Two problems with that keying:
+//
+//   1. Fixture-scope dependence. Publisher's K=10
+//      is_known_contributor threshold counts prior versions of an
+//      identity across all observed blocks. A login that has
+//      legitimately accumulated 100+ versions in the full registry
+//      history may show <10 under a scoped fixture slice (e.g., the
+//      axios 1.13.0→1.15.1 slice the Phase-2 multi-branch deferral
+//      pins). That flips the publisher cell from recurring_member
+//      (T,T) to new_committee_member (T,F) for axios@1.14.1 — but
+//      the security question is unchanged: jasonsaayman is the same
+//      login on both sides of the transition.
+//
+//   2. Publisher's cells encode PUBLISHER-PATTERN severity (committee
+//      churn vs cold handoff with long tenure, etc.). The provenance
+//      question is narrower: has this login been seen before in this
+//      package? Reusing the cell labels coupled two decisions that
+//      should stay orthogonal.
+//
+// The amended table routes on IDENTITY CONTINUITY: does the incoming
+// publisher's account login match any prior block's identity in this
+// package? This is slice-invariant and matches the attack model —
+// axios-class attacks push under a login that has appeared before,
+// which is what the escalator rules are calibrated to evaluate.
+//
+// ROUTING DEFINITION.
+//
+//   Disposition iterates over every per-version provenance record
+//   where in_scope=true, not only transition boundaries. For each:
+//
+//     * version is at a transition boundary AND incoming identity
+//       matches any prior block's identity → "same as prior identity"
+//       row (escalators evaluated).
+//     * version is at a transition boundary AND incoming identity is
+//       genuinely new (not seen in prior history) → publisher-cell-
+//       driven row: new_committee / cold_handoff / returning_dormant
+//       per the publisher pattern's existing severity logic.
+//     * version is intra-block (no transition at this version) →
+//       "same as prior identity" row by definition: intra-block means
+//       the publisher identity is unchanged from the block's start.
 //
 // Where the table shows BLOCK for in_scope=false, disposition is
 // driven by the publisher pattern independently. Provenance pattern
