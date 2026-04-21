@@ -150,7 +150,7 @@ function incomingIntroducesNewDomain(incoming) {
 //     committee members frequently use gmail addresses, and treating
 //     gmail-as-new-domain as escalation would fire on express's
 //     celebrated dougwilson → ulisesgascon handoff.
-function hasCoSignal(t, prior, incoming, identityProfile) {
+function hasCoSignal(t, prior, incoming, identityProfile, provenanceOutput = null) {
   const labels = [];
 
   // (a) New domain class — privacy or unverified. Free-webmail and
@@ -162,19 +162,39 @@ function hasCoSignal(t, prior, incoming, identityProfile) {
     }
   }
 
-  // (b) Provenance method break. Strictest reading: the package had
-  //     established a provenance baseline (prior block's last release
-  //     carried provenance=true) and the incoming block's first
-  //     release drops it (anything other than true — false or
-  //     unobserved). This is the "OIDC lost after consistent history"
-  //     case. Two null-vs-null blocks do NOT fire — no break if no
-  //     baseline existed.
-  if (
+  // (b) Provenance method break — UNION of two sources:
+  //
+  //     Legacy (block-level): the package had established a provenance
+  //     baseline (prior block's last release carried provenance=true)
+  //     and the incoming block's first release drops it (anything
+  //     other than true — false or unobserved). Two null-vs-null
+  //     blocks do NOT fire — no break if no baseline existed.
+  //
+  //     Phase-3 extension (pattern-level): the provenance pattern
+  //     fires provenance_regression=true at the incoming version T.
+  //     This catches the case the block-level reading misses —
+  //     baseline established over multiple blocks culminating in a
+  //     regression mid-stream — and the case where the attack does
+  //     NOT cross a block boundary (same-identity intra-block
+  //     regression would not flip the block-level bits but will be
+  //     flagged here via the pattern).
+  //
+  //     Either source satisfies the co-signal; the labels array
+  //     carries exactly one break-class entry, specific to whichever
+  //     source fired. When both fire the pattern-level label wins —
+  //     it carries the version anchor for downstream explainability.
+  const perVersionSignal =
+    provenanceOutput && t ? findPerVersionSignal(provenanceOutput, t.at_version) : null;
+  const patternRegression =
+    perVersionSignal && perVersionSignal.provenance_regression === true;
+  const blockLevelBreak =
     prior &&
     incoming &&
     prior.last_provenance_present === true &&
-    incoming.first_provenance_present !== true
-  ) {
+    incoming.first_provenance_present !== true;
+  if (patternRegression) {
+    labels.push(`co-signal: provenance regression @ ${perVersionSignal.version}`);
+  } else if (blockLevelBreak) {
     labels.push('co-signal: provenance break');
   }
 
@@ -390,7 +410,7 @@ function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOut
   return { disposition: 'WARN', reasonParts: parts };
 }
 
-function evaluateTransition(t, tenure, shape, identityProfile) {
+function evaluateTransition(t, tenure, shape, identityProfile, provenanceOutput = null) {
   const cell = classifyCell(t);
   if (cell !== 'cold_handoff') {
     return { disposition: 'ALLOW', reason: `${cell} @ ${t.at_version}` };
@@ -430,7 +450,7 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
   if (effectiveShape === 'solo') {
     d = 'BLOCK';
   } else if (priorTenure >= EXCEPTIONAL_PRIOR_TENURE) {
-    const co = hasCoSignal(t, prior, incoming, identityProfile);
+    const co = hasCoSignal(t, prior, incoming, identityProfile, provenanceOutput);
     if (co.present) {
       d = 'BLOCK';
       for (const label of co.labels) parts.push(label);
@@ -621,7 +641,7 @@ export function disposition(publisherOutput, provenanceOutput = null, transition
   const reasons = [];
   for (const i of targetIndices) {
     const t = transitions[i];
-    const r = evaluateTransition(t, tenure, shape, identity_profile);
+    const r = evaluateTransition(t, tenure, shape, identity_profile, provenanceOutput);
 
     // Provenance interaction — only when provenanceOutput is supplied.
     // The cold_handoff cell is driven by the publisher side; provenance
