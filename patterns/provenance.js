@@ -402,7 +402,7 @@
 // experimental OIDC adoption.
 
 import { MIN_HISTORY_DEPTH } from '../constants.js';
-import { compareSemver } from './semver.js';
+import { compareSemver, parseSemver } from './semver.js';
 
 // Streak threshold — how many consecutive prior attested versions
 // are required before a non-attested release at position T fires
@@ -416,6 +416,20 @@ const MIN_BASELINE_STREAK = 3;
 // calibration may widen this to a pattern set (CI-as-publisher bots
 // from other trusted-publisher providers).
 const MACHINE_PUBLISHER_EMAIL = 'npm-oidc-no-reply@github.com';
+
+// Major-component extractor used by per-major streak partitioning.
+// Uses the shared parseSemver first (strict semver); falls back to
+// a leading-digit regex so unusual-but-sort-stable strings like
+// "0.0.0-nightly-…" still classify into a coherent major. Returns
+// null only for genuinely unparseable versions — those share a
+// single null-keyed bucket so they still participate in streak
+// counting as a coherent group rather than vanishing.
+function extractMajor(version) {
+  const parsed = parseSemver(version);
+  if (parsed !== null) return parsed.major;
+  const m = /^(\d+)\./.exec(version);
+  return m ? Number(m[1]) : null;
+}
 
 function validateInput(input) {
   if (!input || typeof input !== 'object') {
@@ -599,25 +613,34 @@ function normalizeAndSortHistory(history) {
 //   the K-streak).
 function computeStreakSignals(sortedRows, minBaselineStreak = MIN_BASELINE_STREAK) {
   const signals = [];
-  let streak = 0;
-  let baselineEverReached = false;
+  // Per-major state map: each major carries its own streak and
+  // sticky baselineEverReached bit. The stream iteration order is
+  // still the sorted (time-ascending) order of the full history; we
+  // just route each row's signal through its major's state slot.
+  const perMajorState = new Map();
   for (const row of sortedRows) {
-    const priorStreak = streak;
+    const major = extractMajor(row.version);
+    let state = perMajorState.get(major);
+    if (!state) {
+      state = { streak: 0, baselineEverReached: false };
+      perMajorState.set(major, state);
+    }
+    const priorStreak = state.streak;
     const baseline_established = priorStreak >= minBaselineStreak;
     const provenance_regression =
       baseline_established && row.provenance_present === false;
     if (row.provenance_present === true) {
-      streak = priorStreak + 1;
+      state.streak = priorStreak + 1;
     } else if (row.provenance_present === false) {
-      streak = 0;
+      state.streak = 0;
     } // null: streak unchanged
-    if (streak >= minBaselineStreak) baselineEverReached = true;
+    if (state.streak >= minBaselineStreak) state.baselineEverReached = true;
     signals.push({
       version: row.version,
       prior_consecutive_attested: priorStreak,
       baseline_established,
       provenance_regression,
-      in_scope: baselineEverReached,
+      in_scope: state.baselineEverReached,
     });
   }
   return signals;
@@ -828,11 +851,18 @@ function extractPipeline(input) {
     const gatedBaseline = hasSufficientHistory && raw.baseline_established;
     const gatedRegression = hasSufficientHistory && raw.provenance_regression;
     const gatedInScope = hasSufficientHistory && raw.in_scope;
+    // Per-major carriers: the streak feeding baseline_established at T
+    // lives entirely within T's own major, so the carrier identities
+    // must be drawn from the same-major prior rows only. Filtering
+    // rowsBeforeT to the major first keeps extractPriorBaselineCarriers
+    // pure (still "last N rows of input"), and cross-major publishers
+    // are correctly excluded from the carrier set.
+    const rowMajor = extractMajor(row.version);
+    const rowsBeforeT = sortedRows.slice(0, i).filter(
+      (r) => extractMajor(r.version) === rowMajor,
+    );
     const carriers = gatedBaseline
-      ? extractPriorBaselineCarriers(
-          sortedRows.slice(0, i),
-          raw.prior_consecutive_attested,
-        )
+      ? extractPriorBaselineCarriers(rowsBeforeT, raw.prior_consecutive_attested)
       : null;
     return assemblePerVersionRecord(
       row,
@@ -866,6 +896,7 @@ export {
   MIN_BASELINE_STREAK,
   MACHINE_PUBLISHER_EMAIL,
   MIN_HISTORY_DEPTH,
+  extractMajor,
   normalizeAndSortHistory,
   computeStreakSignals,
   extractPriorBaselineCarriers,
