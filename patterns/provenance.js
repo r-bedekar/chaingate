@@ -417,6 +417,84 @@ function normalizeAndSortHistory(history) {
   return { rows, skipped: { count: reasons.length, reasons } };
 }
 
+// ---------------------------------------------------------------------------
+// Step 2 — computeStreakSignals
+//
+// Deterministic walk over sortedRows producing a per-version signal
+// record. Pure function of the sorted stream and K; no sufficiency
+// gate — sufficiency is applied downstream in extract() so the walker
+// stays testable in isolation on short fixtures.
+//
+// SEMANTICS.
+//
+//   streak             — current count of consecutive attested
+//                        versions observed just before the row being
+//                        evaluated. Reset by any explicit provenance_
+//                        present=false. Unchanged by null (UNKNOWN).
+//   baselineEverReached — sticky bit: once the streak reaches K at or
+//                        before row T, this stays true for every
+//                        subsequent row. Drives in_scope monotonicity.
+//
+//   Per row T:
+//     prior_consecutive_attested := streak (strictly before T)
+//     baseline_established       := priorStreak >= K
+//     provenance_regression      := baseline_established AND
+//                                    provenance_present === false
+//     in_scope                   := baselineEverReached AFTER
+//                                    updating streak with T's value
+//                                    (so the version that first
+//                                    COMPLETES the K-streak carries
+//                                    in_scope=true — matches design-
+//                                    doc first_baseline_reached_at
+//                                    semantics: axios@1.13.2 becomes
+//                                    in_scope at itself, not 1.13.3)
+//
+// NULL THREADING.
+//
+//   A row with provenance_present === null neither contributes to the
+//   streak nor fires regression. The streak is preserved across a null
+//   row. baseline_established can still be true on a null row if the
+//   prior streak is ≥ K, but the regression AND clause fails because
+//   provenance_present !== false. This matches the GATE CONTRACT
+//   "unknown is not unsigned" invariant.
+//
+// NOTE ON in_scope vs baseline_established.
+//
+//   baseline_established answers "does the streak STRICTLY BEFORE T
+//   meet the threshold?" — used to decide whether T's unsigned state
+//   is a regression. in_scope answers "has the package ever hit
+//   baseline up to and including T?" — used to decide whether the
+//   pattern has anything to say about T at all. The two align at
+//   axios@1.13.3 (baseline AT 3 before, regression fires, in_scope
+//   true) and differ at axios@1.13.2 (baseline not yet AT 3 before,
+//   no regression, but in_scope TRUE because this version completes
+//   the K-streak).
+function computeStreakSignals(sortedRows, minBaselineStreak = MIN_BASELINE_STREAK) {
+  const signals = [];
+  let streak = 0;
+  let baselineEverReached = false;
+  for (const row of sortedRows) {
+    const priorStreak = streak;
+    const baseline_established = priorStreak >= minBaselineStreak;
+    const provenance_regression =
+      baseline_established && row.provenance_present === false;
+    if (row.provenance_present === true) {
+      streak = priorStreak + 1;
+    } else if (row.provenance_present === false) {
+      streak = 0;
+    } // null: streak unchanged
+    if (streak >= minBaselineStreak) baselineEverReached = true;
+    signals.push({
+      version: row.version,
+      prior_consecutive_attested: priorStreak,
+      baseline_established,
+      provenance_regression,
+      in_scope: baselineEverReached,
+    });
+  }
+  return signals;
+}
+
 export default {
   name: 'provenance',
   version: 1,
@@ -439,4 +517,5 @@ export {
   MACHINE_PUBLISHER_EMAIL,
   MIN_HISTORY_DEPTH,
   normalizeAndSortHistory,
+  computeStreakSignals,
 };
