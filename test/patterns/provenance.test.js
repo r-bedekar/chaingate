@@ -6,6 +6,7 @@ import provenance, {
   MACHINE_PUBLISHER_EMAIL,
   normalizeAndSortHistory,
   computeStreakSignals,
+  extractPriorBaselineCarriers,
 } from '../../patterns/provenance.js';
 import { PATTERN_REGISTRY, validatePattern } from '../../patterns/index.js';
 
@@ -320,6 +321,99 @@ test('fixture: all-attested (A × 10 → no regression ever; in_scope after K)',
     sig.map((s) => s.in_scope),
     [false, false, true, true, true, true, true, true, true, true],
   );
+});
+
+// ---------------------------------------------------------------------------
+// Step 3 — extractPriorBaselineCarriers
+// ---------------------------------------------------------------------------
+
+test('extractPriorBaselineCarriers: empty streak → empty struct', () => {
+  const c = extractPriorBaselineCarriers([], 0);
+  assert.deepEqual(c, { identities: [], emails: [], any_machine: false, any_human: false });
+});
+
+test('extractPriorBaselineCarriers: streakLength 0 on non-empty rows → empty struct', () => {
+  const rows = [{ publisher_name: 'alice', publisher_email: 'alice@example.com' }];
+  const c = extractPriorBaselineCarriers(rows, 0);
+  assert.equal(c.any_machine, false);
+  assert.equal(c.any_human, false);
+  assert.deepEqual(c.identities, []);
+});
+
+test('extractPriorBaselineCarriers: all-machine baseline (axios@1.14.1 shape)', () => {
+  const rows = [
+    { publisher_name: 'github-actions[bot]', publisher_email: 'npm-oidc-no-reply@github.com' },
+    { publisher_name: 'github-actions[bot]', publisher_email: 'npm-oidc-no-reply@github.com' },
+    { publisher_name: 'github-actions[bot]', publisher_email: 'npm-oidc-no-reply@github.com' },
+    { publisher_name: 'github-actions[bot]', publisher_email: 'npm-oidc-no-reply@github.com' },
+  ];
+  const c = extractPriorBaselineCarriers(rows, 4);
+  assert.equal(c.any_machine, true);
+  assert.equal(c.any_human, false);
+  assert.deepEqual(c.emails, ['npm-oidc-no-reply@github.com']);
+  assert.deepEqual(c.identities, ['github-actions[bot]']);
+});
+
+test('extractPriorBaselineCarriers: all-human baseline (axios@1.13.3 shape)', () => {
+  const rows = [
+    { publisher_name: 'jasonsaayman', publisher_email: 'jasonsaayman@gmail.com' },
+    { publisher_name: 'jasonsaayman', publisher_email: 'jasonsaayman@gmail.com' },
+    { publisher_name: 'jasonsaayman', publisher_email: 'jasonsaayman@gmail.com' },
+  ];
+  const c = extractPriorBaselineCarriers(rows, 3);
+  assert.equal(c.any_machine, false);
+  assert.equal(c.any_human, true);
+  assert.deepEqual(c.emails, ['jasonsaayman@gmail.com']);
+});
+
+test('extractPriorBaselineCarriers: mixed baseline — both flags true', () => {
+  const rows = [
+    { publisher_name: 'ci', publisher_email: MACHINE_PUBLISHER_EMAIL },
+    { publisher_name: 'jane', publisher_email: 'jane@example.com' },
+    { publisher_name: 'ci', publisher_email: MACHINE_PUBLISHER_EMAIL },
+  ];
+  const c = extractPriorBaselineCarriers(rows, 3);
+  assert.equal(c.any_machine, true);
+  assert.equal(c.any_human, true);
+  // Emails are de-duplicated and sorted ASCII ASC.
+  assert.deepEqual(c.emails, ['jane@example.com', 'npm-oidc-no-reply@github.com']);
+  assert.deepEqual(c.identities, ['ci', 'jane']);
+});
+
+test('extractPriorBaselineCarriers: only last `streakLength` rows contribute', () => {
+  // Total 5 rows, streakLength=3 → only the last 3 count. The leading
+  // human rows are outside the streak window and MUST be ignored.
+  const rows = [
+    { publisher_name: 'old', publisher_email: 'old@example.com' },
+    { publisher_name: 'old', publisher_email: 'old@example.com' },
+    { publisher_name: 'ci', publisher_email: MACHINE_PUBLISHER_EMAIL },
+    { publisher_name: 'ci', publisher_email: MACHINE_PUBLISHER_EMAIL },
+    { publisher_name: 'ci', publisher_email: MACHINE_PUBLISHER_EMAIL },
+  ];
+  const c = extractPriorBaselineCarriers(rows, 3);
+  assert.equal(c.any_machine, true);
+  assert.equal(c.any_human, false);
+  assert.deepEqual(c.emails, [MACHINE_PUBLISHER_EMAIL]);
+});
+
+test('extractPriorBaselineCarriers: null email rows do not count as machine OR human', () => {
+  const rows = [
+    { publisher_name: 'mystery', publisher_email: null },
+    { publisher_name: 'mystery', publisher_email: null },
+    { publisher_name: 'mystery', publisher_email: null },
+  ];
+  const c = extractPriorBaselineCarriers(rows, 3);
+  assert.equal(c.any_machine, false);
+  assert.equal(c.any_human, false);
+  assert.deepEqual(c.emails, []);
+  assert.deepEqual(c.identities, ['mystery']);
+});
+
+test('extractPriorBaselineCarriers: streakLength exceeds available rows → defensive slice', () => {
+  const rows = [{ publisher_name: 'a', publisher_email: 'a@b.com' }];
+  const c = extractPriorBaselineCarriers(rows, 99);
+  assert.equal(c.any_human, true);
+  assert.deepEqual(c.identities, ['a']);
 });
 
 test('fixture: long-unsigned-tail (A,A,A,U×20 → only U₁ fires)', () => {

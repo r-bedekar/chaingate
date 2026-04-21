@@ -495,6 +495,72 @@ function computeStreakSignals(sortedRows, minBaselineStreak = MIN_BASELINE_STREA
   return signals;
 }
 
+// ---------------------------------------------------------------------------
+// Step 3 — extractPriorBaselineCarriers
+//
+// Returns the identity profile of the versions that carried the
+// currently-established baseline into version T. Input is the rows
+// strictly before T plus the streak length (prior_consecutive_attested
+// at T). The K carriers are the LAST `streakLength` rows of
+// rowsBeforeT — by construction those are all attested (else they
+// wouldn't be in the streak).
+//
+// any_machine / any_human heuristic.
+//
+//   machine = publisher_email exactly matches MACHINE_PUBLISHER_EMAIL
+//   (GitHub Actions trusted-publisher bot, the dominant attested-
+//   publish identity in the 104-package seed). Starter pattern;
+//   future calibration may widen the match to other CI bot addresses
+//   as they appear in the corpus.
+//
+//   human = non-null publisher_email that does NOT match the machine
+//   pattern. Rows with null publisher_email contribute neither — we
+//   can't tell the shape of an unknown identity, and classifying
+//   missing data as "human" would inflate the human signal
+//   mechanically. Conservative bias: unknown emails are excluded
+//   from both counts.
+//
+// Ordering / determinism.
+//
+//   identities and emails are de-duplicated and sorted ASCII ASC so
+//   two runs on identical inputs produce byte-identical output
+//   (pattern-cache determinism contract).
+//
+// Empty-streak behaviour.
+//
+//   If streakLength is 0 or exceeds rowsBeforeT.length, the function
+//   still returns a valid object with empty arrays and both flags
+//   false. The caller (per-version assembly in Step 4) MUST set
+//   prior_baseline_carriers=null when baseline_established=false, so
+//   this branch is defensive rather than normal operation.
+function extractPriorBaselineCarriers(rowsBeforeT, streakLength) {
+  const empty = { identities: [], emails: [], any_machine: false, any_human: false };
+  if (!Array.isArray(rowsBeforeT) || streakLength <= 0) return empty;
+  const start = Math.max(0, rowsBeforeT.length - streakLength);
+  const carriers = rowsBeforeT.slice(start);
+  const identitySet = new Set();
+  const emailSet = new Set();
+  let any_machine = false;
+  let any_human = false;
+  for (const row of carriers) {
+    if (row.publisher_name) identitySet.add(row.publisher_name);
+    if (row.publisher_email) {
+      emailSet.add(row.publisher_email);
+      if (row.publisher_email === MACHINE_PUBLISHER_EMAIL) {
+        any_machine = true;
+      } else {
+        any_human = true;
+      }
+    }
+  }
+  return {
+    identities: [...identitySet].sort(),
+    emails: [...emailSet].sort(),
+    any_machine,
+    any_human,
+  };
+}
+
 export default {
   name: 'provenance',
   version: 1,
@@ -518,4 +584,5 @@ export {
   MIN_HISTORY_DEPTH,
   normalizeAndSortHistory,
   computeStreakSignals,
+  extractPriorBaselineCarriers,
 };
