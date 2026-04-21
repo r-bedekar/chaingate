@@ -29,11 +29,13 @@
 // case). The combination is NOT a simple OR — severity depends on
 // which pattern fired and the supporting context.
 //
-// BASELINE DEFINITION.
+// BASELINE DEFINITION (per-major, amended 2026-04-21).
 //
 //   A package has an ESTABLISHED provenance baseline at version T
-//   when the last MIN_BASELINE_STREAK versions strictly prior to T
-//   were all attested (provenance_present === true).
+//   in major M when the last MIN_BASELINE_STREAK versions strictly
+//   prior to T WITHIN MAJOR M were all attested
+//   (provenance_present === true). Cross-major versions do not
+//   contribute to and do not reset major M's streak.
 //
 //   Starter constant: MIN_BASELINE_STREAK = 3.
 //     - 1 is trivially any attested release — false baselines on
@@ -42,31 +44,37 @@
 //     - 3 requires three consecutive attested releases — enough to
 //       say "attested publish is the norm here, not an experiment."
 //       axios attack has 4 consecutive machine-OIDC versions before
-//       it, so K=3 detects it; legitimate one-off CI trials do not.
+//       it in the 1.x train, so K=3 detects it; legitimate one-off
+//       CI trials do not.
 //     - 4+ misses real breaks on packages with shorter release
 //       histories.
 //   Subject to revision in calibrate.js (Phase 5) against the train
-//   set. Corpus diagnostic under K=3 on the full 104-package seed:
-//   17 of 104 packages fire ≥1 regression (16.3%), 274 total fires
-//   across the 104-package seed, zero concerning FPs in a 5-sample
-//   classification — all non-attack fires lack any escalator and
-//   land at WARN.
+//   set. Corpus diagnostic under K=3 on the full 104-package seed
+//   (per-major): 9 of 104 packages fire ≥1 regression, 239 total
+//   fires, zero concerning FPs in a 5-sample classification — all
+//   non-attack fires lack any escalator and land at WARN.
 //
-// STREAK COUNTING.
+// STREAK COUNTING (per-major, amended 2026-04-21).
 //
-//   The streak is contiguous prior attested versions, reset by any
-//   non-attested version. Versions are ordered by published_at_ms
-//   ascending with a stable secondary key (see sortRows() below).
+//   Streaks are counted per major. Each major maintains its own
+//   independent streak; a version in major N does not contribute
+//   to and does not reset major M's streak. The stream is still
+//   ordered by published_at_ms ascending with a stable secondary
+//   key (see sortRows() below) — only the streak dimension is
+//   partitioned by major.
 //
-//   prior_consecutive_attested is computed STRICTLY BEFORE version T;
-//   it counts the run of attested versions immediately preceding T.
-//   A non-attested version T consumes the streak for the purpose of
-//   evaluating T, then resets the streak to 0 for the next version.
+//   prior_consecutive_attested is computed STRICTLY BEFORE version T
+//   WITHIN MAJOR M; it counts the run of attested versions in
+//   major M immediately preceding T, skipping over versions in
+//   other majors. A non-attested version T in major M consumes
+//   major M's streak for the purpose of evaluating T, then resets
+//   major M's streak to 0; other majors' streaks are untouched.
 //
-//   This correctly handles the "CLI between OIDC" gap: a single
-//   unsigned release fires (if baseline was already reached) and
-//   then the streak rebuilds from 0 for subsequent attested
-//   releases.
+//   This correctly handles the "CLI between OIDC" gap within a
+//   major AND the legacy-branch backport case across majors: a
+//   single unsigned release in major M fires (if major M's
+//   baseline was already reached) and rebuilds from 0 in major M;
+//   a CLI release in major N has no effect on major M's streak.
 //
 // REGRESSION SIGNAL.
 //
@@ -78,31 +86,37 @@
 //   layer combining this signal with publisher-pattern output and
 //   the four escalator rules below.
 //
-// PER-VERSION in_scope SEMANTICS.
+// PER-VERSION in_scope SEMANTICS (per-major, amended 2026-04-21).
 //
-//   in_scope is a PER-VERSION determination, not per-package. At each
-//   version T, in_scope=true iff the package has reached
-//   MIN_BASELINE_STREAK consecutive attested versions at some point
-//   at or before T (i.e. baseline was first established at some
-//   version ≤ T). Once in_scope=true at version T, it remains true
-//   for every subsequent version in the ordered stream — this is a
-//   monotonic property of history (baseline-reached cannot be
-//   un-reached).
+//   in_scope is PER-VERSION AND PER-MAJOR. At version T in major M,
+//   in_scope=true iff major M has reached MIN_BASELINE_STREAK
+//   consecutive attested versions at some point at or before T
+//   WITHIN MAJOR M's own stream. Monotonicity applies within a
+//   major only — baseline-reached in major M does NOT imply
+//   in_scope=true for any version in major N. Each major carries
+//   its own sticky baseline-reached bit.
 //
-//   Attacks on packages that never adopted OIDC (event-stream@3.3.6,
-//   ua-parser-js@0.7.29) have in_scope=false at their attack version.
-//   The provenance pattern has nothing to say about them. Silence is
-//   the correct output.
+//   Attacks on majors that never adopted OIDC (event-stream@3.3.6
+//   in major 3, ua-parser-js@0.7.29 in major 0, ua-parser-js@1.0.0
+//   in major 1) have in_scope=false at their attack version even
+//   if other majors of the same package did adopt OIDC. The
+//   provenance pattern has nothing to say about them; silence is
+//   correct. Publisher-pattern cold-handoff detection carries
+//   those cases independently.
 //
-// PRIOR BASELINE CARRIERS.
+// PRIOR BASELINE CARRIERS (per-major, amended 2026-04-21).
 //
 //   prior_baseline_carriers records WHO was publishing during the
-//   current baseline streak — up to the version being evaluated.
-//   any_machine distinguishes "CI was the baseline" (GitHub Actions
-//   bot with npm-oidc-no-reply@github.com, strongest signal) from
-//   "one individual's personal trusted-publisher OIDC was the
-//   baseline" (weaker signal — same human who may legitimately
-//   revert to CLI). This flag feeds escalator (d) below.
+//   current baseline streak within the version's major — up to the
+//   version being evaluated, intersected with major M's stream.
+//   Cross-major identities do not contribute (they are not in the
+//   streak by construction, since the streak is per-major).
+//   any_machine distinguishes "CI was the baseline in this major"
+//   (GitHub Actions bot with npm-oidc-no-reply@github.com, strongest
+//   signal) from "one individual's personal trusted-publisher OIDC
+//   was the baseline in this major" (weaker signal — same human who
+//   may legitimately revert to CLI). This flag feeds escalator (d)
+//   below.
 //
 // DISPOSITION INTERACTION TABLE (axes: incoming-identity relationship
 // to prior history × provenance state at version T).
@@ -229,6 +243,56 @@
 //   attack (axios — same jasonsaayman npm login across 1.14.1).
 //   Separating concerns restores detection on same-identity attacks
 //   that swap publishing infrastructure.
+//
+// PER-MAJOR RATIONALE (amended 2026-04-21).
+//
+//   Earlier versions of this contract treated the package's version
+//   history as a single ordered stream for streak purposes. That
+//   collapsed when a package publishes legacy-branch CLI releases
+//   alongside active-branch OIDC releases (axios 1.x OIDC +
+//   sporadic 0.30.x CLI backports). A CLI release on the legacy
+//   major reset the single-stream streak, so the attack version
+//   one release later on the active major saw a pre-regression
+//   streak of 2 instead of the true 4 — baseline was not
+//   established at the attack version, in_scope was false,
+//   regression was suppressed, and disposition demoted from BLOCK
+//   to WARN.
+//
+//   The per-major amendment partitions the streak dimension by
+//   SemVer major. Each major carries its own streak, baseline-
+//   reached bit, in_scope state, and regression firings. A CLI
+//   release in major N has no effect on major M's streak.
+//
+//   Validated on the 104-package seed (see docs/PROVENANCE_
+//   DIAGNOSTIC_FINDINGS.md, 2026-04-21):
+//     * axios@1.14.1 on full 135-version history → BLOCK with
+//       escalators [new_domain, privacy, machine_to_human]
+//       (previously suppressed to WARN).
+//     * event-stream@3.3.6, ua-parser-js@0.7.29/0.8.0/1.0.0:
+//       in_scope=false under both semantics (majors never
+//       adopted OIDC); silence preserved; publisher-pattern
+//       BLOCK unchanged.
+//     * lodash@4.17.16: publisher-driven BLOCK, provenance
+//       silent under both semantics; unchanged.
+//     * Corpus FP surface: 9 packages / 239 fires per-major vs
+//       17 / 274 prior. All non-attack fires land at WARN
+//       (zero escalators) per the 5-sample classification.
+//
+//   Edge-case handling (no special logic added):
+//     * Packages that skip majors (0.x → 2.x): each major is
+//       independent. No bridge across the gap.
+//     * Mid-major OIDC adoption (CLI then attested within same
+//       major): streak starts when the first attested version
+//       in that major appears; builds from there. This is
+//       identical to current behavior on a single-major package.
+//     * Prerelease versions (-alpha, -canary, nightly builds):
+//       included in their major's stream with no special
+//       handling. Display-layer rollup (deferred, see docs/
+//       FUTURE_DIRECTIONS.md) will address WARN volume from
+//       CI-alpha/CLI-stable alternation patterns at the UX
+//       layer, NOT at the detection layer — benign-pattern
+//       detection rules would create attacker-reachable
+//       suppression recipes.
 // =====================================================================
 //
 // INPUT SHAPE.
