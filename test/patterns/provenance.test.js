@@ -288,6 +288,31 @@ test('normalizeAndSortHistory: lowercases and trims publisher_email', () => {
   assert.equal(rows[0].publisher_email, 'foo@bar.com');
 });
 
+test('normalizeAndSortHistory: rejects duplicate versions, keeps first occurrence in input order', () => {
+  // Two rows claim '1.0.1'. The first (with prov=1, earlier ts) wins;
+  // the second is skipped with reason 'duplicate_version'. This
+  // matters because otherwise the sort could interleave them
+  // arbitrarily when timestamps also match, breaking determinism.
+  const { rows, skipped } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: 1, publisher_email: 'first@example.com' },
+    { version: '1.0.2', published_at_ms: 300, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 250, provenance_present: 0, publisher_email: 'second@example.com' },
+    { version: '1.0.3', published_at_ms: 400, provenance_present: 1 },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.version),
+    ['1.0.0', '1.0.1', '1.0.2', '1.0.3'],
+  );
+  // First occurrence survived — provenance_present=true, not false.
+  const surviving = rows.find((r) => r.version === '1.0.1');
+  assert.equal(surviving.provenance_present, true);
+  assert.equal(surviving.publisher_email, 'first@example.com');
+  assert.equal(skipped.count, 1);
+  assert.equal(skipped.reasons.length, 1);
+  assert.deepEqual(skipped.reasons[0], { index: 3, reason: 'duplicate_version' });
+});
+
 test('normalizeAndSortHistory: returns empty arrays on empty input', () => {
   const { rows, skipped } = normalizeAndSortHistory([]);
   assert.deepEqual(rows, []);

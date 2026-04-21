@@ -362,9 +362,28 @@ function validateInput(input) {
 // array of `{ index, reason }` objects — one entry per dropped row in
 // input order. Array is ordered so drift diffs stay legible; if the
 // count climbs, the reasons tell you why without re-running the load.
+//
+// Duplicate-version rejection. When two rows share the same `version`
+// string, only the first occurrence (in INPUT order) is retained. Any
+// later occurrence is dropped with reason 'duplicate_version'. Two
+// reasons for this policy:
+//   1. The pattern's unit of analysis is "the release at version T."
+//      Two rows claiming the same version makes that question
+//      ill-posed — which row IS the release? The input is
+//      malformed, and silently concatenating a second row into the
+//      stream would inflate attested/regression counts without
+//      basis.
+//   2. Determinism. Without explicit handling, the sort could
+//      interleave the duplicates arbitrarily when timestamps also
+//      match, causing pattern-cache drift between machines.
+// First-seen-wins matches the "trust the earliest observation" bias
+// used elsewhere in the collector; callers with genuine version
+// collisions (none known in the 104-package seed) would need to
+// de-duplicate before calling extract().
 function normalizeAndSortHistory(history) {
   const rows = [];
   const reasons = [];
+  const seenVersions = new Set();
   for (let i = 0; i < history.length; i += 1) {
     const raw = history[i];
     if (!raw || typeof raw !== 'object') {
@@ -381,6 +400,11 @@ function normalizeAndSortHistory(history) {
       reasons.push({ index: i, reason: 'missing or non-integer published_at_ms' });
       continue;
     }
+    if (seenVersions.has(version)) {
+      reasons.push({ index: i, reason: 'duplicate_version' });
+      continue;
+    }
+    seenVersions.add(version);
     let provenance_present = null;
     if (raw.provenance_present === 1 || raw.provenance_present === true) {
       provenance_present = true;
