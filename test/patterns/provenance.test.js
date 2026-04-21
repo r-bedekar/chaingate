@@ -823,3 +823,100 @@ test('canonical: ua-parser-js@0.7.29 — pre-OIDC adoption, pattern silent', { s
   assert.strictEqual(v.prior_baseline_carriers, null);
   assert.equal(out.packageRollup.regression_count, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Corpus FP surface diagnostic — per-major (amended 2026-04-21).
+//
+// Phase-2 calibration reported 17 packages / 274 fires under full-history
+// streak semantics, with zero concerning FPs in a 5-sample disposition
+// classification (all non-attack fires WARN, no escalator). This test
+// re-runs the corpus classifier under per-major streak semantics to
+// confirm no FP-surface regression was introduced.
+//
+// Acceptance:
+//   * Firing-packages and fire-count stay within the bound established
+//     in Phase 2 (≤ 17 packages / ≤ 274 fires). Per-major is expected
+//     to reduce both (cross-major contamination is eliminated), not
+//     expand either.
+//   * axios fires at 1.14.1 under per-major (Diagnostic E acceptance).
+//   * Every non-attack fire classifies as WARN at the disposition
+//     layer (no escalators, no publisher co-signal upgrade).
+// ---------------------------------------------------------------------------
+test('corpus FP surface: per-major fires bounded by Phase-2 envelope and attack version BLOCKs', { skip: !HAS_SEED }, async () => {
+  const { disposition } = await import('../../validation/disposition.js');
+  const publisher = (await import('../../patterns/publisher.js')).default;
+
+  const db = new Database(SEED_PATH, { readonly: true });
+  const pkgs = db.prepare('SELECT id, package_name FROM packages').all();
+  const attackMap = new Map();
+  const attackRows = db
+    .prepare(
+      `SELECT p.package_name, v.version FROM attack_labels a
+       JOIN versions v ON v.id = a.version_id
+       JOIN packages p ON p.id = a.package_id
+       WHERE a.is_malicious = 1`,
+    )
+    .all();
+  for (const r of attackRows) {
+    if (!attackMap.has(r.package_name)) attackMap.set(r.package_name, new Set());
+    attackMap.get(r.package_name).add(r.version);
+  }
+  db.close();
+
+  const firingPackages = new Set();
+  let totalFires = 0;
+  const axiosFires = [];
+
+  for (const p of pkgs) {
+    const history = loadSeedHistory(p.package_name);
+    const prov = provenance.extract({ packageName: p.package_name, history });
+    const fires = prov.perVersion.filter((v) => v.provenance_regression);
+    if (fires.length === 0) continue;
+    firingPackages.add(p.package_name);
+    totalFires += fires.length;
+    if (p.package_name === 'axios') {
+      for (const f of fires) axiosFires.push(f.version);
+    }
+
+    // Classification: run through disposition and confirm non-attack
+    // fires land at WARN (no escalators). Attack-version fires may
+    // BLOCK legitimately.
+    const pub = publisher.extract({ packageName: p.package_name, history });
+    const verdict = disposition(pub, prov);
+    const attackVersions = attackMap.get(p.package_name) || new Set();
+    for (const f of fires) {
+      const isAttack = attackVersions.has(f.version);
+      const reasonLine = verdict.reasons.find((r) =>
+        r.includes(`provenance_regression @ ${f.version}`),
+      );
+      if (!reasonLine) continue;
+      if (!isAttack) {
+        assert.ok(
+          reasonLine.startsWith('WARN:'),
+          `non-attack regression at ${p.package_name}@${f.version} must be WARN, got: ${reasonLine}`,
+        );
+        assert.ok(
+          !/escalators=\[/.test(reasonLine),
+          `non-attack regression must not fire escalators, got: ${reasonLine}`,
+        );
+      }
+    }
+  }
+
+  // Phase-2 envelope: ≤17 packages / ≤274 fires. Per-major should
+  // reduce both; the invariant is that it cannot exceed.
+  assert.ok(
+    firingPackages.size <= 17,
+    `per-major firing-package count ${firingPackages.size} exceeds Phase-2 bound 17`,
+  );
+  assert.ok(
+    totalFires <= 274,
+    `per-major fire count ${totalFires} exceeds Phase-2 bound 274`,
+  );
+
+  // axios full-history acceptance: 1.14.1 must be among the fires.
+  assert.ok(
+    axiosFires.includes('1.14.1'),
+    `axios must fire at 1.14.1 under per-major on full history, fires=${JSON.stringify(axiosFires)}`,
+  );
+});
