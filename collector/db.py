@@ -565,6 +565,39 @@ def upsert_attack_label(
         return bool(row[0]) if row else False
 
 
+# ---------------------------------------------------------------------------
+# Schema migrations
+#
+# The Postgres schema for ChainGate is managed out-of-band (initial CREATE
+# TABLEs live in the VPS provisioning notes, not in code). New columns that
+# extend existing tables are tracked here as idempotent ALTER TABLE
+# statements so `apply_schema_migrations(conn)` brings a fresh DB up to the
+# current shape, and is a no-op on an already-migrated DB.
+#
+# Add new migrations to _SCHEMA_MIGRATIONS in order. Use IF NOT EXISTS so
+# repeated runs are safe.
+# ---------------------------------------------------------------------------
+
+_SCHEMA_MIGRATIONS: tuple[str, ...] = (
+    # 2026-04-21: OSV advisory timeline enrichment (Tier 2 data-layer).
+    # advisory_published_at captures the OSV 'published' timestamp.
+    # detection_lag_days = days(advisory_published_at - versions.published_at)
+    # for labels pinned to a version. Consumed by Phase 4 validation + the
+    # research post's detection-lag distribution.
+    "ALTER TABLE attack_labels "
+    "ADD COLUMN IF NOT EXISTS advisory_published_at TIMESTAMPTZ",
+    "ALTER TABLE attack_labels "
+    "ADD COLUMN IF NOT EXISTS detection_lag_days INTEGER",
+)
+
+
+def apply_schema_migrations(conn) -> None:
+    """Run all ALTER statements in _SCHEMA_MIGRATIONS. Idempotent."""
+    with conn.cursor() as cur:
+        for stmt in _SCHEMA_MIGRATIONS:
+            cur.execute(stmt)
+
+
 def start_run(conn, source: str) -> int:
     with conn.cursor() as cur:
         cur.execute(

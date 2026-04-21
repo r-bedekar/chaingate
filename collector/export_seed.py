@@ -118,21 +118,23 @@ CREATE TABLE seed_metadata (
 );
 
 CREATE TABLE attack_labels (
-    id                INTEGER PRIMARY KEY,
-    package_id        INTEGER NOT NULL REFERENCES packages(id),
-    version_id        INTEGER REFERENCES versions(id),
-    is_malicious      INTEGER NOT NULL CHECK (is_malicious IN (0, 1)),
-    attack_name       TEXT,
-    source            TEXT,
-    advisory_id       TEXT,
-    aliases           TEXT,
-    severity          TEXT,
-    summary           TEXT,
-    affected_range    TEXT,
-    url               TEXT,
-    modified_at       TEXT,
-    provenance_source TEXT NOT NULL DEFAULT 'collected'
-                       CHECK (provenance_source IN ('collected', 'reconstructed'))
+    id                     INTEGER PRIMARY KEY,
+    package_id             INTEGER NOT NULL REFERENCES packages(id),
+    version_id             INTEGER REFERENCES versions(id),
+    is_malicious           INTEGER NOT NULL CHECK (is_malicious IN (0, 1)),
+    attack_name            TEXT,
+    source                 TEXT,
+    advisory_id            TEXT,
+    aliases                TEXT,
+    severity               TEXT,
+    summary                TEXT,
+    affected_range         TEXT,
+    url                    TEXT,
+    modified_at            TEXT,
+    advisory_published_at  TEXT,
+    detection_lag_days     INTEGER,
+    provenance_source      TEXT NOT NULL DEFAULT 'collected'
+                            CHECK (provenance_source IN ('collected', 'reconstructed'))
 );
 
 CREATE INDEX idx_versions_pkg      ON versions(package_id);
@@ -229,7 +231,8 @@ ATTACK_LABEL_SELECT = """
 SELECT a.id, a.package_id, a.version_id, a.is_malicious,
        a.attack_name, a.source,
        a.advisory_id, a.aliases, a.severity, a.summary,
-       a.affected_range, a.url, a.modified_at
+       a.affected_range, a.url, a.modified_at,
+       a.advisory_published_at, a.detection_lag_days
 FROM attack_labels a
 JOIN packages p ON p.id = a.package_id
 WHERE p.ecosystem = 'npm'
@@ -241,8 +244,9 @@ INSERT INTO attack_labels (
     id, package_id, version_id, is_malicious,
     attack_name, source,
     advisory_id, aliases, severity, summary,
-    affected_range, url, modified_at
-) VALUES (?, ?, ?, ?,  ?, ?,  ?, ?, ?, ?,  ?, ?, ?)
+    affected_range, url, modified_at,
+    advisory_published_at, detection_lag_days
+) VALUES (?, ?, ?, ?,  ?, ?,  ?, ?, ?, ?,  ?, ?, ?,  ?, ?)
 """
 
 BATCH = 2000
@@ -398,11 +402,13 @@ def _copy_attack_labels(pg_cur, sqlite_cur) -> int:
                 attack_name, source,
                 advisory_id, _json_or_none(aliases), severity, summary,
                 affected_range, url, _utc_iso(modified_at),
+                _utc_iso(advisory_published_at), detection_lag_days,
             )
             for (lid, package_id, version_id, is_malicious,
                  attack_name, source,
                  advisory_id, aliases, severity, summary,
-                 affected_range, url, modified_at) in batch
+                 affected_range, url, modified_at,
+                 advisory_published_at, detection_lag_days) in batch
         ]
         sqlite_cur.executemany(ATTACK_LABEL_INSERT, mapped)
         total += len(mapped)
