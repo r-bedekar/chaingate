@@ -297,9 +297,62 @@ function evaluateTransition(t, tenure, shape, identityProfile) {
   return { disposition: d, reason: parts.join(' | ') };
 }
 
-export function disposition(extracted) {
+// disposition(publisherOutput, provenanceOutput?, transitionIndex?)
+//
+// PRIMARY INPUT — publisherOutput — the object returned by
+// patterns/publisher.js extract(). Must carry tenure[], transitions[],
+// identity_profile, shape, signals. This remains the sole required
+// argument; single-arg callers continue to work unchanged.
+//
+// OPTIONAL — provenanceOutput — the object returned by
+// patterns/provenance.js extract(). When null/undefined, disposition
+// behaves exactly as the Phase-2 single-arg form: no provenance
+// interaction table, no four-escalator evaluation, no provenance_
+// regression co-signal extension. Existing disposition tests must
+// continue passing without modification to their inputs.
+//
+// OPTIONAL — transitionIndex — integer index into publisherOutput.
+// transitions[] identifying a specific transition to evaluate. When
+// null the function iterates every transition and returns a
+// package-level verdict (existing behavior). Callers that need a
+// single-transition verdict (unit tests, targeted diagnostics) pass
+// the index; the return shape is unchanged but `reasons` will carry
+// exactly one entry.
+//
+// CORRELATION RULE (provenance ↔ publisher).
+//
+//   provenanceOutput.perVersion is indexed by VERSION STRING (each
+//   element has a .version field). publisherOutput.transitions is
+//   indexed by from_index (the tenure block being transitioned OUT
+//   of). Disposition at publisher transition T maps to the provenance
+//   signal at the version that the transition ENDS AT — i.e., the
+//   INCOMING version, transitions[i].at_version. Look up
+//   provenanceOutput.perVersion.find(v => v.version === t.at_version)
+//   to read in_scope / provenance_regression / prior_baseline_carriers
+//   / incoming_publisher for that version.
+//
+//   For the no-transition case (transitions.length === 0) or the
+//   recurring_member cell (same identity across the transition),
+//   there is no "incoming version of a cold handoff" — the provenance
+//   signal is consulted on the perVersion entries directly, one per
+//   release in the package stream.
+export function disposition(publisherOutput, provenanceOutput = null, transitionIndex = null) {
+  const extracted = publisherOutput;
   if (!extracted || typeof extracted !== 'object') {
     throw new Error('disposition: input must be a non-null object');
+  }
+  if (provenanceOutput !== null && provenanceOutput !== undefined) {
+    if (typeof provenanceOutput !== 'object') {
+      throw new Error('disposition: provenanceOutput must be an object or null');
+    }
+    if (!Array.isArray(provenanceOutput.perVersion)) {
+      throw new Error('disposition: provenanceOutput.perVersion must be an array');
+    }
+  }
+  if (transitionIndex !== null && transitionIndex !== undefined) {
+    if (!Number.isInteger(transitionIndex) || transitionIndex < 0) {
+      throw new Error('disposition: transitionIndex must be a non-negative integer or null');
+    }
   }
   const { tenure, transitions, identity_profile, shape, signals } = extracted;
   if (!Array.isArray(tenure) || !Array.isArray(transitions)) {
@@ -334,9 +387,23 @@ export function disposition(extracted) {
     };
   }
 
+  const targetIndices =
+    transitionIndex === null || transitionIndex === undefined
+      ? transitions.map((_, i) => i)
+      : [transitionIndex];
+  if (transitionIndex !== null && transitionIndex !== undefined) {
+    if (transitionIndex >= transitions.length) {
+      throw new Error(
+        `disposition: transitionIndex ${transitionIndex} out of range ` +
+          `(transitions.length=${transitions.length})`,
+      );
+    }
+  }
+
   let pkg = 'ALLOW';
   const reasons = [];
-  for (const t of transitions) {
+  for (const i of targetIndices) {
+    const t = transitions[i];
     const r = evaluateTransition(t, tenure, shape, identity_profile);
     reasons.push(`${r.disposition}: ${r.reason}`);
     pkg = escalate(pkg, r.disposition);
