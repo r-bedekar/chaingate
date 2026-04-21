@@ -390,19 +390,25 @@
 //
 //   {
 //     skipped:                  integer,   // rows dropped in normalize
-//     has_sufficient_history:   boolean,   // observed_versions_count >= MIN_HISTORY_DEPTH
+//     has_sufficient_history:   boolean,   // observed_versions_count >= MIN_PROVENANCE_HISTORY
 //     min_baseline_streak:      integer,   // K actually used (for logging)
 //   }
 //
 // has_sufficient_history mirrors publisher.js's short-circuit gate.
-// A package with fewer than MIN_HISTORY_DEPTH total observed versions
-// cannot produce provenance_regression=true even if its visible
-// versions happen to form an A-A-A-U pattern — applying K=3 against
-// 5-version packages would generate regressions on genuinely
-// experimental OIDC adoption.
+// A package with fewer than MIN_PROVENANCE_HISTORY total observed
+// versions cannot produce provenance_regression=true even if its
+// visible versions happen to form an A-A-A-U pattern — applying
+// K=3 against 5-version packages would generate regressions on
+// genuinely experimental OIDC adoption.
+//
+// Intentionally decoupled from constants.js MIN_HISTORY_DEPTH so
+// provenance calibration moves independently of publisher's general
+// sufficiency threshold. Starts at the same value (8) but may
+// diverge during Phase 4 tuning.
 
-import { MIN_HISTORY_DEPTH } from '../constants.js';
 import { compareSemver, parseSemver } from './semver.js';
+
+export const MIN_PROVENANCE_HISTORY = 8;
 
 // Streak threshold — how many consecutive prior attested versions
 // are required before a non-attested release at position T fires
@@ -899,7 +905,7 @@ function assemblePackageRollup(perVersion, sortedRows, minBaselineStreak = MIN_B
 //   assemblePerVersionRecord → assemblePackageRollup
 //
 // Sufficiency short-circuit applies to PER-VERSION signals only:
-// below MIN_HISTORY_DEPTH, every per-version entry has
+// below MIN_PROVENANCE_HISTORY, every per-version entry has
 // baseline_established / provenance_regression / in_scope forced to
 // false and carriers=null. The rollup still reports raw observable
 // aggregates (max_consecutive_attested, first_baseline_reached_at,
@@ -914,7 +920,7 @@ function extractPipeline(input) {
   validateInput(input);
   const { rows: sortedRows, skipped } = normalizeAndSortHistory(input.history);
   const streakSignals = computeStreakSignals(sortedRows);
-  const hasSufficientHistory = sortedRows.length >= MIN_HISTORY_DEPTH;
+  const hasSufficientHistory = sortedRows.length >= MIN_PROVENANCE_HISTORY;
 
   const perVersion = sortedRows.map((row, i) => {
     const raw = streakSignals[i];
@@ -965,7 +971,6 @@ export default {
 export {
   MIN_BASELINE_STREAK,
   MACHINE_PUBLISHER_EMAIL,
-  MIN_HISTORY_DEPTH,
   extractMajor,
   normalizeAndSortHistory,
   computeStreakSignals,

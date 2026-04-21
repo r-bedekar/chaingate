@@ -667,8 +667,8 @@ test('fixture: long-unsigned-tail (A,A,A,U×20 → only U₁ fires)', () => {
   assert.equal(sig.filter((s) => s.provenance_regression).length, 1);
 });
 
-test('fixture: below-sufficiency (<MIN_HISTORY_DEPTH total → short-circuit)', () => {
-  // 4 versions (A,A,A,U) — well under MIN_HISTORY_DEPTH=8. The
+test('fixture: below-sufficiency (<MIN_PROVENANCE_HISTORY total → short-circuit)', () => {
+  // 4 versions (A,A,A,U) — well under MIN_PROVENANCE_HISTORY=8. The
   // walker computes regression_at_the_U locally but extract()
   // suppresses it because signals.has_sufficient_history=false.
   const history = [
