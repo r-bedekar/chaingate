@@ -941,3 +941,96 @@ test('phase 3: sufficiency short-circuit — thin history → ALLOW regardless o
   assert.equal(verdict.disposition, 'ALLOW');
   assert.match(verdict.reasons[0], /insufficient history/);
 });
+
+// ---------------------------------------------------------------------------
+// Per-major acceptance tests (amended GATE CONTRACT 2026-04-21).
+//
+// These exercise disposition on UNFILTERED seed histories — the
+// production input shape — to confirm per-major streak semantics
+// holds detection under cross-major legacy-branch publishing. The
+// Phase-3 fixture tests use scoped slices (e.g., axios /^1\.1[345]\./)
+// to isolate the interaction table; these tests re-run the same
+// packages on full histories to validate that no cross-major CLI
+// backport suppresses the detection path.
+//
+// Acceptance gate: axios@1.14.1 must BLOCK with escalators a
+// (new_domain), b (privacy), d (machine_to_human) on the full
+// 135-version history. Prior to per-major, the legacy-branch 0.30.3
+// CLI publish between 1.13.5 and 1.13.6 reset the streak, producing
+// WARN and silently missing the attack on production input.
+// ---------------------------------------------------------------------------
+
+test('per-major acceptance: axios@1.14.1 on full 135-version history → BLOCK with escalators a,b,d', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios');
+  assert.ok(history.length > 100, `expected full axios history, got ${history.length}`);
+  const { prov, verdict } = dispose('axios', history);
+  const focus = prov.perVersion.find((v) => v.version === '1.14.1');
+  assert.ok(focus, 'axios@1.14.1 must be present in perVersion');
+  assert.equal(focus.in_scope, true, 'major 1 must reach baseline under per-major');
+  assert.equal(focus.baseline_established, true);
+  assert.equal(focus.provenance_regression, true);
+  assert.ok(
+    focus.prior_consecutive_attested >= 3,
+    `expected major-1 streak ≥ 3 at 1.14.1, got ${focus.prior_consecutive_attested}`,
+  );
+  assert.equal(verdict.disposition, 'BLOCK');
+  const block = verdict.reasons.find(
+    (r) => r.startsWith('BLOCK:') && r.includes('provenance_regression @ 1.14.1'),
+  );
+  assert.ok(block, `expected BLOCK line for 1.14.1, got ${JSON.stringify(verdict.reasons)}`);
+  assert.match(block, /escalators=\[[^\]]*new_domain[^\]]*\]/);
+  assert.match(block, /escalators=\[[^\]]*privacy[^\]]*\]/);
+  assert.match(block, /escalators=\[[^\]]*machine_to_human[^\]]*\]/);
+});
+
+test('per-major acceptance: axios@1.13.3 per-version line on full history → WARN (regression without escalators)', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios');
+  const { prov, verdict } = dispose('axios', history);
+  const focus = prov.perVersion.find((v) => v.version === '1.13.3');
+  assert.ok(focus);
+  assert.equal(focus.provenance_regression, true);
+  // The per-version signal is WARN; the package verdict is BLOCK because
+  // 1.14.1's escalator-laden BLOCK dominates. Both lines appear in reasons.
+  const warn = verdict.reasons.find(
+    (r) => r.startsWith('WARN:') && r.includes('provenance_regression @ 1.13.3'),
+  );
+  assert.ok(warn, 'expected WARN line for 1.13.3');
+  assert.match(warn, /regression without escalators/);
+  assert.ok(!/escalators=\[/.test(warn), `no escalator must fire at 1.13.3, got: ${warn}`);
+});
+
+test('per-major acceptance: event-stream@3.3.6 on full history → BLOCK via publisher (provenance silent)', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('event-stream');
+  const { prov, verdict } = dispose('event-stream', history);
+  const focus = prov.perVersion.find((v) => v.version === '3.3.6');
+  assert.ok(focus);
+  // Major 3 never adopted OIDC — provenance pattern must be silent.
+  assert.equal(focus.in_scope, false);
+  assert.equal(focus.provenance_regression, false);
+  assert.equal(verdict.disposition, 'BLOCK');
+  const block = verdict.reasons.find((r) => r.startsWith('BLOCK:') && r.includes('cold_handoff'));
+  assert.ok(block, `expected publisher-driven BLOCK, got ${JSON.stringify(verdict.reasons)}`);
+});
+
+test('per-major acceptance: lodash@4.17.16 on full history → BLOCK via publisher (unchanged from Phase 2)', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('lodash');
+  const { verdict } = dispose('lodash', history);
+  assert.equal(verdict.disposition, 'BLOCK');
+  const block = verdict.reasons.find(
+    (r) => r.startsWith('BLOCK:') && r.includes('cold_handoff @ 4.17.16'),
+  );
+  assert.ok(block, `expected BLOCK at 4.17.16, got ${JSON.stringify(verdict.reasons)}`);
+});
+
+test('per-major acceptance: ua-parser-js@0.7.29 — major 0 in_scope=false under per-major', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('ua-parser-js');
+  const { prov } = dispose('ua-parser-js', history);
+  const focus = prov.perVersion.find((v) => v.version === '0.7.29');
+  assert.ok(focus);
+  // Major 0 has zero attested versions; per-major streak never reaches
+  // MIN_BASELINE_STREAK; in_scope stays false throughout major 0.
+  // Provenance pattern silence at the attack version is correct.
+  assert.equal(focus.in_scope, false);
+  assert.equal(focus.baseline_established, false);
+  assert.equal(focus.provenance_regression, false);
+});
