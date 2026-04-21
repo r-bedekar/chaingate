@@ -18,12 +18,15 @@
 // test/patterns/*.test.js.
 //
 // Build order (V2_DESIGN §11): publisher → provenance → cadence →
-// script → dep-structure. Only publisher is registered today.
+// script → dep-structure. publisher is fully implemented; provenance
+// is registered as a skeleton (Phase 1) pending core logic (Phase 2).
 
 import publisher from './publisher.js';
+import provenance from './provenance.js';
 
 export const PATTERN_REGISTRY = Object.freeze({
   [publisher.name]: publisher,
+  [provenance.name]: provenance,
 });
 
 export function validatePattern(mod) {
