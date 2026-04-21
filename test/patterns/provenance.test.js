@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import provenance, {
   MIN_BASELINE_STREAK,
   MACHINE_PUBLISHER_EMAIL,
+  normalizeAndSortHistory,
 } from '../../patterns/provenance.js';
 import { PATTERN_REGISTRY, validatePattern } from '../../patterns/index.js';
 
@@ -74,6 +75,128 @@ test('provenance.extract: throws "not yet implemented" on valid input (Phase 1 s
     () => provenance.extract({ packageName: 'axios', history: [] }),
     /not yet implemented/,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Step 1 — normalizeAndSortHistory
+// Row validation, null coercion, and deterministic sort (published_at_ms
+// ASC, compareSemver ASC). Tiebreaker finalized here: semver ASC, no id.
+// ---------------------------------------------------------------------------
+
+test('normalizeAndSortHistory: sorts by published_at_ms ASC', () => {
+  const { rows } = normalizeAndSortHistory([
+    { version: '1.0.1', published_at_ms: 200, provenance_present: 1 },
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.2', published_at_ms: 300, provenance_present: 0 },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.version),
+    ['1.0.0', '1.0.1', '1.0.2'],
+  );
+});
+
+test('normalizeAndSortHistory: tiebreaks identical timestamps by semver ASC', () => {
+  const { rows } = normalizeAndSortHistory([
+    { version: '1.0.2', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.10', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 100, provenance_present: 1 },
+  ]);
+  // Semver-aware: 1.0.10 sorts after 1.0.2, not lexically before.
+  assert.deepEqual(
+    rows.map((r) => r.version),
+    ['1.0.0', '1.0.1', '1.0.2', '1.0.10'],
+  );
+});
+
+test('normalizeAndSortHistory: deterministic across re-runs on tied timestamps', () => {
+  const input = [
+    { version: '2.0.0', published_at_ms: 500, provenance_present: 1 },
+    { version: '1.9.0', published_at_ms: 500, provenance_present: 1 },
+    { version: '1.5.0', published_at_ms: 500, provenance_present: 0 },
+  ];
+  const a = normalizeAndSortHistory(input);
+  const b = normalizeAndSortHistory(input);
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
+});
+
+test('normalizeAndSortHistory: coerces provenance_present to strict boolean', () => {
+  const { rows } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: true },
+    { version: '1.0.2', published_at_ms: 300, provenance_present: 0 },
+    { version: '1.0.3', published_at_ms: 400, provenance_present: false },
+  ]);
+  assert.equal(rows[0].provenance_present, true);
+  assert.equal(rows[1].provenance_present, true);
+  assert.equal(rows[2].provenance_present, false);
+  assert.equal(rows[3].provenance_present, false);
+});
+
+test('normalizeAndSortHistory: preserves null provenance_present as null (UNKNOWN)', () => {
+  const { rows } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, provenance_present: null },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: undefined },
+    { version: '1.0.2', published_at_ms: 300 },
+    { version: '1.0.3', published_at_ms: 400, provenance_present: 'yes' },
+  ]);
+  // Every non-0/1/true/false value normalizes to null — the "UNKNOWN"
+  // bucket. This is the load-bearing NULL-semantics invariant from the
+  // GATE CONTRACT; downstream MUST NOT see undefined or stringly values.
+  for (const r of rows) {
+    assert.strictEqual(r.provenance_present, null);
+  }
+});
+
+test('normalizeAndSortHistory: skips rows missing version or published_at_ms', () => {
+  const { rows, skipped } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '', published_at_ms: 200, provenance_present: 1 }, // empty version
+    { version: '1.0.1', published_at_ms: '200', provenance_present: 1 }, // string ts
+    { published_at_ms: 300, provenance_present: 0 }, // missing version
+    { version: '1.0.2', provenance_present: 0 }, // missing ts
+    null, // non-object
+    { version: '1.0.3', published_at_ms: 400, provenance_present: 1 },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.version),
+    ['1.0.0', '1.0.3'],
+  );
+  assert.equal(skipped.count, 5);
+  assert.equal(skipped.reasons.length, 5);
+  // Reasons are index-tagged and ordered by input position.
+  assert.deepEqual(
+    skipped.reasons.map((r) => r.index),
+    [1, 2, 3, 4, 5],
+  );
+});
+
+test('normalizeAndSortHistory: does not require publisher_email on every row', () => {
+  // GATE CONTRACT: a row with null publisher_email can still contribute
+  // to the attested/unsigned streak. Only the regression-firing row
+  // needs publisher_email for disposition-layer escalators.
+  const { rows, skipped } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1, publisher_email: null },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: 1 },
+  ]);
+  assert.equal(skipped.count, 0);
+  assert.equal(rows.length, 2);
+  assert.strictEqual(rows[0].publisher_email, null);
+  assert.strictEqual(rows[1].publisher_email, null);
+});
+
+test('normalizeAndSortHistory: lowercases and trims publisher_email', () => {
+  const { rows } = normalizeAndSortHistory([
+    { version: '1.0.0', published_at_ms: 100, publisher_email: '  Foo@Bar.COM  ' },
+  ]);
+  assert.equal(rows[0].publisher_email, 'foo@bar.com');
+});
+
+test('normalizeAndSortHistory: returns empty arrays on empty input', () => {
+  const { rows, skipped } = normalizeAndSortHistory([]);
+  assert.deepEqual(rows, []);
+  assert.equal(skipped.count, 0);
+  assert.deepEqual(skipped.reasons, []);
 });
 
 // ---------------------------------------------------------------------------

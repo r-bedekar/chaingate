@@ -298,6 +298,7 @@
 // experimental OIDC adoption.
 
 import { MIN_HISTORY_DEPTH } from '../constants.js';
+import { compareSemver } from './semver.js';
 
 // Streak threshold — how many consecutive prior attested versions
 // are required before a non-attested release at position T fires
@@ -305,9 +306,11 @@ import { MIN_HISTORY_DEPTH } from '../constants.js';
 // sweep in Phase 5 against the train set.
 const MIN_BASELINE_STREAK = 3;
 
-// Machine-identity marker — GitHub Actions bot email. Used by the
-// extract phase (when implemented) to populate
-// prior_baseline_carriers.any_machine.
+// Machine-identity marker — GitHub Actions bot email. Used by
+// extractPriorBaselineCarriers to populate
+// prior_baseline_carriers.any_machine. Starter heuristic; future
+// calibration may widen this to a pattern set (CI-as-publisher bots
+// from other trusted-publisher providers).
 const MACHINE_PUBLISHER_EMAIL = 'npm-oidc-no-reply@github.com';
 
 function validateInput(input) {
@@ -320,6 +323,98 @@ function validateInput(input) {
   if (!Array.isArray(input.history)) {
     throw new Error('provenance.extract: input.history must be an array');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — normalizeAndSortHistory
+//
+// Row-level validation + deterministic sort. Invalid rows are dropped
+// and counted in `skipped`. The output `rows` array is ready for the
+// streak walker in Step 2 (computeStreakSignals); each row carries
+// normalized fields and a strict-boolean-or-null provenance_present.
+//
+// Drop criteria:
+//   * row is null/not-object
+//   * missing non-empty string `version`
+//   * missing integer `published_at_ms`
+// Any other field may be absent or malformed without dropping the row —
+// null publisher_email is explicitly acceptable (GATE CONTRACT input
+// shape). The pattern needs version + timestamp to anchor the stream;
+// everything else is graceful-degradation.
+//
+// provenance_present is coerced to strict {true, false, null}:
+//   * 1 or true                            → true
+//   * 0 or false                            → false
+//   * everything else (null, undefined, …) → null  (UNKNOWN)
+// This is the load-bearing step for NULL semantics per the GATE
+// CONTRACT. Never treat null as unsigned; downstream sees exactly
+// three states.
+//
+// Sort order (finalizes the Phase-1-open tiebreaker decision):
+//   primary   — published_at_ms ASC
+//   secondary — compareSemver(version) ASC
+// No id-based tiebreak — the pattern input shape does not carry id.
+// Semver ordering matches patterns/publisher.js sortRows() convention,
+// keeps the two patterns aligned, and is deterministic on any two
+// accepted rows (non-empty version strings always compare).
+//
+// Returns { rows, skipped: { count, reasons } } where `reasons` is an
+// array of `{ index, reason }` objects — one entry per dropped row in
+// input order. Array is ordered so drift diffs stay legible; if the
+// count climbs, the reasons tell you why without re-running the load.
+function normalizeAndSortHistory(history) {
+  const rows = [];
+  const reasons = [];
+  for (let i = 0; i < history.length; i += 1) {
+    const raw = history[i];
+    if (!raw || typeof raw !== 'object') {
+      reasons.push({ index: i, reason: 'row is not an object' });
+      continue;
+    }
+    const version =
+      typeof raw.version === 'string' && raw.version.length > 0 ? raw.version : null;
+    if (version === null) {
+      reasons.push({ index: i, reason: 'missing or empty version' });
+      continue;
+    }
+    if (!Number.isInteger(raw.published_at_ms)) {
+      reasons.push({ index: i, reason: 'missing or non-integer published_at_ms' });
+      continue;
+    }
+    let provenance_present = null;
+    if (raw.provenance_present === 1 || raw.provenance_present === true) {
+      provenance_present = true;
+    } else if (raw.provenance_present === 0 || raw.provenance_present === false) {
+      provenance_present = false;
+    }
+    const publisher_name =
+      typeof raw.publisher_name === 'string' && raw.publisher_name.length > 0
+        ? raw.publisher_name
+        : null;
+    const publisher_email =
+      typeof raw.publisher_email === 'string' && raw.publisher_email.length > 0
+        ? raw.publisher_email.trim().toLowerCase()
+        : null;
+    const publisher_tool =
+      typeof raw.publisher_tool === 'string' && raw.publisher_tool.length > 0
+        ? raw.publisher_tool
+        : null;
+    rows.push({
+      version,
+      published_at_ms: raw.published_at_ms,
+      publisher_name,
+      publisher_email,
+      publisher_tool,
+      provenance_present,
+    });
+  }
+  rows.sort((a, b) => {
+    if (a.published_at_ms !== b.published_at_ms) {
+      return a.published_at_ms < b.published_at_ms ? -1 : 1;
+    }
+    return compareSemver(a.version, b.version);
+  });
+  return { rows, skipped: { count: reasons.length, reasons } };
 }
 
 export default {
@@ -339,4 +434,9 @@ export default {
   },
 };
 
-export { MIN_BASELINE_STREAK, MACHINE_PUBLISHER_EMAIL, MIN_HISTORY_DEPTH };
+export {
+  MIN_BASELINE_STREAK,
+  MACHINE_PUBLISHER_EMAIL,
+  MIN_HISTORY_DEPTH,
+  normalizeAndSortHistory,
+};
