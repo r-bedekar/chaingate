@@ -1,3 +1,5 @@
+import { classifyProvider, extractDomain } from '../patterns/provider.js';
+
 // Canonical disposition function — Section 11 step 7.
 //
 // Encodes the GATE CONTRACT from patterns/publisher.js as a pure,
@@ -217,32 +219,130 @@ function findPerVersionSignal(provenanceOutput, version) {
   return null;
 }
 
-// Four-escalator evaluation. Phase-3 STEP 3 will fill in the four
-// rule bodies; STEP 2 ships the routing scaffold with a zero-fire
-// stub so the interaction-table paths can be exercised in isolation
-// before escalator logic lands.
+// Machine-publisher detector — see patterns/provenance.js
+// MACHINE_PUBLISHER_EMAIL. Duplicated here (not imported) so the
+// disposition layer doesn't take a runtime dependency on a pattern
+// constant; calibration changes to the pattern's machine-matcher are
+// expected to remain narrow, and the disposition layer's read of
+// "who is the incoming publisher" is conceptually independent of the
+// pattern's "who carried the baseline" read.
+const MACHINE_PUBLISHER_EMAIL_RE = /^npm-oidc-no-reply@github\.com$/i;
+
+function isMachinePublisher(email) {
+  if (typeof email !== 'string' || email.length === 0) return false;
+  return MACHINE_PUBLISHER_EMAIL_RE.test(email.trim());
+}
+
+// Build the domain→version-count map that classifyProvider needs, by
+// consuming provenance-pattern perVersion records (one entry per
+// observed version, each carrying incoming_publisher.email). This
+// re-derives what patterns/publisher.js computed internally without
+// re-scanning raw packument rows — the spec's "consume only pattern
+// output" rule. Null / missing emails contribute no entry.
+function buildDomainCountMap(provenanceOutput) {
+  const counts = new Map();
+  if (!provenanceOutput || !Array.isArray(provenanceOutput.perVersion)) {
+    return counts;
+  }
+  for (const v of provenanceOutput.perVersion) {
+    const email = v && v.incoming_publisher ? v.incoming_publisher.email : null;
+    const domain = extractDomain(email);
+    if (domain === null) continue;
+    counts.set(domain, (counts.get(domain) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Prior-domain set at version T. Consumes provenance perVersion
+// entries strictly before T (by published_at_ms) and returns the set
+// of their extracted email domains. This matches the GATE CONTRACT
+// escalator (a) definition: "set of all domains seen in prior
+// versions of the package's publisher history."
 //
-// Contract (stable across STEP 2 → STEP 3):
-//   Input:
-//     perVersionSignal — provenanceOutput.perVersion entry for the
-//       incoming version (never null here; caller gates).
-//     publisherOutput — full publisher.extract() result, for the
-//       already-extracted prior-domain set and incoming tenure block.
-//     transitionIndex — index into publisherOutput.transitions, or
-//       null for the no-transition / same-identity case (prior domain
-//       set then spans all tenure blocks preceding the incoming
-//       version chronologically).
-//   Output:
-//     { fired: boolean, escalators: Array<'new_domain'|'privacy'|
-//       'unverified'|'machine_to_human'> }
-//   Each escalator is evaluated INDEPENDENTLY; any fire flips
-//   `fired` true. The `escalators` array is what reason-string
-//   construction reads to name which rules tripped.
-function hasProvenanceEscalator(perVersionSignal, publisherOutput, transitionIndex) {
-  void perVersionSignal;
+// Using provenance perVersion (not publisher.tenure) means intra-
+// block email rotations are visible — publisher.tenure collapses
+// them into a single block domain. The axios@1.14.1 case is exactly
+// this: jasonsaayman remains the account login across the attack,
+// publisher sees one tenure block with block.domain=<earliest
+// email's domain>, but the per-version row stream shows proton.me
+// as an email appearing only at version 1.14.1. Prior set computed
+// this way correctly excludes proton.me.
+function buildPriorDomainSet(provenanceOutput, incomingPublishedAtMs) {
+  const set = new Set();
+  if (!provenanceOutput || !Array.isArray(provenanceOutput.perVersion)) return set;
+  for (const v of provenanceOutput.perVersion) {
+    if (!v || typeof v.published_at_ms !== 'number') continue;
+    if (v.published_at_ms >= incomingPublishedAtMs) continue;
+    const email = v.incoming_publisher ? v.incoming_publisher.email : null;
+    const domain = extractDomain(email);
+    if (domain !== null) set.add(domain);
+  }
+  return set;
+}
+
+// Four-escalator evaluation for the recurring_member / no-transition
+// cell. Each rule fires INDEPENDENTLY against the incoming version
+// T's data; any fire flips `fired` true. The `escalators` array is
+// what reason-string construction reads to name which rules tripped.
+//
+// Rule bodies per GATE CONTRACT (patterns/provenance.js lines
+// 144-167):
+//
+//   (a) new_domain       — incoming email's domain is not in the set
+//                          of domains seen in prior versions.
+//   (b) privacy          — classifyProvider on incoming domain
+//                          returns 'privacy'.
+//   (c) unverified       — classifyProvider on incoming domain
+//                          returns 'unverified'.
+//   (d) machine_to_human — prior_baseline_carriers.any_machine is
+//                          true AND the incoming publisher is NOT a
+//                          machine-identity email.
+//
+// transitionIndex is currently unused — escalator evaluation reads
+// its anchor from perVersionSignal — but retained in the signature
+// so future escalator extensions that need the publisher-side
+// transition context (e.g., a "cross-cell escalator") don't require
+// a call-site refactor.
+function hasProvenanceEscalator(perVersionSignal, publisherOutput, provenanceOutput, transitionIndex) {
   void publisherOutput;
   void transitionIndex;
-  return { fired: false, escalators: [] };
+  const escalators = [];
+  if (!perVersionSignal || !perVersionSignal.incoming_publisher) {
+    return { fired: false, escalators };
+  }
+  const incomingEmail = perVersionSignal.incoming_publisher.email;
+  const incomingDomain = extractDomain(incomingEmail);
+
+  // (a) new_domain — requires a non-null incoming domain to be
+  //     meaningful (a bare-name identity has no domain to compare).
+  if (incomingDomain !== null) {
+    const prior = buildPriorDomainSet(provenanceOutput, perVersionSignal.published_at_ms);
+    if (!prior.has(incomingDomain)) {
+      escalators.push('new_domain');
+    }
+  }
+
+  // (b)(c) privacy / unverified — classifyProvider with a
+  //     domain-count map reconstructed from provenance perVersion.
+  if (incomingDomain !== null) {
+    const counts = buildDomainCountMap(provenanceOutput);
+    const providerClass = classifyProvider(incomingDomain, counts);
+    if (providerClass === 'privacy') escalators.push('privacy');
+    if (providerClass === 'unverified') escalators.push('unverified');
+  }
+
+  // (d) machine_to_human — prior baseline was carried (in part) by
+  //     the GitHub Actions OIDC bot AND the incoming publisher is
+  //     not itself that bot (or any other known-machine pattern).
+  //     Fires on axios@1.14.1 (machine-carried baseline, human-CLI
+  //     incoming) but not on axios@1.13.3 (human-OIDC baseline, so
+  //     any_machine=false on the streak carriers).
+  const carriers = perVersionSignal.prior_baseline_carriers;
+  if (carriers && carriers.any_machine === true && !isMachinePublisher(incomingEmail)) {
+    escalators.push('machine_to_human');
+  }
+
+  return { fired: escalators.length > 0, escalators };
 }
 
 // Interaction-table evaluator for the same-identity cells
@@ -266,7 +366,7 @@ function hasProvenanceEscalator(perVersionSignal, publisherOutput, transitionInd
 // cellHint is one of 'recurring_member', 'new_committee_member',
 // 'returning_dormant', 'no_transition'. The caller classifies; this
 // helper only routes.
-function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOutput, transitionIndex) {
+function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOutput, provenanceOutput, transitionIndex) {
   if (!perVersionSignal) {
     return { disposition: 'ALLOW', reasonParts: [] };
   }
@@ -281,7 +381,7 @@ function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOut
     parts.push(`(${cellHint} — capped at WARN per interaction table)`);
     return { disposition: 'WARN', reasonParts: parts };
   }
-  const esc = hasProvenanceEscalator(perVersionSignal, publisherOutput, transitionIndex);
+  const esc = hasProvenanceEscalator(perVersionSignal, publisherOutput, provenanceOutput, transitionIndex);
   if (esc.fired) {
     parts.push(`escalators=[${esc.escalators.join(',')}]`);
     return { disposition: 'BLOCK', reasonParts: parts };
@@ -494,7 +594,7 @@ export function disposition(publisherOutput, provenanceOutput = null, transition
     let pkg = 'ALLOW';
     const reasons = [];
     for (const v of provenanceOutput.perVersion) {
-      const r = evaluateProvenanceSameIdentity('no_transition', v, extracted, null);
+      const r = evaluateProvenanceSameIdentity('no_transition', v, extracted, provenanceOutput, null);
       if (r.disposition !== 'ALLOW') {
         reasons.push(`${r.disposition}: ${r.reasonParts.join(' | ')}`);
         pkg = escalate(pkg, r.disposition);
@@ -534,7 +634,7 @@ export function disposition(publisherOutput, provenanceOutput = null, transition
       const cell = classifyCell(t);
       if (cell !== 'cold_handoff') {
         const pv = findPerVersionSignal(provenanceOutput, t.at_version);
-        const pr = evaluateProvenanceSameIdentity(cell, pv, extracted, i);
+        const pr = evaluateProvenanceSameIdentity(cell, pv, extracted, provenanceOutput, i);
         if (pr.disposition !== 'ALLOW') {
           const combinedReason =
             `${r.reason} | ${pr.reasonParts.join(' | ')}`;
