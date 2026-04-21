@@ -383,24 +383,16 @@ function hasProvenanceEscalator(perVersionSignal, publisherOutput, provenanceOut
 //     string; empty when disposition is ALLOW (caller keeps the
 //     publisher-side reason unchanged).
 //
-// cellHint is one of 'recurring_member', 'new_committee_member',
-// 'returning_dormant', 'no_transition'. The caller classifies; this
-// helper only routes.
-function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOutput, provenanceOutput, transitionIndex) {
-  if (!perVersionSignal) {
-    return { disposition: 'ALLOW', reasonParts: [] };
-  }
-  if (!perVersionSignal.in_scope) {
-    return { disposition: 'ALLOW', reasonParts: [] };
-  }
-  if (!perVersionSignal.provenance_regression) {
-    return { disposition: 'ALLOW', reasonParts: [] };
-  }
+// "Same as prior identity" row. The incoming publisher login has
+// appeared before in this package (either intra-block, or at a
+// transition boundary where the returning login matches a prior
+// block's identity). Escalators are evaluated; any fire → BLOCK,
+// otherwise WARN.
+function evaluateProvenanceSameIdentity(perVersionSignal, publisherOutput, provenanceOutput, transitionIndex) {
+  if (!perVersionSignal) return { disposition: 'ALLOW', reasonParts: [] };
+  if (!perVersionSignal.in_scope) return { disposition: 'ALLOW', reasonParts: [] };
+  if (!perVersionSignal.provenance_regression) return { disposition: 'ALLOW', reasonParts: [] };
   const parts = [`provenance_regression @ ${perVersionSignal.version}`];
-  if (cellHint === 'new_committee_member' || cellHint === 'returning_dormant') {
-    parts.push(`(${cellHint} — capped at WARN per interaction table)`);
-    return { disposition: 'WARN', reasonParts: parts };
-  }
   const esc = hasProvenanceEscalator(perVersionSignal, publisherOutput, provenanceOutput, transitionIndex);
   if (esc.fired) {
     parts.push(`escalators=[${esc.escalators.join(',')}]`);
@@ -408,6 +400,40 @@ function evaluateProvenanceSameIdentity(cellHint, perVersionSignal, publisherOut
   }
   parts.push('regression without escalators');
   return { disposition: 'WARN', reasonParts: parts };
+}
+
+// Identity-continuity check: has the given login appeared in any
+// tenure block whose first version published strictly before the
+// given timestamp? This is the amended GATE CONTRACT routing
+// key (patterns/provenance.js DISPOSITION INTERACTION TABLE). It
+// is slice-invariant: unlike publisher's K=10 is_known_contributor,
+// this fires on the FIRST reappearance of a login regardless of
+// how many prior versions the fixture captures.
+//
+// Intra-block version v (not the block's first version): the
+// containing block has first_published_at_ms strictly less than v's
+// — this function returns true. ✓
+// Transition-boundary version v (first version of block k): blocks
+// before k with the same identity have first < v's — returns true if
+// any exists, false otherwise. ✓
+function incomingIdentityWasSeenBefore(tenure, incomingIdentity, publishedAtMs) {
+  for (const b of tenure) {
+    if (b.identity !== incomingIdentity) continue;
+    if (b.first_published_at_ms < publishedAtMs) return true;
+  }
+  return false;
+}
+
+// Locate the tenure block containing a given timestamp. Each block
+// occupies a contiguous first_published_at_ms..last_published_at_ms
+// range and the ranges do not overlap (publisher.js guarantees).
+function tenureBlockAt(tenure, publishedAtMs) {
+  for (const b of tenure) {
+    if (publishedAtMs >= b.first_published_at_ms && publishedAtMs <= b.last_published_at_ms) {
+      return b;
+    }
+  }
+  return null;
 }
 
 function evaluateTransition(t, tenure, shape, identityProfile, provenanceOutput = null) {
@@ -539,23 +565,25 @@ function evaluateTransition(t, tenure, shape, identityProfile, provenanceOutput 
 // the index; the return shape is unchanged but `reasons` will carry
 // exactly one entry.
 //
-// CORRELATION RULE (provenance ↔ publisher).
+// ROUTING (provenance ↔ publisher) — identity-continuity keyed per
+// the amended GATE CONTRACT interaction table (patterns/provenance.js).
 //
-//   provenanceOutput.perVersion is indexed by VERSION STRING (each
-//   element has a .version field). publisherOutput.transitions is
-//   indexed by from_index (the tenure block being transitioned OUT
-//   of). Disposition at publisher transition T maps to the provenance
-//   signal at the version that the transition ENDS AT — i.e., the
-//   INCOMING version, transitions[i].at_version. Look up
-//   provenanceOutput.perVersion.find(v => v.version === t.at_version)
-//   to read in_scope / provenance_regression / prior_baseline_carriers
-//   / incoming_publisher for that version.
+//   Pass 1 iterates publisher transitions[]. For each transition
+//   whose incoming identity is GENUINELY NEW (never appeared in any
+//   prior block), evaluateTransition() applies publisher-cell-driven
+//   severity (cold_handoff shape/tenure/co-signals, including the
+//   Phase-3 provenance_regression co-signal extension).
 //
-//   For the no-transition case (transitions.length === 0) or the
-//   recurring_member cell (same identity across the transition),
-//   there is no "incoming version of a cold handoff" — the provenance
-//   signal is consulted on the perVersion entries directly, one per
-//   release in the package stream.
+//   Pass 2 iterates provenanceOutput.perVersion[]. For each in-scope
+//   record with provenance_regression=true whose incoming identity
+//   matches any prior block (transition-boundary or intra-block — the
+//   former returning login, the latter by definition same-identity),
+//   the same-identity interaction row applies: WARN, or BLOCK if any
+//   of the four escalators fire.
+//
+//   Versions where the identity is genuinely new are NOT evaluated
+//   in Pass 2 — Pass 1 already covers them, and double-counting would
+//   inflate the reason list.
 export function disposition(publisherOutput, provenanceOutput = null, transitionIndex = null) {
   const extracted = publisherOutput;
   if (!extracted || typeof extracted !== 'object') {
@@ -600,34 +628,6 @@ export function disposition(publisherOutput, provenanceOutput = null, transition
     };
   }
 
-  if (transitions.length === 0) {
-    // No transitions = single-identity package. Publisher has nothing
-    // to say. Provenance-pattern interaction table row "no transition
-    // (same identity)" applies to every version in the stream: scan
-    // the perVersion records for regressions and escalate per the
-    // same-identity rules (recurring_member-equivalent). If
-    // provenanceOutput is null, preserve the Phase-2 single-arg
-    // answer exactly.
-    if (!provenanceOutput) {
-      return { disposition: 'ALLOW', reasons: ['no transitions observed'] };
-    }
-    let pkg = 'ALLOW';
-    const reasons = [];
-    for (const v of provenanceOutput.perVersion) {
-      const r = evaluateProvenanceSameIdentity('no_transition', v, extracted, provenanceOutput, null);
-      if (r.disposition !== 'ALLOW') {
-        reasons.push(`${r.disposition}: ${r.reasonParts.join(' | ')}`);
-        pkg = escalate(pkg, r.disposition);
-      }
-    }
-    if (reasons.length === 0) reasons.push('no transitions observed');
-    return { disposition: pkg, reasons };
-  }
-
-  const targetIndices =
-    transitionIndex === null || transitionIndex === undefined
-      ? transitions.map((_, i) => i)
-      : [transitionIndex];
   if (transitionIndex !== null && transitionIndex !== undefined) {
     if (transitionIndex >= transitions.length) {
       throw new Error(
@@ -637,37 +637,107 @@ export function disposition(publisherOutput, provenanceOutput = null, transition
     }
   }
 
+  // Phase-2 backward-compat path: provenanceOutput not supplied.
+  // Preserves existing single-arg callers byte-for-byte.
+  if (!provenanceOutput) {
+    if (transitions.length === 0) {
+      return { disposition: 'ALLOW', reasons: ['no transitions observed'] };
+    }
+    const targetIndices =
+      transitionIndex === null || transitionIndex === undefined
+        ? transitions.map((_, i) => i)
+        : [transitionIndex];
+    let pkg = 'ALLOW';
+    const reasons = [];
+    for (const i of targetIndices) {
+      const t = transitions[i];
+      const r = evaluateTransition(t, tenure, shape, identity_profile, null);
+      reasons.push(`${r.disposition}: ${r.reason}`);
+      pkg = escalate(pkg, r.disposition);
+    }
+    return { disposition: pkg, reasons };
+  }
+
+  // Phase-3 path: route by IDENTITY CONTINUITY per the amended GATE
+  // CONTRACT interaction table (patterns/provenance.js). Two passes:
+  //
+  //   Pass 1 — publisher-cell-driven transitions where the incoming
+  //     identity is GENUINELY NEW (never seen before in this package).
+  //     evaluateTransition handles cold_handoff severity, co-signals,
+  //     and the new_committee shape-capped WARN. Same-identity
+  //     transitions are SKIPPED in this pass — they fall through to
+  //     Pass 2.
+  //
+  //   Pass 2 — identity-continuity-driven perVersion evaluation. For
+  //     every in-scope perVersion record, determine whether the
+  //     incoming identity has appeared in any prior block. If yes,
+  //     route via the "same as prior identity" row (escalators
+  //     evaluated; any fire → BLOCK, else WARN on regression). If no
+  //     AND the version sits at a publisher transition, the version
+  //     is covered by Pass 1 and we don't double-count it here.
+  //
+  // Each reason line is attributed to exactly one pass; the package
+  // verdict is the escalate-max across both.
+  const transitionByVersion = new Map();
+  for (let i = 0; i < transitions.length; i += 1) {
+    transitionByVersion.set(transitions[i].at_version, i);
+  }
+
   let pkg = 'ALLOW';
   const reasons = [];
-  for (const i of targetIndices) {
-    const t = transitions[i];
-    const r = evaluateTransition(t, tenure, shape, identity_profile, provenanceOutput);
 
-    // Provenance interaction — only when provenanceOutput is supplied.
-    // The cold_handoff cell is driven by the publisher side; provenance
-    // regression there only extends the co-signal set (STEP 4, below).
-    // The three same-identity cells (recurring_member,
-    // new_committee_member, returning_dormant) gain a provenance-driven
-    // disposition delta per the GATE CONTRACT interaction table.
-    let merged = r;
-    if (provenanceOutput) {
-      const cell = classifyCell(t);
-      if (cell !== 'cold_handoff') {
-        const pv = findPerVersionSignal(provenanceOutput, t.at_version);
-        const pr = evaluateProvenanceSameIdentity(cell, pv, extracted, provenanceOutput, i);
-        if (pr.disposition !== 'ALLOW') {
-          const combinedReason =
-            `${r.reason} | ${pr.reasonParts.join(' | ')}`;
-          merged = {
-            disposition: escalate(r.disposition, pr.disposition),
-            reason: combinedReason,
-          };
-        }
-      }
+  // Pass 1 — new-identity transitions (publisher-cell-driven).
+  for (let i = 0; i < transitions.length; i += 1) {
+    if (transitionIndex !== null && transitionIndex !== undefined && i !== transitionIndex) {
+      continue;
     }
+    const t = transitions[i];
+    const incomingBlock = tenure[t.from_index + 1];
+    const incomingIdentity = incomingBlock ? incomingBlock.identity : null;
+    const sameAsPrior =
+      incomingIdentity !== null &&
+      incomingIdentityWasSeenBefore(tenure, incomingIdentity, t.at_published_at_ms);
+    if (sameAsPrior) continue;
+    const r = evaluateTransition(t, tenure, shape, identity_profile, provenanceOutput);
+    reasons.push(`${r.disposition}: ${r.reason}`);
+    pkg = escalate(pkg, r.disposition);
+  }
 
-    reasons.push(`${merged.disposition}: ${merged.reason}`);
-    pkg = escalate(pkg, merged.disposition);
+  // Pass 2 — same-identity perVersion evaluation. When transitionIndex
+  // scopes to one transition, restrict Pass 2 to the perVersion entry
+  // at that transition's at_version (and only when its identity is
+  // same-as-prior — otherwise Pass 1 already covered it).
+  const perVersionToScan =
+    transitionIndex !== null && transitionIndex !== undefined
+      ? provenanceOutput.perVersion.filter(
+          (v) => v.version === transitions[transitionIndex].at_version,
+        )
+      : provenanceOutput.perVersion;
+
+  for (const v of perVersionToScan) {
+    if (!v || !v.in_scope) continue;
+    if (!v.provenance_regression) continue;
+    const blk = tenureBlockAt(tenure, v.published_at_ms);
+    if (!blk) continue;
+    const identity = blk.identity;
+    const sameAsPrior = incomingIdentityWasSeenBefore(tenure, identity, v.published_at_ms);
+    if (!sameAsPrior) {
+      // Genuinely new identity. Publisher-cell path (Pass 1) covers
+      // this version; don't double-count here.
+      continue;
+    }
+    const tIdx = transitionByVersion.has(v.version)
+      ? transitionByVersion.get(v.version)
+      : null;
+    const r = evaluateProvenanceSameIdentity(v, extracted, provenanceOutput, tIdx);
+    if (r.disposition !== 'ALLOW') {
+      reasons.push(`${r.disposition}: ${r.reasonParts.join(' | ')}`);
+      pkg = escalate(pkg, r.disposition);
+    }
+  }
+
+  if (reasons.length === 0) {
+    reasons.push(transitions.length === 0 ? 'no transitions observed' : 'no escalating signals');
   }
   return { disposition: pkg, reasons };
 }
