@@ -47,9 +47,10 @@
 //       histories.
 //   Subject to revision in calibrate.js (Phase 5) against the train
 //   set. Corpus diagnostic under K=3 on the full 104-package seed:
-//   17 packages fire ≥1 regression, 274 total fires, zero concerning
-//   FPs in a 5-sample classification — all non-attack fires lack any
-//   escalator and land at WARN.
+//   17 of 104 packages fire ≥1 regression (16.3%), 274 total fires
+//   across the 104-package seed, zero concerning FPs in a 5-sample
+//   classification — all non-attack fires lack any escalator and
+//   land at WARN.
 //
 // STREAK COUNTING.
 //
@@ -116,8 +117,23 @@
 //   new_committee (T,F)                   | ALLOW          | ALLOW               | WARN
 //   returning_dormant (F,T)               | ALLOW          | ALLOW               | WARN
 //   cold_handoff (F,F), solo, high tenure | BLOCK          | BLOCK (publisher)   | BLOCK (reinforced)
-//   cold_handoff (F,F), non-solo          | WARN (unless   | WARN                | BLOCK — regression is
-//                                         | co-signals)    |                     | an Addition-3 co-signal
+//   cold_handoff (F,F), non-solo          | WARN (unless   | WARN                | BLOCK — regression is one
+//                                         | co-signals)    |                     | of the three accepted
+//                                         |                |                     | co-signals per publisher.js
+//                                         |                |                     | GATE CONTRACT Addition 3
+//                                         |                |                     | (privacy/unverified domain,
+//                                         |                |                     | provenance break, short gap)
+//                                         |                |                     | — meets escalation bar for
+//                                         |                |                     | non-solo cold_handoff BLOCK
+//
+// Where the table shows BLOCK for in_scope=false, disposition is
+// driven by the publisher pattern independently. Provenance pattern
+// silence on in_scope=false is correct and does NOT weaken
+// publisher-pattern BLOCK — the two patterns are layered, not
+// gating. event-stream@3.3.6 is the canonical illustration:
+// provenance says nothing (pre-OIDC era, in_scope=false); publisher
+// says BLOCK (solo high-tenure cold handoff dominictarr →
+// right9ctrl); final disposition is BLOCK.
 //
 // ESCALATOR RULES (recurring_member / no-transition → BLOCK).
 //
@@ -189,13 +205,41 @@
 //     }>
 //   }
 //
-// Rows missing any of (version, published_at_ms as integer,
-// provenance_present) are skipped and counted in signals.skipped.
-// Unlike publisher.js this pattern does NOT require publisher_email
-// to be present on every row — a row with null publisher_email can
-// still contribute to the attested/unsigned streak count. Only the
-// row at the regression-firing position needs a publisher_email for
-// the escalator rules to work at the disposition layer.
+// Rows missing either (version, published_at_ms as integer) are
+// skipped and counted in signals.skipped. Unlike publisher.js this
+// pattern does NOT require publisher_email to be present on every
+// row — a row with null publisher_email can still contribute to
+// the attested/unsigned streak count. Only the row at the
+// regression-firing position needs a publisher_email for the
+// escalator rules to work at the disposition layer.
+//
+// Empty history is a valid input representing a never-before-seen
+// package and does NOT throw. If history is empty (or every row is
+// skipped), extract() returns a valid result with
+// perVersion: [] and packageRollup: {zero-valued fields}. Empty
+// history is distinguished from missing/malformed history (which
+// throws in validateInput).
+//
+// NULL provenance_present semantics. Rows with provenance_present
+// === null (or undefined, or any value other than 0/1/true/false)
+// are treated as UNKNOWN. Such rows neither contribute to streak
+// counting nor fire regression. Only explicit 0/false/1/true
+// values drive the signal. This is the conservative choice —
+// unknown state is not evidence of regression, and the 5 corpus
+// rows with NULL provenance_present are all reconstructed attack
+// metadata where absence of a value should not be over-interpreted.
+// Implementation note: an unknown row is not "unsigned" — it
+// neither extends the streak nor resets it to 0. It is threaded
+// through as a skipped-for-signal-purposes row but retained in
+// perVersion output for completeness (with provenance_present:
+// null and provenance_regression: false).
+//
+// publisher_tool (e.g. "npm@10.8.2") is captured into the
+// per-version signal record for display and metrics ONLY. It is
+// not consumed by regression detection or escalator logic in V1.
+// Reserved for future pattern extensions (e.g. CLI fingerprint
+// change detection, or distinguishing raw `npm publish` from
+// third-party tooling).
 //
 // OUTPUT SHAPE (per-version signal record + package rollup).
 //
