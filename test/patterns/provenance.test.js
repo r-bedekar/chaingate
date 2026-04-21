@@ -576,6 +576,7 @@ test('assemblePackageRollup: empty history → zero-valued rollup, nulls on opti
     human_attested_versions: 0,
     first_attested_version: null,
     first_baseline_reached_at: null,
+    per_major: {},
   });
 });
 

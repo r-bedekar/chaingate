@@ -747,21 +747,36 @@ function assemblePerVersionRecord(row, streakSignal, carriers) {
 // records. Every field is filled (no undefineds) so consumers can
 // read without `?? 0` guards — mirrors publisher.js signals contract.
 //
-// max_consecutive_attested is the longest run of consecutive
-// provenance_present===true rows in the sorted stream. Null rows do
-// NOT break the run (per the UNKNOWN-is-not-unsigned invariant) but
-// do not extend it either — they pass through invisibly to the
-// consecutive-count accumulator.
+// Under per-major streak semantics (amended 2026-04-21), the three
+// streak-derived fields are aggregated across the per-major streams:
 //
-// has_baseline_at_head = running streak at the last row is ≥ K.
-// "Is the baseline currently intact on this package?" — tracked for
-// display; disposition never reads it (GATE CONTRACT MUST-NOT rule).
+//   max_consecutive_attested — the longest run of consecutive
+//     provenance_present===true rows observed in ANY single major's
+//     stream. Taking the max across majors preserves the field's
+//     "how strong was this package's attestation discipline at its
+//     peak" meaning without letting cross-major gaps artificially
+//     shrink it. Null rows do NOT break the run within a major (per
+//     the UNKNOWN-is-not-unsigned invariant) but do not extend it
+//     either — they pass through invisibly.
 //
-// first_baseline_reached_at = version at which the streak FIRST hits
-// K (post-update, i.e. the version that completes the K-attested
-// run). Matches the design-doc semantic: axios@1.13.2 is where the
-// baseline first becomes reachable, not axios@1.13.3 where
-// baseline_established first flips true on that row's prior streak.
+//   has_baseline_at_head — true iff the LATEST row's own major has
+//     a streak ≥ K at that point. "Is the baseline currently intact
+//     on the major the package is actively releasing into?"
+//     Disposition never reads it (GATE CONTRACT MUST-NOT rule);
+//     it is a display/metrics field.
+//
+//   first_baseline_reached_at — earliest version across any major
+//     that FIRST completes a K-attested run within its own major.
+//     Iterates in time order so the first-across-any-major wins,
+//     matching the display semantic "when did this package first
+//     reach an attested baseline in any release train."
+//
+// per_major — new display/metrics breakdown keyed by major number.
+// Each entry carries the same shape as the package-level fields but
+// scoped to that major's stream. Keys are stringified integers so
+// JSON-serialization is stable; a null-major bucket (unparseable
+// versions) is stringified as "null". Sorted ascending by key in the
+// output for determinism.
 //
 // Machine/human attested counts mirror the any_machine / any_human
 // flag semantics: null-email rows contribute to NEITHER count, even
@@ -785,25 +800,79 @@ function assemblePackageRollup(perVersion, sortedRows, minBaselineStreak = MIN_B
     }
   }
 
-  let streak = 0;
+  // Per-major streak accumulators. Keyed by major (integer or null);
+  // each entry tracks running streak + peak + first-baseline version.
+  const perMajorAgg = new Map();
   let max_consecutive_attested = 0;
   let first_baseline_reached_at = null;
   for (const row of sortedRows) {
+    const mj = extractMajor(row.version);
+    let agg = perMajorAgg.get(mj);
+    if (!agg) {
+      agg = {
+        major: mj,
+        total_versions: 0,
+        attested_versions: 0,
+        streak: 0,
+        max_consecutive_attested: 0,
+        baseline_reached_at: null,
+        regression_versions: [],
+      };
+      perMajorAgg.set(mj, agg);
+    }
+    agg.total_versions += 1;
     if (row.provenance_present === true) {
-      streak += 1;
+      agg.streak += 1;
+      agg.attested_versions += 1;
     } else if (row.provenance_present === false) {
-      streak = 0;
-    } // null: unchanged
-    if (streak > max_consecutive_attested) max_consecutive_attested = streak;
-    if (first_baseline_reached_at === null && streak >= minBaselineStreak) {
-      first_baseline_reached_at = row.version;
+      agg.streak = 0;
+    }
+    if (agg.streak > agg.max_consecutive_attested) {
+      agg.max_consecutive_attested = agg.streak;
+    }
+    if (agg.streak > max_consecutive_attested) {
+      max_consecutive_attested = agg.streak;
+    }
+    if (agg.baseline_reached_at === null && agg.streak >= minBaselineStreak) {
+      agg.baseline_reached_at = row.version;
+      if (first_baseline_reached_at === null) first_baseline_reached_at = row.version;
     }
   }
-  const has_baseline_at_head = streak >= minBaselineStreak;
+  // has_baseline_at_head reads the streak state of whichever major
+  // the final row belongs to (the "active" release train).
+  const headMajor =
+    sortedRows.length > 0 ? extractMajor(sortedRows[sortedRows.length - 1].version) : null;
+  const headAgg = perMajorAgg.get(headMajor);
+  const has_baseline_at_head = headAgg ? headAgg.streak >= minBaselineStreak : false;
 
   const regression_versions = [];
   for (const v of perVersion) {
-    if (v.provenance_regression) regression_versions.push(v.version);
+    if (v.provenance_regression) {
+      regression_versions.push(v.version);
+      const mj = extractMajor(v.version);
+      const agg = perMajorAgg.get(mj);
+      if (agg) agg.regression_versions.push(v.version);
+    }
+  }
+
+  // Stable per-major output: sort keys ascending. Null-major (unparseable)
+  // sorts last as "null".
+  const per_major = {};
+  const sortedKeys = [...perMajorAgg.keys()].sort((a, b) => {
+    if (a === null && b === null) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
+  for (const k of sortedKeys) {
+    const agg = perMajorAgg.get(k);
+    per_major[k === null ? 'null' : String(k)] = {
+      total_versions: agg.total_versions,
+      attested_versions: agg.attested_versions,
+      max_consecutive_attested: agg.max_consecutive_attested,
+      baseline_reached_at: agg.baseline_reached_at,
+      regression_versions: agg.regression_versions,
+    };
   }
 
   return {
@@ -817,6 +886,7 @@ function assemblePackageRollup(perVersion, sortedRows, minBaselineStreak = MIN_B
     human_attested_versions,
     first_attested_version,
     first_baseline_reached_at,
+    per_major,
   };
 }
 
