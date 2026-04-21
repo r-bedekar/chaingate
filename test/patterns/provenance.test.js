@@ -1,5 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import provenance, {
   MIN_BASELINE_STREAK,
@@ -32,6 +36,55 @@ function buildHistory(shorthand, { startTs = 1_000_000_000, stepMs = 1000 } = {}
 function walk(shorthand) {
   const { rows } = normalizeAndSortHistory(buildHistory(shorthand));
   return computeStreakSignals(rows);
+}
+
+// ---------------------------------------------------------------------------
+// Seed-DB helper for canonical cases. Loads all rows for a package,
+// optionally filtered by a version predicate, and returns them in the
+// provenance.extract() input shape. Mirrors the row mapping from
+// validation/run-validation.js loadPackageHistory() so canonical
+// tests exercise the same ingest path as the validation runner.
+// ---------------------------------------------------------------------------
+const SEED_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'seed_export',
+  'chaingate-seed.db',
+);
+const HAS_SEED = existsSync(SEED_PATH);
+
+function loadSeedHistory(packageName, versionFilter = null) {
+  const db = new Database(SEED_PATH, { readonly: true });
+  try {
+    const pkg = db
+      .prepare('SELECT id FROM packages WHERE package_name = ?')
+      .get(packageName);
+    if (!pkg) throw new Error(`package not in seed: ${packageName}`);
+    const rows = db
+      .prepare(
+        `SELECT version, published_at, publisher_name, publisher_email,
+                provenance_present
+         FROM versions WHERE package_id = ?`,
+      )
+      .all(pkg.id);
+    const mapped = rows.map((r) => ({
+      version: r.version,
+      published_at_ms: r.published_at ? Date.parse(r.published_at) : null,
+      publisher_name: r.publisher_name,
+      publisher_email: r.publisher_email,
+      provenance_present: r.provenance_present,
+    }));
+    return versionFilter ? mapped.filter((r) => versionFilter(r.version)) : mapped;
+  } finally {
+    db.close();
+  }
+}
+
+function findVersion(perVersion, version) {
+  const v = perVersion.find((r) => r.version === version);
+  if (!v) throw new Error(`version ${version} not in perVersion output`);
+  return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,16 +144,33 @@ test('provenance.extract: rejects non-array history', () => {
   );
 });
 
-test('provenance.extract: throws "not yet implemented" on valid input (Phase 1 skeleton)', () => {
-  // When Phase 2 lands, this test flips to asserting extract() returns
-  // the locked output contract shape (per-version entries + rollup +
-  // signals). Until then, valid input must produce an explicit
-  // not-implemented error so no downstream code relies on a phantom
-  // Phase 1 output.
-  assert.throws(
-    () => provenance.extract({ packageName: 'axios', history: [] }),
-    /not yet implemented/,
-  );
+test('provenance.extract: empty history returns locked contract shape with zero-valued rollup', () => {
+  // Flipped at Step 5 — the Phase-1 "not yet implemented" guard is
+  // gone. Valid input with empty history must return the full three-
+  // key output ({ perVersion, packageRollup, signals }) with
+  // everything zero / null on the optional fields. No throw.
+  const out = provenance.extract({ packageName: 'axios', history: [] });
+  assert.deepEqual(Object.keys(out).sort(), ['packageRollup', 'perVersion', 'signals']);
+  assert.deepEqual(out.perVersion, []);
+  assert.equal(out.packageRollup.total_versions, 0);
+  assert.strictEqual(out.packageRollup.first_attested_version, null);
+  assert.strictEqual(out.packageRollup.first_baseline_reached_at, null);
+  assert.equal(out.signals.skipped, 0);
+  assert.equal(out.signals.has_sufficient_history, false);
+  assert.equal(out.signals.min_baseline_streak, MIN_BASELINE_STREAK);
+});
+
+test('provenance.extract: deterministic on identical input (byte-identical JSON)', () => {
+  const input = {
+    packageName: 'axios',
+    history: [
+      { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+      { version: '1.0.1', published_at_ms: 200, provenance_present: 1 },
+    ],
+  };
+  const a = provenance.extract(input);
+  const b = provenance.extract(input);
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
 });
 
 // ---------------------------------------------------------------------------
@@ -571,19 +641,51 @@ test('fixture: long-unsigned-tail (A,A,A,U×20 → only U₁ fires)', () => {
   assert.equal(sig.filter((s) => s.provenance_regression).length, 1);
 });
 
-test('fixture: below-sufficiency (<MIN_HISTORY_DEPTH total → short-circuit)', { skip: true }, () => {
-  // TODO(Phase 2): with A,A,A,U at 4 total versions (< MIN_HISTORY_DEPTH=8),
-  // signals.has_sufficient_history=false and no regression fires
-  // regardless of streak content. in_scope=false on every version.
-  assert.fail('pending Phase 2 — sufficiency short-circuit not implemented');
+test('fixture: below-sufficiency (<MIN_HISTORY_DEPTH total → short-circuit)', () => {
+  // 4 versions (A,A,A,U) — well under MIN_HISTORY_DEPTH=8. The
+  // walker computes regression_at_the_U locally but extract()
+  // suppresses it because signals.has_sufficient_history=false.
+  const history = [
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: 1 },
+    { version: '1.0.2', published_at_ms: 300, provenance_present: 1 },
+    { version: '1.0.3', published_at_ms: 400, provenance_present: 0 },
+  ];
+  const out = provenance.extract({ packageName: 'synthetic', history });
+  assert.equal(out.signals.has_sufficient_history, false);
+  // Every perVersion record has in_scope=false and no regression.
+  for (const v of out.perVersion) {
+    assert.equal(v.in_scope, false);
+    assert.equal(v.provenance_regression, false);
+    assert.equal(v.baseline_established, false);
+    assert.strictEqual(v.prior_baseline_carriers, null);
+  }
+  assert.equal(out.packageRollup.regression_count, 0);
+  assert.deepEqual(out.packageRollup.regression_versions, []);
 });
 
-test('fixture: timestamp-tie (two versions, same published_at_ms → deterministic order)', { skip: true }, () => {
-  // TODO(Phase 2): two rows with identical published_at_ms, different
-  // ids. Running extract() twice must produce byte-identical output.
-  // Secondary sort key must be deterministic (candidate: id ASC, or
-  // semver ASC — finalize in Phase 2).
-  assert.fail('pending Phase 2 — sort-tiebreaker rule not yet fixed');
+test('fixture: timestamp-tie (two versions, same published_at_ms → deterministic order)', () => {
+  // Two rows at the same ms; compareSemver resolves ordering
+  // deterministically (1.0.0 < 1.0.1). Two runs produce byte-
+  // identical JSON output — the pattern-cache determinism contract.
+  const history = [
+    { version: '1.0.1', published_at_ms: 500, provenance_present: 1 },
+    { version: '1.0.0', published_at_ms: 500, provenance_present: 1 },
+    { version: '1.0.2', published_at_ms: 600, provenance_present: 1 },
+    { version: '1.0.3', published_at_ms: 700, provenance_present: 1 },
+    { version: '1.0.4', published_at_ms: 800, provenance_present: 1 },
+    { version: '1.0.5', published_at_ms: 900, provenance_present: 1 },
+    { version: '1.0.6', published_at_ms: 1000, provenance_present: 1 },
+    { version: '1.0.7', published_at_ms: 1100, provenance_present: 0 },
+  ];
+  const a = provenance.extract({ packageName: 'tied', history });
+  const b = provenance.extract({ packageName: 'tied', history });
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
+  // And the tied pair sorts by semver ASC inside the same ms.
+  assert.deepEqual(
+    a.perVersion.slice(0, 2).map((v) => v.version),
+    ['1.0.0', '1.0.1'],
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -592,57 +694,106 @@ test('fixture: timestamp-tie (two versions, same published_at_ms → determinist
 // expected top-level signal and disposition class.
 // ---------------------------------------------------------------------------
 
-test('canonical: axios@1.14.1 — regression + escalators (a,b,d) → BLOCK-class', { skip: true }, () => {
-  // TODO(Phase 2): fixture loads axios 1.13.0 → 1.15.1 rows from the
-  // seed (attack reconstruction). At 1.14.1:
-  //   prior_consecutive_attested = 4
-  //   baseline_established = true
-  //   provenance_regression = true
-  //   prior_baseline_carriers.any_machine = true
-  //   incoming_publisher.email = 'ifstap@proton.me'
-  // Disposition-layer assertion is Phase 3. Here we assert only the
-  // pattern output fields.
-  assert.fail('pending Phase 2 — extract() not implemented');
+test('canonical: axios@1.14.1 — regression + escalators (a,b,d) → BLOCK-class', { skip: !HAS_SEED }, () => {
+  // Loads the 11-version axios 1.13.0→1.15.1 train from the seed
+  // (reconstructed 1.14.1 attack row merged by collector/export_seed.py).
+  const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
+  const out = provenance.extract({ packageName: 'axios', history });
+  const v = findVersion(out.perVersion, '1.14.1');
+  assert.equal(v.prior_consecutive_attested, 4);
+  assert.equal(v.baseline_established, true);
+  assert.equal(v.provenance_regression, true);
+  assert.equal(v.in_scope, true);
+  // Baseline carriers immediately prior to 1.14.1 are the 4 GitHub
+  // Actions CI versions (1.13.4–1.14.0) — all-machine.
+  assert.ok(v.prior_baseline_carriers !== null);
+  assert.equal(v.prior_baseline_carriers.any_machine, true);
+  assert.equal(v.prior_baseline_carriers.any_human, false);
+  assert.deepEqual(v.prior_baseline_carriers.emails, [MACHINE_PUBLISHER_EMAIL]);
+  // Incoming attack publisher.
+  assert.equal(v.incoming_publisher.email, 'ifstap@proton.me');
+  assert.equal(v.provenance_present, false);
 });
 
-test('canonical: axios@1.13.3 — regression, zero escalators → WARN-class', { skip: true }, () => {
-  // TODO(Phase 2): same axios fixture, earlier version. At 1.13.3:
-  //   prior_consecutive_attested = 3
-  //   baseline_established = true
-  //   provenance_regression = true
-  //   prior_baseline_carriers.any_machine = false  (personal OIDC baseline)
-  //   incoming_publisher.email = 'jasonsaayman@gmail.com'  (not new, not privacy)
-  // Locks the "legitimate CLI during baseline → WARN" invariant.
-  assert.fail('pending Phase 2 — extract() not implemented');
+test('canonical: axios@1.13.3 — regression, zero escalators → WARN-class', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
+  const out = provenance.extract({ packageName: 'axios', history });
+  const v = findVersion(out.perVersion, '1.13.3');
+  assert.equal(v.prior_consecutive_attested, 3);
+  assert.equal(v.baseline_established, true);
+  assert.equal(v.provenance_regression, true);
+  assert.equal(v.in_scope, true);
+  // Baseline carriers at 1.13.3 are 1.13.0/1/2 — all personal-OIDC
+  // from jasonsaayman@gmail.com. any_machine must be FALSE to
+  // preserve the WARN invariant (legitimate CLI during personal-
+  // OIDC baseline → WARN, not BLOCK).
+  assert.ok(v.prior_baseline_carriers !== null);
+  assert.equal(v.prior_baseline_carriers.any_machine, false);
+  assert.equal(v.prior_baseline_carriers.any_human, true);
+  assert.deepEqual(v.prior_baseline_carriers.emails, ['jasonsaayman@gmail.com']);
+  assert.equal(v.incoming_publisher.email, 'jasonsaayman@gmail.com');
 });
 
-test('canonical: event-stream@3.3.6 — pre-OIDC era, pattern silent', { skip: true }, () => {
-  // TODO(Phase 2): fixture loads event-stream 3.3.5, 3.3.6. At 3.3.6:
-  //   baseline_established = false (no attested versions in history)
-  //   provenance_regression = false
-  //   in_scope = false
-  // Publisher pattern drives BLOCK for this attack; provenance abstains.
-  assert.fail('pending Phase 2 — extract() not implemented');
+test('canonical: axios rollup matches design-doc Task-2 target', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
+  const out = provenance.extract({ packageName: 'axios', history });
+  assert.equal(out.packageRollup.total_versions, 11);
+  assert.equal(out.packageRollup.attested_versions, 9);
+  assert.equal(out.packageRollup.max_consecutive_attested, 4);
+  assert.equal(out.packageRollup.has_baseline_at_head, false);
+  assert.deepEqual(out.packageRollup.regression_versions, ['1.13.3', '1.14.1']);
+  assert.equal(out.packageRollup.regression_count, 2);
+  assert.equal(out.packageRollup.machine_attested_versions, 6);
+  assert.equal(out.packageRollup.human_attested_versions, 3);
+  assert.equal(out.packageRollup.first_attested_version, '1.13.0');
+  assert.equal(out.packageRollup.first_baseline_reached_at, '1.13.2');
 });
 
-test('canonical: lodash@4.17.16 — no OIDC history, must NOT false-positive', { skip: true }, () => {
-  // TODO(Phase 2): fixture loads lodash 4.17.15 → 4.17.23. Package
-  // has never adopted OIDC. Every version:
-  //   baseline_established = false
-  //   provenance_regression = false
-  //   in_scope = false
-  assert.fail('pending Phase 2 — extract() not implemented');
+test('canonical: event-stream@3.3.6 — pre-OIDC era, pattern silent', { skip: !HAS_SEED }, () => {
+  // Load the full event-stream history through 3.3.6. Package had no
+  // provenance adoption at attack time (2018) — every row in the
+  // stream has provenance_present in {0, null}, so the streak never
+  // reaches K and baseline is never established.
+  const history = loadSeedHistory('event-stream');
+  const out = provenance.extract({ packageName: 'event-stream', history });
+  const v = findVersion(out.perVersion, '3.3.6');
+  assert.equal(v.baseline_established, false);
+  assert.equal(v.provenance_regression, false);
+  assert.equal(v.in_scope, false);
+  assert.strictEqual(v.prior_baseline_carriers, null);
+  // Rollup confirms the "never attested" shape at the package level.
+  assert.equal(out.packageRollup.attested_versions, 0);
+  assert.equal(out.packageRollup.max_consecutive_attested, 0);
+  assert.strictEqual(out.packageRollup.first_baseline_reached_at, null);
+  assert.equal(out.packageRollup.regression_count, 0);
 });
 
-test('canonical: ua-parser-js@0.7.29 — pre-OIDC adoption, pattern silent', { skip: true }, () => {
-  // TODO(Phase 2): fixture loads ua-parser-js through 0.7.29 only
-  // (first OIDC is 2023-08; attack is 2021-10, predates adoption).
-  // At 0.7.29:
-  //   baseline_established = false
-  //   provenance_regression = false
-  //   in_scope = false
-  // Same faisalman identity throughout — no publisher transition
-  // either. Both patterns correctly abstain; attack is outside the
-  // scope of either pattern (same-account credential theft).
-  assert.fail('pending Phase 2 — extract() not implemented');
+test('canonical: lodash@4.17.16 — no OIDC history, must NOT false-positive', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('lodash');
+  const out = provenance.extract({ packageName: 'lodash', history });
+  // Every version in the lodash history must be out-of-scope and
+  // non-firing — the package never adopted provenance.
+  for (const v of out.perVersion) {
+    assert.equal(v.baseline_established, false, `baseline at ${v.version}`);
+    assert.equal(v.provenance_regression, false, `regression at ${v.version}`);
+    assert.equal(v.in_scope, false, `in_scope at ${v.version}`);
+    assert.strictEqual(v.prior_baseline_carriers, null);
+  }
+  assert.equal(out.packageRollup.regression_count, 0);
+  assert.equal(out.packageRollup.max_consecutive_attested, 0);
+});
+
+test('canonical: ua-parser-js@0.7.29 — pre-OIDC adoption, pattern silent', { skip: !HAS_SEED }, () => {
+  // ua-parser-js first adopted OIDC 2023-08; the 0.7.29 attack is
+  // 2021-10. Filter to 0.7.x to stay within the pre-adoption window
+  // — under this slice, the pattern has no attested history to form
+  // a baseline on.
+  const history = loadSeedHistory('ua-parser-js', (v) => /^0\.7\./.test(v));
+  const out = provenance.extract({ packageName: 'ua-parser-js', history });
+  const v = findVersion(out.perVersion, '0.7.29');
+  assert.equal(v.baseline_established, false);
+  assert.equal(v.provenance_regression, false);
+  assert.equal(v.in_scope, false);
+  assert.strictEqual(v.prior_baseline_carriers, null);
+  assert.equal(out.packageRollup.regression_count, 0);
 });

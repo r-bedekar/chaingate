@@ -669,21 +669,69 @@ function assemblePackageRollup(perVersion, sortedRows, minBaselineStreak = MIN_B
   };
 }
 
+// ---------------------------------------------------------------------------
+// Step 5 — extract() pipeline
+//
+// Deterministic pure composition over the four building blocks:
+//   normalizeAndSortHistory → computeStreakSignals →
+//   extractPriorBaselineCarriers (per regression-firing row) →
+//   assemblePerVersionRecord → assemblePackageRollup
+//
+// Sufficiency short-circuit applies to PER-VERSION signals only:
+// below MIN_HISTORY_DEPTH, every per-version entry has
+// baseline_established / provenance_regression / in_scope forced to
+// false and carriers=null. The rollup still reports raw observable
+// aggregates (max_consecutive_attested, first_baseline_reached_at,
+// etc.) because those are display/metrics fields and suppressing
+// them would hide what the stream actually looks like. Regression
+// counts naturally fall to 0 because perVersion was gated.
+//
+// Empty history is accepted: every sub-function returns valid
+// zero/empty outputs, the rollup is all-zeros with null on the
+// optional-version fields.
+function extractPipeline(input) {
+  validateInput(input);
+  const { rows: sortedRows, skipped } = normalizeAndSortHistory(input.history);
+  const streakSignals = computeStreakSignals(sortedRows);
+  const hasSufficientHistory = sortedRows.length >= MIN_HISTORY_DEPTH;
+
+  const perVersion = sortedRows.map((row, i) => {
+    const raw = streakSignals[i];
+    const gatedBaseline = hasSufficientHistory && raw.baseline_established;
+    const gatedRegression = hasSufficientHistory && raw.provenance_regression;
+    const gatedInScope = hasSufficientHistory && raw.in_scope;
+    const carriers = gatedBaseline
+      ? extractPriorBaselineCarriers(
+          sortedRows.slice(0, i),
+          raw.prior_consecutive_attested,
+        )
+      : null;
+    return assemblePerVersionRecord(
+      row,
+      {
+        prior_consecutive_attested: raw.prior_consecutive_attested,
+        baseline_established: gatedBaseline,
+        provenance_regression: gatedRegression,
+        in_scope: gatedInScope,
+      },
+      carriers,
+    );
+  });
+
+  const packageRollup = assemblePackageRollup(perVersion, sortedRows);
+  const signals = {
+    skipped: skipped.count,
+    has_sufficient_history: hasSufficientHistory,
+    min_baseline_streak: MIN_BASELINE_STREAK,
+  };
+  return { perVersion, packageRollup, signals };
+}
+
 export default {
   name: 'provenance',
   version: 1,
   requires: ['history'],
-
-  extract(input) {
-    validateInput(input);
-    // Phase 2 will replace this throw with the streak walker, the
-    // per-version signal builder, and the package-rollup
-    // aggregator. Until then the pattern is registered, contract-
-    // validated, and importable — but calling extract() on a valid
-    // input throws so no downstream code silently relies on the
-    // skeleton shape before the implementation exists.
-    throw new Error('provenance.extract: not yet implemented (Phase 1 skeleton)');
-  },
+  extract: extractPipeline,
 };
 
 export {
