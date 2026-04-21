@@ -1,11 +1,58 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import publisher from '../../patterns/publisher.js';
+import provenance from '../../patterns/provenance.js';
 import {
   disposition,
   __thresholds,
 } from '../../validation/disposition.js';
+
+const SEED_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'seed_export',
+  'chaingate-seed.db',
+);
+const HAS_SEED = existsSync(SEED_PATH);
+
+function loadSeedHistory(packageName, versionFilter = null) {
+  const db = new Database(SEED_PATH, { readonly: true });
+  try {
+    const pkg = db
+      .prepare('SELECT id FROM packages WHERE package_name = ?')
+      .get(packageName);
+    if (!pkg) throw new Error(`package not in seed: ${packageName}`);
+    const rows = db
+      .prepare(
+        `SELECT version, published_at, publisher_name, publisher_email,
+                provenance_present
+         FROM versions WHERE package_id = ?`,
+      )
+      .all(pkg.id);
+    const mapped = rows.map((r) => ({
+      version: r.version,
+      published_at_ms: r.published_at ? Date.parse(r.published_at) : null,
+      publisher_name: r.publisher_name,
+      publisher_email: r.publisher_email,
+      provenance_present: r.provenance_present,
+    }));
+    return versionFilter ? mapped.filter((r) => versionFilter(r.version)) : mapped;
+  } finally {
+    db.close();
+  }
+}
+
+function dispose(packageName, history) {
+  const pub = publisher.extract({ packageName, history });
+  const prov = provenance.extract({ packageName, history });
+  return { pub, prov, verdict: disposition(pub, prov) };
+}
 
 // ---------------------------------------------------------------------------
 // Test fixtures re-use the publisher.extract() contract end-to-end so the
@@ -739,4 +786,158 @@ test('disposition rejects malformed extracted objects', () => {
     () => disposition({ tenure: [], transitions: [], signals: { has_sufficient_history: true }, identity_profile: {}, shape: 0 }),
     /shape must be a string/,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — disposition × provenance interaction tests. Each canonical
+// seed-backed case verifies that the identity-continuity routing lands
+// the expected verdict with a reason string that names the firing
+// escalators / co-signals. Synthetic cases cover the non-solo cold-
+// handoff co-signal extension and the legitimate emergency-CLI path.
+// ---------------------------------------------------------------------------
+
+test('phase 3: axios@1.14.1 — same identity + regression + (a,b,d) → BLOCK', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
+  const { verdict } = dispose('axios', history);
+  assert.equal(verdict.disposition, 'BLOCK');
+  const block = verdict.reasons.find((r) => r.startsWith('BLOCK:'));
+  assert.ok(block, `expected a BLOCK reason, got ${JSON.stringify(verdict.reasons)}`);
+  assert.match(block, /provenance_regression @ 1\.14\.1/);
+  assert.match(block, /escalators=\[[^\]]*new_domain[^\]]*\]/);
+  assert.match(block, /escalators=\[[^\]]*privacy[^\]]*\]/);
+  assert.match(block, /escalators=\[[^\]]*machine_to_human[^\]]*\]/);
+});
+
+test('phase 3: axios@1.13.3 — intra-block regression, zero escalators → WARN', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
+  const { verdict } = dispose('axios', history);
+  // 1.13.3 lands in a WARN reason line on the intra-block same-identity
+  // row. 1.14.1 also fires a separate BLOCK reason; that's expected and
+  // covered in the test above. Here we verify the 1.13.3 line shape.
+  const warn = verdict.reasons.find(
+    (r) => r.startsWith('WARN:') && r.includes('provenance_regression @ 1.13.3'),
+  );
+  assert.ok(warn, `expected a 1.13.3 WARN, got ${JSON.stringify(verdict.reasons)}`);
+  assert.match(warn, /regression without escalators/);
+  assert.ok(!/escalators=\[/.test(warn),
+    `1.13.3 WARN must not name any escalators, got: ${warn}`);
+});
+
+test('phase 3: event-stream@3.3.6 — publisher-driven BLOCK, provenance silent', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('event-stream');
+  const { prov, verdict } = dispose('event-stream', history);
+  assert.equal(verdict.disposition, 'BLOCK');
+  // Provenance must be silent on event-stream — never reached baseline.
+  for (const v of prov.perVersion) {
+    assert.equal(v.in_scope, false);
+    assert.equal(v.provenance_regression, false);
+  }
+  // The BLOCK reason must come from publisher (cold_handoff), not from
+  // any provenance_regression string.
+  const block = verdict.reasons.find((r) => r.startsWith('BLOCK:'));
+  assert.ok(block);
+  assert.match(block, /cold_handoff/);
+  assert.match(block, /shape=solo/);
+  assert.ok(!block.includes('provenance_regression'),
+    `BLOCK must not cite provenance, got: ${block}`);
+});
+
+test('phase 3: ua-parser-js@0.7.29 — no transition + in_scope=false → ALLOW', { skip: !HAS_SEED }, () => {
+  const history = loadSeedHistory('ua-parser-js', (v) => /^0\.7\./.test(v));
+  const { pub, prov, verdict } = dispose('ua-parser-js', history);
+  assert.equal(verdict.disposition, 'ALLOW');
+  // Publisher sees a single identity across 0.7.x → 0 transitions.
+  assert.equal(pub.transitions.length, 0);
+  // Provenance is silent — never adopted OIDC in this window.
+  const v = prov.perVersion.find((r) => r.version === '0.7.29');
+  assert.ok(v);
+  assert.equal(v.in_scope, false);
+  assert.equal(verdict.reasons[0], 'no transitions observed');
+});
+
+// Synthetic helper: build rows with explicit provenance_present for
+// the two co-signal-extension scenarios below. Timestamps step 1 day
+// so publisher's gap_ms >= SHORT_GAP_MS and (c) short-gap co-signal
+// does NOT fire — isolates the provenance_regression co-signal.
+const DAY_MS_D = 86_400_000;
+function buildAttestedRows(spec, startMs = 1_700_000_000_000) {
+  const rows = [];
+  let t = startMs;
+  let patch = 0;
+  for (const [email, count, attested] of spec) {
+    for (let i = 0; i < count; i += 1) {
+      rows.push({
+        version: `1.0.${patch}`,
+        published_at_ms: t,
+        publisher_name: email.split('@')[0],
+        publisher_email: email,
+        provenance_present: attested ? 1 : 0,
+      });
+      t += DAY_MS_D;
+      patch += 1;
+    }
+  }
+  return rows;
+}
+
+test('phase 3: non-solo cold_handoff + regression + no other co-signals → BLOCK', () => {
+  // Committee shape (U=4), EXCEPTIONAL prior_tenure on outgoing block
+  // (charlie with 20 versions), incoming new identity on a
+  // non-privacy/non-unverified domain, long gap. The only available
+  // co-signal is provenance_regression at the incoming version T —
+  // which must be sufficient to upgrade WARN→BLOCK under the STEP 4
+  // extension.
+  const rows = buildAttestedRows([
+    ['alice@corp.com', 5, true],
+    ['bob@corp.com', 5, true],
+    ['charlie@corp.com', 20, true],
+    ['dave@corp.com', 1, false],
+  ]);
+  const { pub, verdict } = dispose('non-solo-cold-handoff', rows);
+  assert.notEqual(pub.shape, 'solo');
+  const t = pub.transitions[pub.transitions.length - 1];
+  assert.equal(t.prior_tenure_versions, 20);
+  assert.equal(verdict.disposition, 'BLOCK');
+  const block = verdict.reasons.find((r) => r.startsWith('BLOCK:'));
+  assert.ok(block);
+  assert.match(block, /co-signal: provenance regression @ 1\.0\.30/);
+});
+
+test('phase 3: legitimate committee emergency CLI — same identity, same domain, human baseline → WARN', () => {
+  // alice publishes 5 attested, bob 5 attested, alice returns for one
+  // unsigned release — an "emergency CLI" from the same human. Same
+  // identity (intra-returning), same domain (corp.com seen before),
+  // verified-corporate (non-privacy, non-unverified), baseline
+  // carried entirely by humans (any_machine=false). No escalator
+  // should fire. Per the interaction table: WARN.
+  const rows = buildAttestedRows([
+    ['alice@corp.com', 5, true],
+    ['bob@corp.com', 5, true],
+    ['alice@corp.com', 1, false],
+  ]);
+  const { verdict } = dispose('committee-emergency-cli', rows);
+  assert.equal(verdict.disposition, 'WARN');
+  const warn = verdict.reasons.find(
+    (r) => r.startsWith('WARN:') && r.includes('provenance_regression'),
+  );
+  assert.ok(warn, `expected a regression WARN, got ${JSON.stringify(verdict.reasons)}`);
+  assert.match(warn, /regression without escalators/);
+  assert.ok(!/escalators=\[/.test(warn),
+    `no escalator must fire, got: ${warn}`);
+});
+
+test('phase 3: sufficiency short-circuit — thin history → ALLOW regardless of signals', () => {
+  // 5 versions < MIN_HISTORY_DEPTH=8. Even with a fabricated regression
+  // pattern (AAAU), disposition must short-circuit to ALLOW. This is
+  // the same-layer short-circuit as the Phase-2 sufficiency axis and
+  // must fire BEFORE the interaction table is consulted.
+  const rows = buildAttestedRows([
+    ['alice@corp.com', 3, true],
+    ['bob@corp.com', 1, false],
+    ['charlie@corp.com', 1, true],
+  ]);
+  const { pub, verdict } = dispose('thin', rows);
+  assert.equal(pub.signals.has_sufficient_history, false);
+  assert.equal(verdict.disposition, 'ALLOW');
+  assert.match(verdict.reasons[0], /insufficient history/);
 });
