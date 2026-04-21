@@ -561,6 +561,114 @@ function extractPriorBaselineCarriers(rowsBeforeT, streakLength) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Step 4a — assemblePerVersionRecord
+//
+// Pure combiner: given a normalized row, its streak signal, and the
+// already-computed carrier struct (null when baseline not
+// established), emit the per-version record exactly as specified in
+// the GATE CONTRACT OUTPUT SHAPE block. No defaults, no derivation
+// — every field is explicit so the output is inspection-friendly and
+// the caller's responsibility for carriers-vs-null is visible at the
+// call site.
+function assemblePerVersionRecord(row, streakSignal, carriers) {
+  return {
+    version: row.version,
+    published_at_ms: row.published_at_ms,
+    provenance_present: row.provenance_present,
+    prior_consecutive_attested: streakSignal.prior_consecutive_attested,
+    baseline_established: streakSignal.baseline_established,
+    provenance_regression: streakSignal.provenance_regression,
+    in_scope: streakSignal.in_scope,
+    prior_baseline_carriers: carriers,
+    incoming_publisher: {
+      name: row.publisher_name,
+      email: row.publisher_email,
+      tool: row.publisher_tool,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Step 4b — assemblePackageRollup
+//
+// Package-level aggregate derived from sortedRows + per-version
+// records. Every field is filled (no undefineds) so consumers can
+// read without `?? 0` guards — mirrors publisher.js signals contract.
+//
+// max_consecutive_attested is the longest run of consecutive
+// provenance_present===true rows in the sorted stream. Null rows do
+// NOT break the run (per the UNKNOWN-is-not-unsigned invariant) but
+// do not extend it either — they pass through invisibly to the
+// consecutive-count accumulator.
+//
+// has_baseline_at_head = running streak at the last row is ≥ K.
+// "Is the baseline currently intact on this package?" — tracked for
+// display; disposition never reads it (GATE CONTRACT MUST-NOT rule).
+//
+// first_baseline_reached_at = version at which the streak FIRST hits
+// K (post-update, i.e. the version that completes the K-attested
+// run). Matches the design-doc semantic: axios@1.13.2 is where the
+// baseline first becomes reachable, not axios@1.13.3 where
+// baseline_established first flips true on that row's prior streak.
+//
+// Machine/human attested counts mirror the any_machine / any_human
+// flag semantics: null-email rows contribute to NEITHER count, even
+// if provenance_present===true. Conservative bias; unknown identity
+// shouldn't inflate either side.
+function assemblePackageRollup(perVersion, sortedRows, minBaselineStreak = MIN_BASELINE_STREAK) {
+  const total_versions = sortedRows.length;
+  let attested_versions = 0;
+  let machine_attested_versions = 0;
+  let human_attested_versions = 0;
+  let first_attested_version = null;
+  for (const row of sortedRows) {
+    if (row.provenance_present === true) {
+      attested_versions += 1;
+      if (first_attested_version === null) first_attested_version = row.version;
+      if (row.publisher_email === MACHINE_PUBLISHER_EMAIL) {
+        machine_attested_versions += 1;
+      } else if (row.publisher_email !== null) {
+        human_attested_versions += 1;
+      }
+    }
+  }
+
+  let streak = 0;
+  let max_consecutive_attested = 0;
+  let first_baseline_reached_at = null;
+  for (const row of sortedRows) {
+    if (row.provenance_present === true) {
+      streak += 1;
+    } else if (row.provenance_present === false) {
+      streak = 0;
+    } // null: unchanged
+    if (streak > max_consecutive_attested) max_consecutive_attested = streak;
+    if (first_baseline_reached_at === null && streak >= minBaselineStreak) {
+      first_baseline_reached_at = row.version;
+    }
+  }
+  const has_baseline_at_head = streak >= minBaselineStreak;
+
+  const regression_versions = [];
+  for (const v of perVersion) {
+    if (v.provenance_regression) regression_versions.push(v.version);
+  }
+
+  return {
+    total_versions,
+    attested_versions,
+    max_consecutive_attested,
+    has_baseline_at_head,
+    regression_versions,
+    regression_count: regression_versions.length,
+    machine_attested_versions,
+    human_attested_versions,
+    first_attested_version,
+    first_baseline_reached_at,
+  };
+}
+
 export default {
   name: 'provenance',
   version: 1,
@@ -585,4 +693,6 @@ export {
   normalizeAndSortHistory,
   computeStreakSignals,
   extractPriorBaselineCarriers,
+  assemblePerVersionRecord,
+  assemblePackageRollup,
 };

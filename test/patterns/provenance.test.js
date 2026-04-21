@@ -7,6 +7,8 @@ import provenance, {
   normalizeAndSortHistory,
   computeStreakSignals,
   extractPriorBaselineCarriers,
+  assemblePerVersionRecord,
+  assemblePackageRollup,
 } from '../../patterns/provenance.js';
 import { PATTERN_REGISTRY, validatePattern } from '../../patterns/index.js';
 
@@ -414,6 +416,145 @@ test('extractPriorBaselineCarriers: streakLength exceeds available rows → defe
   const c = extractPriorBaselineCarriers(rows, 99);
   assert.equal(c.any_human, true);
   assert.deepEqual(c.identities, ['a']);
+});
+
+// ---------------------------------------------------------------------------
+// Step 4 — assemblePerVersionRecord + assemblePackageRollup
+// ---------------------------------------------------------------------------
+
+test('assemblePerVersionRecord: emits every contract field, carriers=null when missing', () => {
+  const row = {
+    version: '1.2.3',
+    published_at_ms: 12345,
+    publisher_name: 'alice',
+    publisher_email: 'alice@example.com',
+    publisher_tool: 'npm@10.8.2',
+    provenance_present: true,
+  };
+  const streak = {
+    prior_consecutive_attested: 0,
+    baseline_established: false,
+    provenance_regression: false,
+    in_scope: false,
+  };
+  const rec = assemblePerVersionRecord(row, streak, null);
+  assert.equal(rec.version, '1.2.3');
+  assert.equal(rec.published_at_ms, 12345);
+  assert.equal(rec.provenance_present, true);
+  assert.equal(rec.prior_consecutive_attested, 0);
+  assert.equal(rec.baseline_established, false);
+  assert.equal(rec.provenance_regression, false);
+  assert.equal(rec.in_scope, false);
+  assert.strictEqual(rec.prior_baseline_carriers, null);
+  assert.deepEqual(rec.incoming_publisher, {
+    name: 'alice',
+    email: 'alice@example.com',
+    tool: 'npm@10.8.2',
+  });
+});
+
+test('assemblePerVersionRecord: carriers struct passed through unchanged', () => {
+  const carriers = {
+    identities: ['github-actions[bot]'],
+    emails: ['npm-oidc-no-reply@github.com'],
+    any_machine: true,
+    any_human: false,
+  };
+  const rec = assemblePerVersionRecord(
+    { version: '1', published_at_ms: 1, publisher_name: null, publisher_email: null, publisher_tool: null, provenance_present: false },
+    { prior_consecutive_attested: 3, baseline_established: true, provenance_regression: true, in_scope: true },
+    carriers,
+  );
+  assert.strictEqual(rec.prior_baseline_carriers, carriers);
+});
+
+test('assemblePackageRollup: empty history → zero-valued rollup, nulls on optional version fields', () => {
+  const rollup = assemblePackageRollup([], []);
+  assert.deepEqual(rollup, {
+    total_versions: 0,
+    attested_versions: 0,
+    max_consecutive_attested: 0,
+    has_baseline_at_head: false,
+    regression_versions: [],
+    regression_count: 0,
+    machine_attested_versions: 0,
+    human_attested_versions: 0,
+    first_attested_version: null,
+    first_baseline_reached_at: null,
+  });
+});
+
+test('assemblePackageRollup: axios 1.13.0→1.15.1 shape matches design-doc rollup', () => {
+  // Synthetic replay of the 11-version axios train per
+  // docs/PATTERNS_PROVENANCE.md Task 2 walk table. Establishes the
+  // expected rollup field values so Step 5 extract() on the real
+  // seed-loaded axios slice can be asserted against the same targets.
+  const history = [
+    { version: '1.13.0', published_at_ms: 1_000, publisher_email: 'jasonsaayman@gmail.com', provenance_present: 1 },
+    { version: '1.13.1', published_at_ms: 2_000, publisher_email: 'jasonsaayman@gmail.com', provenance_present: 1 },
+    { version: '1.13.2', published_at_ms: 3_000, publisher_email: 'jasonsaayman@gmail.com', provenance_present: 1 },
+    { version: '1.13.3', published_at_ms: 4_000, publisher_email: 'jasonsaayman@gmail.com', provenance_present: 0 },
+    { version: '1.13.4', published_at_ms: 5_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.13.5', published_at_ms: 6_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.13.6', published_at_ms: 7_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.14.0', published_at_ms: 8_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.14.1', published_at_ms: 9_000, publisher_email: 'ifstap@proton.me', provenance_present: 0 },
+    { version: '1.15.0', published_at_ms: 10_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.15.1', published_at_ms: 11_000, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+  ];
+  const { rows } = normalizeAndSortHistory(history);
+  const streaks = computeStreakSignals(rows);
+  const perVersion = rows.map((row, i) =>
+    assemblePerVersionRecord(row, streaks[i], null),
+  );
+  const rollup = assemblePackageRollup(perVersion, rows);
+  assert.equal(rollup.total_versions, 11);
+  assert.equal(rollup.attested_versions, 9);
+  assert.equal(rollup.max_consecutive_attested, 4); // 1.13.4 → 1.14.0 is the longest run
+  assert.equal(rollup.has_baseline_at_head, false); // only 1.15.0, 1.15.1 at end = 2 < 3
+  assert.deepEqual(rollup.regression_versions, ['1.13.3', '1.14.1']);
+  assert.equal(rollup.regression_count, 2);
+  assert.equal(rollup.machine_attested_versions, 6);
+  assert.equal(rollup.human_attested_versions, 3);
+  assert.equal(rollup.first_attested_version, '1.13.0');
+  assert.equal(rollup.first_baseline_reached_at, '1.13.2');
+});
+
+test('assemblePackageRollup: null rows neither extend nor break consecutive-attested run', () => {
+  // A, A, N, A — max_consecutive_attested should be 3 (null passes
+  // through without contributing or resetting). Mirrors the NULL-
+  // semantics invariant from the GATE CONTRACT.
+  const history = [
+    { version: '1.0.0', published_at_ms: 100, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 200, provenance_present: 1 },
+    { version: '1.0.2', published_at_ms: 300, provenance_present: null },
+    { version: '1.0.3', published_at_ms: 400, provenance_present: 1 },
+  ];
+  const { rows } = normalizeAndSortHistory(history);
+  const streaks = computeStreakSignals(rows);
+  const perVersion = rows.map((row, i) =>
+    assemblePerVersionRecord(row, streaks[i], null),
+  );
+  const rollup = assemblePackageRollup(perVersion, rows);
+  assert.equal(rollup.max_consecutive_attested, 3);
+  assert.equal(rollup.has_baseline_at_head, true); // streak at end = 3 (A,N,A treated as a run of 3)
+});
+
+test('assemblePackageRollup: null-email attested row counts toward attested but not machine/human', () => {
+  const history = [
+    { version: '1.0.0', published_at_ms: 100, publisher_email: null, provenance_present: 1 },
+    { version: '1.0.1', published_at_ms: 200, publisher_email: MACHINE_PUBLISHER_EMAIL, provenance_present: 1 },
+    { version: '1.0.2', published_at_ms: 300, publisher_email: 'human@example.com', provenance_present: 1 },
+  ];
+  const { rows } = normalizeAndSortHistory(history);
+  const streaks = computeStreakSignals(rows);
+  const perVersion = rows.map((row, i) =>
+    assemblePerVersionRecord(row, streaks[i], null),
+  );
+  const rollup = assemblePackageRollup(perVersion, rows);
+  assert.equal(rollup.attested_versions, 3);
+  assert.equal(rollup.machine_attested_versions, 1);
+  assert.equal(rollup.human_attested_versions, 1); // null-email row excluded from both
 });
 
 test('fixture: long-unsigned-tail (A,A,A,U×20 → only U₁ fires)', () => {
