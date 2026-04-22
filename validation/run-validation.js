@@ -190,19 +190,28 @@ function resolveLabelTargets(label, historyById) {
   return { kind: 'unspecified', versions: [] };
 }
 
-// Walk per-transition verdicts. disposition() already returns a
-// reasons[] aligned with extracted.transitions; we pair them here so
-// downstream code can ask "what did the gate say at version V?".
-function buildTransitionVerdicts(extracted, dispositionResult) {
-  if (extracted.transitions.length === 0) return new Map();
+// Walk per-version verdicts. Each reason string carries its own
+// "@ <version>" anchor emitted by disposition.js (both Pass 1
+// transition-driven reasons and Pass 2 provenance-regression reasons).
+// Keying the verdicts map off that anchor decouples this pairing from
+// the length and order of dispositionResult.reasons[] — which stopped
+// being 1:1 with extracted.transitions[] once Phase-3 two-arg
+// disposition began skipping same-identity transitions in Pass 1 and
+// appending provenance-version reasons in Pass 2.
+//
+// Control-flow reasons that have no version anchor ("no transitions
+// observed", "insufficient history (...)", "no escalating signals")
+// do not match the anchor regex and are skipped — they aren't
+// attributable to any single version.
+const REASON_ANCHOR_RE = /^(ALLOW|WARN|BLOCK):\s[^@]*@\s*(\S+)/;
+
+function buildTransitionVerdicts(_extracted, dispositionResult) {
   const verdicts = new Map();
-  for (let i = 0; i < extracted.transitions.length; i += 1) {
-    const t = extracted.transitions[i];
-    const reason = dispositionResult.reasons[i] ?? '';
-    // reasons[i] format: "<DISPOSITION>: <detail>"
-    const colon = reason.indexOf(':');
-    const verdict = colon >= 0 ? reason.slice(0, colon).trim() : 'ALLOW';
-    verdicts.set(t.at_version, { disposition: verdict, reason });
+  for (const reason of dispositionResult.reasons) {
+    if (typeof reason !== 'string') continue;
+    const m = REASON_ANCHOR_RE.exec(reason);
+    if (!m) continue;
+    verdicts.set(m[2], { disposition: m[1], reason });
   }
   return verdicts;
 }
