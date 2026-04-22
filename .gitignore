@@ -42,3 +42,8 @@ test/witness/fixtures/
 
 # OS
 .DS_Store
+
+# Internal working notes — never commit
+claude.md
+CLAUDE.md
+.claude/
