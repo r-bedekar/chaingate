@@ -30,7 +30,23 @@
     "precision_packages_point": 0,
     "attack_labels_total": 7,
     "attack_labels_detected": 0,
-    "recall_labels_point": 0
+    "recall_labels_point": 0,
+    "attack_labels_attributable": 4,
+    "recall_labels_point_attributable": 0,
+    "attack_packages_detected_publisher_only": 0,
+    "attack_packages_detected_provenance_only": 0,
+    "attack_packages_detected_both": 0,
+    "provenance_only_attack_detected": 0,
+    "provenance_only_clean_blocked": 1,
+    "recall_provenance_point": 0,
+    "false_positive_rate_provenance_point": 0.011,
+    "escalator_fire_counts": {
+      "new_domain": 1,
+      "privacy": 0,
+      "unverified": 0,
+      "machine_to_human": 0
+    },
+    "detection_lag_days_quartiles": null
   },
   "per_attack": [
     {
@@ -45,6 +61,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "committee",
       "providers_seen": [
         "free-webmail",
@@ -65,6 +82,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "committee",
       "providers_seen": [
         "free-webmail",
@@ -85,6 +103,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "solo",
       "providers_seen": [
         "verified-corporate"
@@ -106,6 +125,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "solo",
       "providers_seen": [
         "free-webmail"
@@ -127,6 +147,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "solo",
       "providers_seen": [
         "free-webmail"
@@ -148,6 +169,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "solo",
       "providers_seen": [
         "free-webmail"
@@ -169,6 +191,7 @@
       "detected_version": null,
       "detected_disposition": null,
       "disposition_reason": null,
+      "detection_lag_days": null,
       "shape": "solo",
       "providers_seen": [
         "free-webmail"
@@ -187,7 +210,9 @@
       "has_sufficient_history": true,
       "transitions": 10,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "@types/react",
@@ -198,7 +223,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "@types/react-dom",
@@ -209,7 +236,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "@typescript-eslint/parser",
@@ -220,7 +249,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 109
+      "warn_transitions": 109,
+      "provenance_regression_count": 109,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ajv",
@@ -231,7 +262,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "async",
@@ -242,7 +275,9 @@
       "has_sufficient_history": true,
       "transitions": 12,
       "block_transitions": 1,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "autoprefixer",
@@ -253,7 +288,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "babel-loader",
@@ -264,7 +301,9 @@
       "has_sufficient_history": true,
       "transitions": 17,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "bcrypt",
@@ -275,7 +314,9 @@
       "has_sufficient_history": true,
       "transitions": 7,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "better-sqlite3",
@@ -286,7 +327,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "body-parser",
@@ -297,7 +340,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "bower",
@@ -308,7 +353,9 @@
       "has_sufficient_history": true,
       "transitions": 11,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "buffer",
@@ -319,7 +366,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "chai",
@@ -330,7 +379,9 @@
       "has_sufficient_history": true,
       "transitions": 9,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "classnames",
@@ -341,7 +392,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "commander",
@@ -352,7 +405,9 @@
       "has_sufficient_history": true,
       "transitions": 28,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "concurrently",
@@ -363,7 +418,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "cookie",
@@ -374,7 +431,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "cookie-parser",
@@ -385,7 +444,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "cors",
@@ -396,7 +457,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "cross-env",
@@ -407,7 +470,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "css-loader",
@@ -418,7 +483,9 @@
       "has_sufficient_history": true,
       "transitions": 9,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "date-fns",
@@ -429,7 +496,9 @@
       "has_sufficient_history": true,
       "transitions": 14,
       "block_transitions": 1,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "dayjs",
@@ -440,7 +509,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "debug",
@@ -451,7 +522,9 @@
       "has_sufficient_history": true,
       "transitions": 6,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "dotenv",
@@ -462,7 +535,9 @@
       "has_sufficient_history": true,
       "transitions": 8,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "esbuild",
@@ -473,7 +548,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "eslint",
@@ -484,7 +561,9 @@
       "has_sufficient_history": true,
       "transitions": 18,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "eslint-plugin-import",
@@ -495,7 +574,9 @@
       "has_sufficient_history": true,
       "transitions": 3,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "events",
@@ -506,7 +587,9 @@
       "has_sufficient_history": true,
       "transitions": 3,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "express",
@@ -517,7 +600,9 @@
       "has_sufficient_history": true,
       "transitions": 14,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "express-generator",
@@ -528,7 +613,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "fs-extra",
@@ -539,7 +626,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "glob",
@@ -550,7 +639,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "got",
@@ -561,7 +652,9 @@
       "has_sufficient_history": true,
       "transitions": 28,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "graceful-fs",
@@ -572,7 +665,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "inherits",
@@ -583,7 +678,9 @@
       "has_sufficient_history": false,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ioredis",
@@ -594,7 +691,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "jest",
@@ -605,7 +704,9 @@
       "has_sufficient_history": true,
       "transitions": 20,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 5,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "joi",
@@ -616,7 +717,9 @@
       "has_sufficient_history": true,
       "transitions": 32,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "jsonwebtoken",
@@ -627,7 +730,9 @@
       "has_sufficient_history": true,
       "transitions": 18,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "left-pad",
@@ -638,7 +743,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "lodash",
@@ -649,7 +756,9 @@
       "has_sufficient_history": true,
       "transitions": 3,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "lru-cache",
@@ -660,7 +769,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "minimist",
@@ -671,7 +782,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "mocha",
@@ -682,7 +795,9 @@
       "has_sufficient_history": true,
       "transitions": 27,
       "block_transitions": 0,
-      "warn_transitions": 6
+      "warn_transitions": 6,
+      "provenance_regression_count": 1,
+      "provenance_escalator_fires": 1
     },
     {
       "package": "mongoose",
@@ -693,7 +808,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 2,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ms",
@@ -704,7 +821,9 @@
       "has_sufficient_history": true,
       "transitions": 5,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "mysql2",
@@ -715,7 +834,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "next",
@@ -726,7 +847,9 @@
       "has_sufficient_history": true,
       "transitions": 59,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 5,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "node-fetch",
@@ -737,7 +860,9 @@
       "has_sufficient_history": true,
       "transitions": 7,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "node-ipc",
@@ -748,7 +873,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "nodemon",
@@ -759,7 +886,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "pg",
@@ -770,7 +899,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "playwright",
@@ -781,7 +912,9 @@
       "has_sufficient_history": true,
       "transitions": 19,
       "block_transitions": 4,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "postcss",
@@ -792,7 +925,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "prettier",
@@ -803,7 +938,9 @@
       "has_sufficient_history": true,
       "transitions": 27,
       "block_transitions": 0,
-      "warn_transitions": 8
+      "warn_transitions": 8,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "process",
@@ -814,7 +951,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "prop-types",
@@ -825,7 +964,9 @@
       "has_sufficient_history": true,
       "transitions": 7,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "puppeteer",
@@ -836,7 +977,9 @@
       "has_sufficient_history": true,
       "transitions": 15,
       "block_transitions": 1,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "react",
@@ -847,7 +990,9 @@
       "has_sufficient_history": true,
       "transitions": 112,
       "block_transitions": 2,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "react-dom",
@@ -858,7 +1003,9 @@
       "has_sufficient_history": true,
       "transitions": 109,
       "block_transitions": 2,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "react-redux",
@@ -869,7 +1016,9 @@
       "has_sufficient_history": true,
       "transitions": 16,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "react-router-dom",
@@ -880,7 +1029,9 @@
       "has_sufficient_history": true,
       "transitions": 8,
       "block_transitions": 3,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "readable-stream",
@@ -891,7 +1042,9 @@
       "has_sufficient_history": true,
       "transitions": 7,
       "block_transitions": 1,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "redis",
@@ -902,7 +1055,9 @@
       "has_sufficient_history": true,
       "transitions": 11,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "redux",
@@ -913,7 +1068,9 @@
       "has_sufficient_history": true,
       "transitions": 10,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "request",
@@ -924,7 +1081,9 @@
       "has_sufficient_history": true,
       "transitions": 9,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "rimraf",
@@ -935,7 +1094,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "rollup",
@@ -946,7 +1107,9 @@
       "has_sufficient_history": true,
       "transitions": 12,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "safer-buffer",
@@ -957,7 +1120,9 @@
       "has_sufficient_history": false,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "semver",
@@ -968,7 +1133,9 @@
       "has_sufficient_history": true,
       "transitions": 10,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "sharp",
@@ -979,7 +1146,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "sinon",
@@ -990,7 +1159,9 @@
       "has_sufficient_history": true,
       "transitions": 56,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "style-loader",
@@ -1001,7 +1172,9 @@
       "has_sufficient_history": true,
       "transitions": 5,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "supertest",
@@ -1012,7 +1185,9 @@
       "has_sufficient_history": true,
       "transitions": 11,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 5,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "svelte",
@@ -1023,7 +1198,9 @@
       "has_sufficient_history": true,
       "transitions": 35,
       "block_transitions": 1,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ts-loader",
@@ -1034,7 +1211,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ts-node",
@@ -1045,7 +1224,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "tsconfig-paths",
@@ -1056,7 +1237,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "tslib",
@@ -1067,7 +1250,9 @@
       "has_sufficient_history": true,
       "transitions": 2,
       "block_transitions": 0,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "tsx",
@@ -1078,7 +1263,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "typescript",
@@ -1089,7 +1276,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ua-parser-js",
@@ -1100,7 +1289,9 @@
       "has_sufficient_history": true,
       "transitions": 0,
       "block_transitions": 0,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "undici",
@@ -1111,7 +1302,9 @@
       "has_sufficient_history": true,
       "transitions": 55,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 5,
+      "provenance_regression_count": 2,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "uuid",
@@ -1122,7 +1315,9 @@
       "has_sufficient_history": true,
       "transitions": 7,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 2,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "vite",
@@ -1133,7 +1328,9 @@
       "has_sufficient_history": true,
       "transitions": 37,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 5,
+      "provenance_regression_count": 1,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "vitest",
@@ -1144,7 +1341,9 @@
       "has_sufficient_history": true,
       "transitions": 33,
       "block_transitions": 1,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 1,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "vue",
@@ -1155,7 +1354,9 @@
       "has_sufficient_history": true,
       "transitions": 5,
       "block_transitions": 2,
-      "warn_transitions": 1
+      "warn_transitions": 1,
+      "provenance_regression_count": 1,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "webpack",
@@ -1166,7 +1367,9 @@
       "has_sufficient_history": true,
       "transitions": 8,
       "block_transitions": 3,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "ws",
@@ -1177,7 +1380,9 @@
       "has_sufficient_history": true,
       "transitions": 3,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 3,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "yargs",
@@ -1188,7 +1393,9 @@
       "has_sufficient_history": true,
       "transitions": 16,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 4,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "yup",
@@ -1199,7 +1406,9 @@
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 0,
+      "provenance_regression_count": 0,
+      "provenance_escalator_fires": 0
     },
     {
       "package": "zod",
@@ -1210,7 +1419,9 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 0,
-      "warn_transitions": 15
+      "warn_transitions": 15,
+      "provenance_regression_count": 13,
+      "provenance_escalator_fires": 0
     }
   ]
 }

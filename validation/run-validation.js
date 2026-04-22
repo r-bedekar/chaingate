@@ -33,7 +33,11 @@ import provenance, {
   MIN_PROVENANCE_HISTORY,
   MIN_BASELINE_STREAK,
 } from '../patterns/provenance.js';
-import { disposition, __thresholds } from './disposition.js';
+import {
+  disposition,
+  hasProvenanceEscalator,
+  __thresholds,
+} from './disposition.js';
 import {
   MIN_HISTORY_DEPTH,
   MIN_VERIFIED_VERSIONS,
@@ -151,7 +155,8 @@ function loadAttackLabels(db, packageId) {
   return db
     .prepare(
       `SELECT id, version_id, is_malicious, affected_range,
-              advisory_id, source, provenance_source, summary
+              advisory_id, source, provenance_source, summary,
+              detection_lag_days
        FROM attack_labels
        WHERE package_id = ? AND is_malicious = 1
          AND (
@@ -232,10 +237,78 @@ function classifyCell(t) {
   return 'cold_handoff';
 }
 
-// Per-attack row. "detected" = any target version lands on a BLOCK
-// transition. For range_based labels we report the first BLOCKed
-// target version encountered (sorted order), keeping the row compact.
-function buildPerAttackRow(pkgName, label, targets, extracted, verdicts) {
+// Locate the tenure block whose [first_published_at_ms,
+// last_published_at_ms] contains the given timestamp. Re-implemented
+// locally rather than imported from disposition.js (which has its own
+// internal version) to keep run-validation.js self-contained.
+function tenureBlockContaining(publishedAtMs, tenure) {
+  if (typeof publishedAtMs !== 'number' || !Array.isArray(tenure)) return null;
+  for (const b of tenure) {
+    if (publishedAtMs >= b.first_published_at_ms && publishedAtMs <= b.last_published_at_ms) {
+      return b;
+    }
+  }
+  return null;
+}
+
+// Walk provOut.perVersion and call hasProvenanceEscalator directly on
+// every in-scope regression fire. Returns a list of { version,
+// escalators[], fired, perVersionSignal } — the single source of truth
+// for provenance-driven aggregates (§4a, §4b, §4c). Using the
+// structural escalator evaluator directly avoids the hidden format-
+// string contract a reason-string grep would create.
+function iterateProvenanceFires(provOut, publisherOutput) {
+  const fires = [];
+  if (!provOut || !Array.isArray(provOut.perVersion)) return fires;
+  for (const v of provOut.perVersion) {
+    if (!v || !v.in_scope) continue;
+    if (!v.provenance_regression) continue;
+    const esc = hasProvenanceEscalator(v, publisherOutput, provOut, null);
+    fires.push({
+      version: v.version,
+      escalators: esc.escalators,
+      fired: esc.fired,
+      perVersionSignal: v,
+    });
+  }
+  return fires;
+}
+
+// Nearest-rank quartiles over a pre-sorted ascending integer array.
+// Returns null when n=0 so the aggregate emits literal `null` for
+// corpora without lag data.
+function computeQuartiles(sortedInts) {
+  const n = sortedInts.length;
+  if (n === 0) return null;
+  const pick = (p) => sortedInts[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))];
+  return {
+    n,
+    min: sortedInts[0],
+    q1: pick(0.25),
+    median: pick(0.5),
+    q3: pick(0.75),
+    max: sortedInts[n - 1],
+  };
+}
+
+// Per-attack row. "detected" = at least one candidate version is AT or
+// AFTER a BLOCK verdict within the same tenure block. Class A (exact-
+// version BLOCK) and Class C (BLOCK fires at block-start, label targets
+// a later version in the same block) resolve uniformly through the
+// at-or-after walk.
+//
+// The recorded detected_version is the BLOCK anchor, not the label
+// target — a reader needs to know WHERE the gate fired. For an exact-
+// match Class A case the two coincide; for Class C they differ
+// (event-stream labels at 3.3.6, gate fires at 3.3.5).
+//
+// Class B (label.kind='unspecified', candidate_versions=[]) is
+// inherently undetectable at this layer — no version anchor to walk
+// from. Such rows return with detected=false; they are excluded from
+// recall_labels_point_attributable's denominator (see §4 aggregate
+// computation in run()).
+function buildPerAttackRow(pkgName, label, targets, extracted, verdicts, historyByVersion) {
+  const tenure = extracted.tenure;
   const row = {
     package: pkgName,
     advisory_id: label.advisory_id,
@@ -250,35 +323,65 @@ function buildPerAttackRow(pkgName, label, targets, extracted, verdicts) {
     detected_version: null,
     detected_disposition: null,
     disposition_reason: null,
+    detection_lag_days: label.detection_lag_days ?? null,
     shape: extracted.shape,
     providers_seen: extracted.identity_profile.providers_seen?.slice?.() ?? [],
     domain_stability: extracted.identity_profile.domain_stability ?? null,
     cell: null,
   };
 
-  // A label on a package where extract() has no transitions at all can
-  // never be detected at this layer — record it honestly and move on.
   if (verdicts.size === 0 || targets.versions.length === 0) return row;
 
+  // Pass 1: find any BLOCK — exact-version or at-or-after within
+  // candidate's tenure block. First candidate (sorted) wins.
+  let picked = null;
+  for (const v of targets.versions) {
+    const exact = verdicts.get(v);
+    if (exact && exact.disposition === 'BLOCK') {
+      picked = { anchor: v, verdict: exact };
+      break;
+    }
+    const vRow = historyByVersion.get(v);
+    if (!vRow || typeof vRow.published_at_ms !== 'number') continue;
+    const vBlock = tenureBlockContaining(vRow.published_at_ms, tenure);
+    if (!vBlock) continue;
+    let bestAnchor = null;
+    for (const [k, verdict] of verdicts) {
+      if (verdict.disposition !== 'BLOCK') continue;
+      if (k === v) continue;
+      if (compareSemver(v, k) < 0) continue;
+      const kRow = historyByVersion.get(k);
+      if (!kRow || typeof kRow.published_at_ms !== 'number') continue;
+      const kBlock = tenureBlockContaining(kRow.published_at_ms, tenure);
+      if (kBlock !== vBlock) continue;
+      if (bestAnchor === null || compareSemver(k, bestAnchor) < 0) bestAnchor = k;
+    }
+    if (bestAnchor !== null) {
+      picked = { anchor: bestAnchor, verdict: verdicts.get(bestAnchor) };
+      break;
+    }
+  }
+  if (picked) {
+    row.detected = true;
+    row.detected_version = picked.anchor;
+    row.detected_disposition = 'BLOCK';
+    row.disposition_reason = picked.verdict.reason;
+    const t = extracted.transitions.find((x) => x.at_version === picked.anchor);
+    row.cell = t ? classifyCell(t) : null;
+    return row;
+  }
+
+  // Pass 2: no BLOCK anywhere; record the first exact non-BLOCK verdict
+  // for diagnostic visibility (not counted as detected).
   for (const v of targets.versions) {
     const verdict = verdicts.get(v);
     if (!verdict) continue;
-    if (verdict.disposition === 'BLOCK') {
-      row.detected = true;
-      row.detected_version = v;
-      row.detected_disposition = verdict.disposition;
-      row.disposition_reason = verdict.reason;
-      const t = extracted.transitions.find((x) => x.at_version === v);
-      row.cell = t ? classifyCell(t) : null;
-      return row;
-    }
-    if (!row.detected_disposition) {
-      row.detected_version = v;
-      row.detected_disposition = verdict.disposition;
-      row.disposition_reason = verdict.reason;
-      const t = extracted.transitions.find((x) => x.at_version === v);
-      row.cell = t ? classifyCell(t) : null;
-    }
+    row.detected_version = v;
+    row.detected_disposition = verdict.disposition;
+    row.disposition_reason = verdict.reason;
+    const t = extracted.transitions.find((x) => x.at_version === v);
+    row.cell = t ? classifyCell(t) : null;
+    break;
   }
   return row;
 }
@@ -310,6 +413,19 @@ function run(options) {
     let tnPackages = 0; // clean packages without BLOCK
     let warnClean = 0;  // clean packages at WARN (for visibility)
 
+    // Provenance-aware aggregate accumulators (§4a, §4b, §4c).
+    let provenanceOnlyAttackDetected = 0;
+    let provenanceOnlyCleanBlocked = 0;
+    let publisherOnlyAttackDetected = 0;
+    let provenanceOnlyAttackDetectedDecomp = 0;
+    let bothAttackDetected = 0;
+    const escalatorFireCounts = {
+      new_domain: 0,
+      privacy: 0,
+      unverified: 0,
+      machine_to_human: 0,
+    };
+
     for (const pkgName of scopePackages) {
       const pkgId = nameToId.get(pkgName);
       if (pkgId == null) {
@@ -317,11 +433,31 @@ function run(options) {
       }
       const history = loadPackageHistory(db, pkgId);
       const historyById = new Map(history.map((h) => [h.version_id, h]));
+      const historyByVersion = new Map(history.map((h) => [h.version, h]));
 
       const extracted = publisher.extract({ packageName: pkgName, history });
       const provOut = provenance.extract({ packageName: pkgName, history });
       const d = disposition(extracted, provOut);
       const verdicts = buildTransitionVerdicts(extracted, d);
+
+      // Structural provenance classification, read off the fire list
+      // rather than parsed out of reason strings.
+      const provFires = iterateProvenanceFires(provOut, extracted);
+      const provBlockAnchors = new Set(
+        provFires.filter((f) => f.fired).map((f) => f.version),
+      );
+      const hasProvenanceBlockPkg = provBlockAnchors.size > 0;
+      const hasPublisherBlockPkg = [...verdicts.entries()].some(
+        ([k, v]) => v.disposition === 'BLOCK' && !provBlockAnchors.has(k),
+      );
+
+      for (const f of provFires) {
+        for (const label of f.escalators) {
+          if (Object.prototype.hasOwnProperty.call(escalatorFireCounts, label)) {
+            escalatorFireCounts[label] += 1;
+          }
+        }
+      }
 
       const isAttack = attackLabeled.has(pkgName);
       if (isAttack) {
@@ -330,6 +466,16 @@ function run(options) {
         if (d.disposition === 'BLOCK') fpPackages += 1;
         else if (d.disposition === 'WARN') { warnClean += 1; tnPackages += 1; }
         else tnPackages += 1;
+      }
+
+      if (hasProvenanceBlockPkg) {
+        if (isAttack) provenanceOnlyAttackDetected += 1;
+        else provenanceOnlyCleanBlocked += 1;
+      }
+      if (isAttack && d.disposition === 'BLOCK') {
+        if (hasPublisherBlockPkg && hasProvenanceBlockPkg) bothAttackDetected += 1;
+        else if (hasPublisherBlockPkg) publisherOnlyAttackDetected += 1;
+        else if (hasProvenanceBlockPkg) provenanceOnlyAttackDetectedDecomp += 1;
       }
 
       perPackage.push({
@@ -342,13 +488,17 @@ function run(options) {
         transitions: extracted.transitions.length,
         block_transitions: [...verdicts.values()].filter((v) => v.disposition === 'BLOCK').length,
         warn_transitions: [...verdicts.values()].filter((v) => v.disposition === 'WARN').length,
+        provenance_regression_count: provFires.length,
+        provenance_escalator_fires: provFires.filter((f) => f.fired).length,
       });
 
       if (isAttack) {
         const labels = loadAttackLabels(db, pkgId);
         for (const label of labels) {
           const targets = resolveLabelTargets(label, historyById);
-          perAttack.push(buildPerAttackRow(pkgName, label, targets, extracted, verdicts));
+          perAttack.push(
+            buildPerAttackRow(pkgName, label, targets, extracted, verdicts, historyByVersion),
+          );
         }
       }
     }
@@ -369,6 +519,33 @@ function run(options) {
     const attackLabelsDetected = perAttack.filter((r) => r.detected).length;
     const labelRecallPoint = attackLabelsTotal > 0
       ? round4(attackLabelsDetected / attackLabelsTotal) : null;
+
+    // Attributable denominator excludes Class B (unspecified labels
+    // with zero candidate_versions) and range-based labels whose
+    // range matched nothing in the observed history. Both classes
+    // have no version anchor the gate could fire against; counting
+    // them against recall mixes label-health signal with pattern
+    // recall. recall_labels_point stays with the all-inclusive
+    // denominator for continuity with commit 2.
+    const attackLabelsAttributable = perAttack.filter(
+      (r) => r.candidate_versions && r.candidate_versions.length > 0,
+    ).length;
+    const attackLabelsAttributableDetected = perAttack.filter(
+      (r) => r.detected && r.candidate_versions && r.candidate_versions.length > 0,
+    ).length;
+    const labelRecallAttributablePoint = attackLabelsAttributable > 0
+      ? round4(attackLabelsAttributableDetected / attackLabelsAttributable) : null;
+
+    const recallProvenancePoint = attackPkgsInScope > 0
+      ? round4(provenanceOnlyAttackDetected / attackPkgsInScope) : null;
+    const fpRateProvenancePoint = cleanPkgsInScope > 0
+      ? round4(provenanceOnlyCleanBlocked / cleanPkgsInScope) : null;
+
+    const detectedLags = perAttack
+      .filter((r) => r.detected && typeof r.detection_lag_days === 'number')
+      .map((r) => r.detection_lag_days)
+      .sort((a, b) => a - b);
+    const detectionLagDaysQuartiles = computeQuartiles(detectedLags);
 
     perPackage.sort((a, b) => (a.package < b.package ? -1 : a.package > b.package ? 1 : 0));
     perAttack.sort((a, b) => {
@@ -401,6 +578,17 @@ function run(options) {
         attack_labels_total: attackLabelsTotal,
         attack_labels_detected: attackLabelsDetected,
         recall_labels_point: labelRecallPoint,
+        attack_labels_attributable: attackLabelsAttributable,
+        recall_labels_point_attributable: labelRecallAttributablePoint,
+        attack_packages_detected_publisher_only: publisherOnlyAttackDetected,
+        attack_packages_detected_provenance_only: provenanceOnlyAttackDetectedDecomp,
+        attack_packages_detected_both: bothAttackDetected,
+        provenance_only_attack_detected: provenanceOnlyAttackDetected,
+        provenance_only_clean_blocked: provenanceOnlyCleanBlocked,
+        recall_provenance_point: recallProvenancePoint,
+        false_positive_rate_provenance_point: fpRateProvenancePoint,
+        escalator_fire_counts: escalatorFireCounts,
+        detection_lag_days_quartiles: detectionLagDaysQuartiles,
       },
       per_attack: perAttack,
       per_package: perPackage,
