@@ -1,8 +1,9 @@
-> **Status: Active development — not ready for production use.**  
-> Core witness architecture and proxy are functional. Sequence-aware
-> pattern detection (V2) is in progress. Content-hash gate is the
-> only active BLOCK gate. Other metadata gates are informational
-> until V2 ships. Feedback welcome.
+> **Status: Active development — not ready for production use.**
+> The detection engine is built and validated against a 209-package
+> corpus (recall 0.67 on held-out attack set, provenance false-positive
+> rate 0.00 on clean packages). The proxy, CLI, and gate runner that
+> sit around it are the next build-out (P5). See
+> [What's built today](#whats-built-today) for what actually runs.
 
 # ChainGate
 
@@ -11,110 +12,120 @@
 Every supply chain security tool asks: *"Is this package known to be bad?"*
 ChainGate asks: *"Is this package different from what it looked like yesterday?"*
 
-No threat feeds. No subscriptions. No cloud dependency. Self-hosted.
+No threat feeds. No subscriptions. No cloud dependency. Self-hosted. Apache 2.0.
 
 ---
 
 ## The Problem
 
-On March 31, 2026, axios@1.14.1 was published with a hidden RAT. 100M weekly downloads. 3-hour window. The npm registry metadata showed four red flags — new phantom dependency, publisher email changed, provenance disappeared, publish method flipped from OIDC to CLI token. None of this was surfaced to the developer at install time.
+On March 31, 2026, axios@1.14.1 was published with a hidden RAT. 100M weekly downloads. Socket flagged it in six minutes. Every intelligence-based tool — JFrog, Sonatype, Snyk — was blind until databases updated. The npm registry metadata told a different story from the start: a phantom dependency, a new publisher email on a privacy domain, provenance disappeared, publish method flipped from GitHub Actions OIDC to a CLI token.
 
-JFrog, Sonatype, Snyk — they catch **known** threats. CVEs in their database, malware in their signatures. During the zero-day window before any database is updated, they're blind.
+None of this is exotic. It's all in the registry metadata every tool already downloads. It just isn't surfaced to the developer at install time.
 
-ChainGate catches **unknown** threats that show structural anomalies — by remembering what every package looked like and telling you when something changed.
+ChainGate is the part that does the surfacing — by remembering what every package looked like before, and flagging structural changes at install time, without any threat feed.
 
-## How It Works
+## The Idea
 
-ChainGate sits between your developer (or CI pipeline) and the package registry. It records a baseline profile for every package version it sees — content hash, dependency structure, publisher identity, provenance status. Every subsequent install is compared against this baseline.
+ChainGate keeps a **witness log** — an append-only record of every package version it has ever observed, with its content hash, dependency tree, publisher identity, and provenance status. When a new version shows up, deterministic **gates** compare it against the history in the log.
+
+Six gates, each reading a different axis of the registry metadata:
+
+| Gate | What it checks |
+|------|----------------|
+| **Content Hash** | Does the tarball hash match what was first observed? (catches republish attacks — Trivy, Notepad++) |
+| **Dep Structure** | Did a new dependency appear, especially one recently published? |
+| **Publisher Identity** | Did the publisher email or domain change? |
+| **Provenance Continuity** | Did attested publish break? (OIDC → CLI token) |
+| **Release Age** | Is this version less than N hours old? |
+| **Scope Boundary** | Phantom dependency + install scripts — hard limit |
+
+The signals layer. An axios-class attack trips four at once. A legitimate new release trips none. The combination is what makes this work, not any single gate.
+
+## How It Works (concept)
 
 ```
-Developer → ChainGate proxy → upstream registry
-                  ↓
-          Compare against baseline
-          Apply deterministic gates
-          ✅ ALLOW  ⚠️ WARN  🚫 BLOCK
+Developer / CI → ChainGate proxy → upstream registry
+                        ↓
+                Compare against witness log
+                Apply deterministic gates
+                ✅ ALLOW  ⚠️ WARN  🚫 BLOCK
 ```
 
-No threat intelligence feeds required. Just: "this version is different from what I expect" → warn or block.
+No threat intelligence feeds. Just "is this version structurally consistent with the history of this package."
 
-## What You See
+## What's Built Today
 
-```
-$ npm install axios
-✓ axios@1.14.0 — verified (hash match, 3 deps, OIDC provenance)
+Everything below runs on a fresh clone in under five minutes.
 
-$ npm install axios@1.14.1
-🚫 BLOCKED: axios@1.14.1
-   ├── New dependency: plain-crypto-js (first published 18 hours ago)
-   ├── Publisher email changed: gmail.com → protonmail.me
-   ├── Provenance: NONE (previous 14 versions had OIDC attestation)
-   └── Publish method: CLI token (previous versions via GitHub Actions)
-   
-   Run: chaingate allow axios@1.14.1 --reason "..." to override
-```
+**Detection engine.** Two pattern layers — publisher identity (tenure blocks, cold handoffs, domain classification) and per-major provenance (attestation baselines, regression detection, four-escalator logic). Both pure functions over a package's observed history.
 
-*Demo shows target V2 behavior. Current V1 surfaces publisher,
-dependency, and provenance signals as informational warnings
-while sequence-aware pattern detection is in development.
-Content-hash mismatch is the only active BLOCK gate.*
+**Witness store.** Append-only log backed by SQLite. Content hashes, dependency trees, publisher metadata, provenance status for 209 packages × 69,964 versions × 181,240 version files.
 
-## Gates
+**Collector.** Pulls live npm and PyPI data, OSV advisories, PyPI attestations. Produces a signed (Ed25519) seed bundle ready for distribution.
 
-| Gate | What it checks | Default |
-|------|---------------|---------|
-| **Content Hash** | Does the hash match what was first observed for this version? | BLOCK |
-| **Dep Structure** | Did the dependency tree change unexpectedly? | WARN |
-| **Publisher Identity** | Did the publisher email/identity change? | WARN |
-| **Provenance Continuity** | Did the publish method change (OIDC → CLI)? | WARN |
-| **Release Age** | Is the version less than N hours old? | WARN |
-| **Scope Boundary** | Absolute limits (phantom dep + install scripts) | WARN |
+**Validation harness.** Runs the detection engine against train/test splits on the corpus and emits metrics to `validation/results.json`. Golden snapshot tests guard the numbers.
 
-Content hash mismatch is the only hard block by default. Everything else warns. You decide what to escalate.
+**Current numbers on the held-out test split:**
 
-*Currently, only Content Hash is an active BLOCK gate. All other
-gates surface informational signals. Sequence-aware pattern
-detection (V2) will activate these as full gates.*
+| Metric | Value |
+|--------|-------|
+| Package recall | 0.67 (4 of 6 labeled attacks detected) |
+| Attributable label recall | 1.0 (every attack with a version-pinned label is caught) |
+| Provenance-only false-positive rate on clean packages | 0.0 |
+| Canonical attacks caught | axios@1.14.1, event-stream@3.3.6, shai-hulud, ua-parser-js |
 
-## Attack Coverage
-
-| Attack | How ChainGate catches it |
-|--------|------------------------|
-| **Axios** (phantom dep + publisher change) | 4 gates fire simultaneously |
-| **Trivy** (Git tag force-pushed) | Content hash mismatch |
-| **Notepad++** (binary replaced via server hijack) | Content hash mismatch |
-| **Shai-Hulud** (500+ packages via stolen tokens) | Publisher identity changes across packages |
-
-**Honest limitation:** If an attacker compromises the CI/CD pipeline and publishes through the same workflow with the same structure — only changing code — the metadata looks clean. For that you need code-level analysis (Socket, Snyk). ChainGate is complementary, not a replacement.
-
-## Quick Start
-
-Requires **Node.js 22+**.
+**Try it:**
 
 ```bash
-# npm package not yet published — install from source
 git clone https://github.com/r-bedekar/chaingate.git
 cd chaingate && npm install
-npm link                # makes 'chaingate' command available
-chaingate init          # downloads signed seed DB, starts proxy, patches .npmrc
-npm install axios       # now routed through ChainGate
-chaingate status        # see what was observed
-chaingate why axios@1.7.9   # explain the gate decision
-chaingate stop          # restore .npmrc, stop proxy
+npm test                                           # 482 tests pass
+node validation/run-validation.js --mode=test      # run detection on held-out set
+cat validation/results.json | jq '.aggregates'     # see the numbers
 ```
 
-## Deployment Modes
+The Python collector stack is optional (needed only to rebuild the seed from scratch):
 
-**Mode 1: Standalone proxy** — lightweight, for individual devs and small teams.
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r collector/requirements.txt
+.venv/bin/pytest test/collector/test_osv.py -v     # 35 tests pass
+```
 
-**Mode 2: Integration layer** — plugin for JFrog Artifactory or Sonatype Nexus. Your existing repo handles proxying, ChainGate adds the intelligence.
+## What's Next
 
-## Ecosystem Support
+**P5 — Proxy, CLI, and gate runner.** The part that turns the detection engine into an installable tool. Ten-day build.
 
-| Ecosystem | Status |
-|-----------|--------|
-| npm | 🟢 Active |
-| PyPI | 🔵 Planned |
-| Docker Hub | 🔵 Planned |
+- Proxy that sits between `npm install` and the registry (`undici`-based packument rewriter)
+- CLI: `chaingate init`, `allow`, `why`, `status`, `stop`, `update-seed`
+- Gate runner wiring the six gates into the proxy request path
+- End-to-end integration tests including one real `npm install` smoke test
+
+Design is locked in [`docs/P5.md`](docs/P5.md). Zero bytes written yet — this is the current focus.
+
+After P5: research post + calibration publication, Black Hat MEA Arsenal submission, PyPI ecosystem support, Artifactory / Nexus plugin layer.
+
+## Attack Coverage (from the corpus)
+
+These attacks are detected end-to-end by the current detection engine on the validation corpus. "Caught" means the validation harness reports `detected=true` with the disposition reasons shown.
+
+| Attack | How the detection engine catches it |
+|--------|-------------------------------------|
+| **Axios 1.14.1** | Per-major provenance regression + three escalators: new domain (proton.me), privacy provider, machine-to-human handoff |
+| **Event-stream 3.3.6** | Publisher cold-handoff BLOCK at 3.3.5 (right9ctrl ownership change), propagates to 3.3.6 via same-tenure-block detection |
+| **Shai-Hulud** | Publisher identity change across 500+ packages (fixture-verified) |
+| **Ua-parser-js** | New unverified domain after established baseline (fixture-verified) |
+
+**Honest limitation.** If an attacker compromises the CI/CD pipeline and publishes through the same workflow with the same publisher and the same structure — only changing code — the metadata looks clean. Code-level analysis tools (Socket, Snyk) catch those. ChainGate is complementary, not a replacement. Honest estimated coverage: 70–80% of known supply-chain attack patterns.
+
+## What Makes This Different
+
+|  | JFrog Curation | Sonatype Firewall | Socket | **ChainGate** |
+|---|---|---|---|---|
+| Detection signal | Known CVE + malware DB | Proprietary AI | Code analysis | **Historical baseline** |
+| Zero-day window | Blind until DB updated | Partial | Fast (6 min, cloud) | **Immediate, local** |
+| Needs external intel | Yes | Yes | Yes | **No** |
+| Self-hosted | Yes (expensive) | Yes (expensive) | No | **Yes, free** |
+| Open source | No | No | CLI only | **Yes** |
 
 ## Architecture
 
@@ -122,39 +133,35 @@ chaingate stop          # restore .npmrc, stop proxy
 ┌─────────────────────────────────────────┐
 │              CHAINGATE PROXY            │
 │                                         │
-│  ┌─────────────┐  ┌─────────────────┐  │
-│  │   WITNESS    │  │      GATES      │  │
-│  │   (Memory)   │  │  (Det. Rules)   │  │
-│  │              │  │                 │  │
-│  │ Content hash │  │ Hash verify     │  │
-│  │ Pkg profiles │  │ Dep structure   │  │
-│  │ Merkle tree  │  │ Publisher ID    │  │
-│  │              │  │ Provenance      │  │
-│  └──────┬───────┘  │ Release age     │  │
-│         │          │ Scope boundary  │  │
-│         │          └────────┬────────┘  │
-│         │                   │           │
-│         ▼                   ▼           │
-│  ┌──────────────────────────────────┐   │
-│  │        DECISION ENGINE           │   │
-│  │   ALLOW / WARN / BLOCK           │   │
-│  └──────────────────────────────────┘   │
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │   WITNESS   │  │      GATES      │   │
+│  │             │  │                 │   │
+│  │ Content hash│  │ Hash verify     │   │
+│  │ Pkg profiles│  │ Dep structure   │   │
+│  │ Append-only │  │ Publisher ID    │   │
+│  │             │  │ Provenance      │   │
+│  └──────┬──────┘  │ Release age     │   │
+│         │         │ Scope boundary  │   │
+│         │         └────────┬────────┘   │
+│         ▼                  ▼            │
+│  ┌───────────────────────────────────┐  │
+│  │        DECISION ENGINE            │  │
+│  │     ALLOW / WARN / BLOCK          │  │
+│  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
 ```
 
-## What Makes This Different
+## Ecosystem Support
 
-| | JFrog Curation | Sonatype Firewall | Socket | **ChainGate** |
-|---|---|---|---|---|
-| Detection | Known CVE + malware DB | Proprietary AI | Code analysis | **Historical baseline** |
-| Zero-day window | Blind until DB updated | Partial | Fast (6 min) | **Immediate** |
-| Needs external intel | Yes | Yes | Yes | **No** |
-| Self-hosted | Yes (expensive) | Yes (expensive) | No | **Yes (free)** |
-| Open source | No | No | CLI only | **Yes** |
+| Ecosystem | Status |
+|-----------|--------|
+| npm | 🟢 Detection engine built; proxy in progress (P5) |
+| PyPI | 🔵 Collector built; detection engine planned |
+| Docker Hub | 🔵 Planned |
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We welcome ecosystem connectors for new package registries.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Feedback, questions, and ecosystem-connector contributions welcome.
 
 ## License
 
@@ -162,10 +169,10 @@ Apache 2.0 — see [LICENSE](LICENSE).
 
 ## Contact
 
-Built by Rizwan Bedekar — feedback, questions, and collaboration welcome.  
-Email: rbedekar@zeroinsec.com  
+Built by Rizwan Bedekar.
+Email: rbedekar@zeroinsec.com
 GitHub: [@r-bedekar](https://github.com/r-bedekar)
 
 ---
 
-*ChainGate catches what intelligence-based tools miss — during the zero-day window before any database has been updated.*
+*ChainGate catches what intelligence-based tools miss — during the zero-day window before any database has been updated. Detection engine built. Proxy next.*
