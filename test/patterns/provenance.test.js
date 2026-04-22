@@ -763,13 +763,13 @@ test('canonical: axios@1.13.3 — regression, zero escalators → WARN-class', {
 test('canonical: axios rollup matches design-doc Task-2 target', { skip: !HAS_SEED }, () => {
   const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
   const out = provenance.extract({ packageName: 'axios', history });
-  assert.equal(out.packageRollup.total_versions, 11);
-  assert.equal(out.packageRollup.attested_versions, 9);
+  assert.equal(out.packageRollup.total_versions, 12);
+  assert.equal(out.packageRollup.attested_versions, 10);
   assert.equal(out.packageRollup.max_consecutive_attested, 4);
-  assert.equal(out.packageRollup.has_baseline_at_head, false);
+  assert.equal(out.packageRollup.has_baseline_at_head, true);
   assert.deepEqual(out.packageRollup.regression_versions, ['1.13.3', '1.14.1']);
   assert.equal(out.packageRollup.regression_count, 2);
-  assert.equal(out.packageRollup.machine_attested_versions, 6);
+  assert.equal(out.packageRollup.machine_attested_versions, 7);
   assert.equal(out.packageRollup.human_attested_versions, 3);
   assert.equal(out.packageRollup.first_attested_version, '1.13.0');
   assert.equal(out.packageRollup.first_baseline_reached_at, '1.13.2');
