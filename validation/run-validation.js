@@ -28,7 +28,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import publisher from '../patterns/publisher.js';
+import publisher, { WINDOW_W, WINDOW_K } from '../patterns/publisher.js';
 import provenance, {
   MIN_PROVENANCE_HISTORY,
   MIN_BASELINE_STREAK,
@@ -68,8 +68,8 @@ const DEFAULT_OUT = path.join(REPO_ROOT, 'validation', 'results.json');
 // Starter constants per docs/4_PLAN.md §2. Recorded in results.json so
 // any re-tune lands as a visible diff.
 const STARTER_PARAMETERS = {
-  W: 3, // is_overlap_window_W3 — baked into publisher.js (sub-step 2d)
-  K: 10, // is_known_contributor_K10 — baked into publisher.js (sub-step 2e)
+  W: WINDOW_W, // patterns/publisher.js — is_overlap_window_W3 (sub-step 2d)
+  K: WINDOW_K, // patterns/publisher.js — is_known_contributor_K10 (sub-step 2e)
   MIN_HISTORY_DEPTH,
   MIN_VERIFIED_VERSIONS,
   CHURNING_WINDOW,

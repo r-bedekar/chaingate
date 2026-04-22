@@ -234,7 +234,15 @@ import { compareSemver } from './semver.js';
 // Changing this constant will flip fixtures H and I in
 // test/patterns/publisher.test.js — that is BY DESIGN, the regression
 // alarm that tells a future contributor calibration moved.
-const WINDOW_W = 3;
+//
+// Env-var override (CHAINGATE_PARAM_W) is consumed by the calibration
+// sensitivity sweep (validation/calibration/run-sensitivity.js). NaN
+// on unset/empty/malformed input falls back to the default.
+// Exported so validation/run-validation.js can record the effective
+// value in results.json.parameters.W without duplicating the literal.
+export const WINDOW_W = Number.isFinite(Number(process.env.CHAINGATE_PARAM_W))
+  ? Number(process.env.CHAINGATE_PARAM_W)
+  : 3;
 
 // Threshold for known_contributor detection (sub-step 2e).
 // "How many prior releases does an incoming identity need to be treated
@@ -246,7 +254,11 @@ const WINDOW_W = 3;
 //
 // Subject to revision in sub-step 4. Changing this constant will flip
 // fixtures L and M — the inclusive >= K boundary guard.
-const WINDOW_K = 10;
+//
+// Env-var override: see WINDOW_W above.
+export const WINDOW_K = Number.isFinite(Number(process.env.CHAINGATE_PARAM_K))
+  ? Number(process.env.CHAINGATE_PARAM_K)
+  : 10;
 
 function validateInput(input) {
   if (!input || typeof input !== 'object') {

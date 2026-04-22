@@ -1,0 +1,136 @@
+{
+  "baseline": {
+    "parameters": {
+      "W": 3,
+      "K": 10,
+      "MIN_HISTORY_DEPTH": 8,
+      "MIN_VERIFIED_VERSIONS": 2,
+      "CHURNING_WINDOW": 5,
+      "SOLO_DOMINANCE": 0.8,
+      "HIGH_PRIOR_TENURE": 5,
+      "EXCEPTIONAL_PRIOR_TENURE": 20,
+      "MIN_PROVENANCE_HISTORY": 8,
+      "MIN_BASELINE_STREAK": 3
+    },
+    "fp_rate": 0.3407,
+    "recall": 0.2857,
+    "split_version": 2,
+    "rng_seed": 20260422,
+    "scope_size": 98,
+    "attack_labeled_packages": 7,
+    "clean_packages": 91
+  },
+  "granularity": {
+    "recall_denominator": 7,
+    "recall_min_nonzero_delta": 0.1429,
+    "fp_denominator": 91,
+    "fp_min_nonzero_delta": 0.011
+  },
+  "sensitivities": [
+    {
+      "constant": "W",
+      "delta_fp": 0,
+      "delta_recall": 0,
+      "perturbations": {
+        "down": {
+          "value": 2,
+          "fp": 0.3407,
+          "recall": 0.2857
+        },
+        "up": {
+          "value": 4,
+          "fp": 0.3407,
+          "recall": 0.2857
+        }
+      },
+      "retained": false,
+      "drop_reason": "below thresholds: |Δrecall|=0.0000 < 0.02 AND |ΔFP|=0.0000 < 0.005"
+    },
+    {
+      "constant": "K",
+      "delta_fp": 0,
+      "delta_recall": 0,
+      "perturbations": {
+        "down": {
+          "value": 9,
+          "fp": 0.3407,
+          "recall": 0.2857
+        },
+        "up": {
+          "value": 11,
+          "fp": 0.3407,
+          "recall": 0.2857
+        }
+      },
+      "retained": false,
+      "drop_reason": "below thresholds: |Δrecall|=0.0000 < 0.02 AND |ΔFP|=0.0000 < 0.005"
+    },
+    {
+      "constant": "MIN_VERIFIED_VERSIONS",
+      "delta_fp": 0.0219,
+      "delta_recall": 0,
+      "perturbations": {
+        "down": {
+          "value": 1,
+          "fp": 0.3407,
+          "recall": 0.2857
+        },
+        "up": {
+          "value": 3,
+          "fp": 0.3626,
+          "recall": 0.2857
+        }
+      },
+      "retained": true,
+      "drop_reason": null
+    },
+    {
+      "constant": "CHURNING_WINDOW",
+      "delta_fp": 0,
+      "delta_recall": 0,
+      "perturbations": {
+        "down": {
+          "value": 4,
+          "fp": 0.3407,
+          "recall": 0.2857
+        },
+        "up": {
+          "value": 6,
+          "fp": 0.3407,
+          "recall": 0.2857
+        }
+      },
+      "retained": false,
+      "drop_reason": "below thresholds: |Δrecall|=0.0000 < 0.02 AND |ΔFP|=0.0000 < 0.005"
+    },
+    {
+      "constant": "SOLO_DOMINANCE",
+      "delta_fp": 0.044,
+      "delta_recall": 0.2857,
+      "perturbations": {
+        "down": {
+          "value": 0.75,
+          "fp": 0.3846,
+          "recall": 0.2857
+        },
+        "up": {
+          "value": 0.85,
+          "fp": 0.2967,
+          "recall": 0
+        }
+      },
+      "retained": true,
+      "drop_reason": null
+    }
+  ],
+  "retained_constants": [
+    "MIN_VERIFIED_VERSIONS",
+    "SOLO_DOMINANCE"
+  ],
+  "dropped_constants": [
+    "W",
+    "K",
+    "CHURNING_WINDOW"
+  ],
+  "perturbation_runs": 10
+}

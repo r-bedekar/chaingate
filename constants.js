@@ -70,7 +70,15 @@ export const PRIVACY_PROVIDER_DOMAINS = new Set([
 // non-privacy domain to classify as verified-corporate. Starter value.
 // Sub-step 4 validates; raise if single-version domains false-positive
 // as verified-corporate.
-export const MIN_VERIFIED_VERSIONS = 2;
+//
+// Env-var override (CHAINGATE_PARAM_MIN_VERIFIED_VERSIONS) is consumed
+// by the calibration sensitivity sweep (validation/calibration/run-
+// sensitivity.js) so perturbed runs do not require code edits. NaN on
+// unset/empty/malformed input falls back to the default — the sweep
+// always sets an explicit integer, so no fallback masking in practice.
+export const MIN_VERIFIED_VERSIONS = Number.isFinite(Number(process.env.CHAINGATE_PARAM_MIN_VERIFIED_VERSIONS))
+  ? Number(process.env.CHAINGATE_PARAM_MIN_VERIFIED_VERSIONS)
+  : 2;
 
 // Row count for the domain_stability recency window. A non-null domain
 // that appears in the final CHURNING_WINDOW rows but not in any earlier
@@ -80,7 +88,11 @@ export const MIN_VERIFIED_VERSIONS = 2;
 // The rule is "new-to-window," not "≥ N unique in window" — the latter
 // false-positives on natural rotating committees. See patterns/publisher.js
 // GATE CONTRACT addition 2 for the consumption semantics.
-export const CHURNING_WINDOW = 5;
+//
+// Env-var override: see MIN_VERIFIED_VERSIONS comment above.
+export const CHURNING_WINDOW = Number.isFinite(Number(process.env.CHAINGATE_PARAM_CHURNING_WINDOW))
+  ? Number(process.env.CHAINGATE_PARAM_CHURNING_WINDOW)
+  : 5;
 
 // Fraction of a package's total versions attributable to its single
 // most-active identity beyond which we classify the package as 'solo'
@@ -102,4 +114,10 @@ export const CHURNING_WINDOW = 5;
 // Consumed by:
 //   patterns/publisher.js — computeShape() cascade step 3 (dominance
 //                            override: vmax/total >= SOLO_DOMINANCE).
-export const SOLO_DOMINANCE = 0.80;
+//
+// Env-var override: see MIN_VERIFIED_VERSIONS comment above. Unlike the
+// integer overrides, SOLO_DOMINANCE carries a float; Number() handles
+// both forms without branching.
+export const SOLO_DOMINANCE = Number.isFinite(Number(process.env.CHAINGATE_PARAM_SOLO_DOMINANCE))
+  ? Number(process.env.CHAINGATE_PARAM_SOLO_DOMINANCE)
+  : 0.80;
