@@ -1,60 +1,63 @@
 {
+  "split_version": 2,
   "corpus_size": 104,
   "rng": {
     "algorithm": "mulberry32",
-    "seed": 20260420
+    "seed": 20260422
   },
   "strata": {
-    "attack_labeled_sample": 4,
+    "attack_labeled_sample": 0,
     "clean_sample": 4
   },
   "held_out_packages": [
     "axios",
     "event-stream"
   ],
+  "train_locked_packages": [
+    "chalk",
+    "coa",
+    "eslint-config-prettier",
+    "rc"
+  ],
   "test_set": {
-    "size": 10,
+    "size": 6,
     "packages": [
-      "@types/node",
-      "@typescript-eslint/eslint-plugin",
+      "ajv",
+      "async",
       "axios",
-      "chalk",
-      "coa",
-      "eslint-config-prettier",
-      "eslint-plugin-react",
       "event-stream",
-      "moment",
-      "rc"
+      "vite",
+      "yargs"
     ],
     "attack_labeled": [
       "axios",
-      "chalk",
-      "coa",
-      "eslint-config-prettier",
-      "event-stream",
-      "rc"
+      "event-stream"
     ],
     "clean": [
-      "@types/node",
-      "@typescript-eslint/eslint-plugin",
-      "eslint-plugin-react",
-      "moment"
+      "ajv",
+      "async",
+      "vite",
+      "yargs"
     ]
   },
   "train_set": {
-    "size": 94,
+    "size": 98,
     "attack_labeled": [
+      "chalk",
+      "coa",
       "debug",
+      "eslint-config-prettier",
       "node-ipc",
+      "rc",
       "ua-parser-js"
     ],
     "clean": [
       "@babel/core",
+      "@types/node",
       "@types/react",
       "@types/react-dom",
+      "@typescript-eslint/eslint-plugin",
       "@typescript-eslint/parser",
-      "ajv",
-      "async",
       "autoprefixer",
       "babel-loader",
       "bcrypt",
@@ -77,6 +80,7 @@
       "esbuild",
       "eslint",
       "eslint-plugin-import",
+      "eslint-plugin-react",
       "events",
       "express",
       "express-generator",
@@ -94,6 +98,7 @@
       "lru-cache",
       "minimist",
       "mocha",
+      "moment",
       "mongoose",
       "ms",
       "mysql2",
@@ -132,22 +137,20 @@
       "typescript",
       "undici",
       "uuid",
-      "vite",
       "vitest",
       "vue",
       "webpack",
       "ws",
-      "yargs",
       "yup",
       "zod"
     ],
     "packages": [
       "@babel/core",
+      "@types/node",
       "@types/react",
       "@types/react-dom",
+      "@typescript-eslint/eslint-plugin",
       "@typescript-eslint/parser",
-      "ajv",
-      "async",
       "autoprefixer",
       "babel-loader",
       "bcrypt",
@@ -156,7 +159,9 @@
       "bower",
       "buffer",
       "chai",
+      "chalk",
       "classnames",
+      "coa",
       "commander",
       "concurrently",
       "cookie",
@@ -170,7 +175,9 @@
       "dotenv",
       "esbuild",
       "eslint",
+      "eslint-config-prettier",
       "eslint-plugin-import",
+      "eslint-plugin-react",
       "events",
       "express",
       "express-generator",
@@ -188,6 +195,7 @@
       "lru-cache",
       "minimist",
       "mocha",
+      "moment",
       "mongoose",
       "ms",
       "mysql2",
@@ -202,6 +210,7 @@
       "process",
       "prop-types",
       "puppeteer",
+      "rc",
       "react",
       "react-dom",
       "react-redux",
@@ -228,12 +237,10 @@
       "ua-parser-js",
       "undici",
       "uuid",
-      "vite",
       "vitest",
       "vue",
       "webpack",
       "ws",
-      "yargs",
       "yup",
       "zod"
     ]

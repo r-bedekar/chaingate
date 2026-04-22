@@ -1,8 +1,9 @@
 {
   "mode": "train",
   "corpus": {
-    "scope_size": 94,
-    "attack_labeled_packages": 3,
+    "split_version": 2,
+    "scope_size": 98,
+    "attack_labeled_packages": 7,
     "clean_packages": 91
   },
   "parameters": {
@@ -18,20 +19,20 @@
     "MIN_BASELINE_STREAK": 3
   },
   "aggregates": {
-    "attack_packages_detected": 0,
-    "attack_packages_missed": 3,
+    "attack_packages_detected": 2,
+    "attack_packages_missed": 5,
     "clean_packages_blocked": 31,
     "clean_packages_warned": 44,
     "clean_packages_allowed": 16,
-    "recall_packages_point": 0,
+    "recall_packages_point": 0.2857,
     "false_positive_rate_point": 0.3407,
-    "precision_packages_point": 0,
-    "attack_labels_total": 7,
+    "precision_packages_point": 0.0606,
+    "attack_labels_total": 12,
     "attack_labels_detected": 0,
     "recall_labels_point": 0,
     "attack_labels_attributable": 4,
     "recall_labels_point_attributable": 0,
-    "attack_packages_detected_publisher_only": 0,
+    "attack_packages_detected_publisher_only": 2,
     "attack_packages_detected_provenance_only": 0,
     "attack_packages_detected_both": 0,
     "provenance_only_attack_detected": 0,

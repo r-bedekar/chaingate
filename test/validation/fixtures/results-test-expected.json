@@ -1,8 +1,9 @@
 {
   "mode": "test",
   "corpus": {
-    "scope_size": 10,
-    "attack_labeled_packages": 6,
+    "split_version": 2,
+    "scope_size": 6,
+    "attack_labeled_packages": 2,
     "clean_packages": 4
   },
   "parameters": {
@@ -18,25 +19,25 @@
     "MIN_BASELINE_STREAK": 3
   },
   "aggregates": {
-    "attack_packages_detected": 4,
-    "attack_packages_missed": 2,
+    "attack_packages_detected": 2,
+    "attack_packages_missed": 0,
     "clean_packages_blocked": 1,
     "clean_packages_warned": 2,
     "clean_packages_allowed": 1,
-    "recall_packages_point": 0.6667,
+    "recall_packages_point": 1,
     "false_positive_rate_point": 0.25,
-    "precision_packages_point": 0.8,
-    "attack_labels_total": 9,
+    "precision_packages_point": 0.6667,
+    "attack_labels_total": 4,
     "attack_labels_detected": 3,
-    "recall_labels_point": 0.3333,
+    "recall_labels_point": 0.75,
     "attack_labels_attributable": 3,
     "recall_labels_point_attributable": 1,
-    "attack_packages_detected_publisher_only": 3,
+    "attack_packages_detected_publisher_only": 1,
     "attack_packages_detected_provenance_only": 1,
     "attack_packages_detected_both": 0,
     "provenance_only_attack_detected": 1,
     "provenance_only_clean_blocked": 0,
-    "recall_provenance_point": 0.1667,
+    "recall_provenance_point": 0.5,
     "false_positive_rate_provenance_point": 0,
     "escalator_fire_counts": {
       "new_domain": 1,

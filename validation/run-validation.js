@@ -47,6 +47,8 @@ import {
 import {
   assertHeldOutsNotInTrain,
   assertHeldOutsInTest,
+  assertTrainLockedInTrain,
+  assertTrainLockedNotInTest,
 } from './calibration/held-outs.js';
 import { compareSemver, parseSemver } from '../patterns/semver.js';
 
@@ -392,8 +394,13 @@ function run(options) {
   const scopePackages = scope.packages.slice().sort();
   const scopeSet = new Set(scopePackages);
 
-  if (options.mode === 'train') assertHeldOutsNotInTrain(scopeSet);
-  else assertHeldOutsInTest(scopeSet);
+  if (options.mode === 'train') {
+    assertHeldOutsNotInTrain(scopeSet);
+    assertTrainLockedInTrain(scopeSet);
+  } else {
+    assertHeldOutsInTest(scopeSet);
+    assertTrainLockedNotInTest(scopeSet);
+  }
 
   const db = new Database(options.seed, { readonly: true });
   try {
@@ -561,6 +568,7 @@ function run(options) {
       split_path: path.relative(REPO_ROOT, options.split),
       seed_path: path.relative(REPO_ROOT, options.seed),
       corpus: {
+        split_version: split.split_version ?? 1,
         scope_size: scopePackages.length,
         attack_labeled_packages: attackPkgsInScope,
         clean_packages: cleanPkgsInScope,
