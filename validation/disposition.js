@@ -750,3 +750,11 @@ export const __thresholds = {
   HIGH_PRIOR_TENURE,
   EXCEPTIONAL_PRIOR_TENURE,
 };
+
+// Exported for validation/run-validation.js so the corpus runner can
+// evaluate per-fire escalator counts against provenance perVersion
+// records without re-implementing the four-escalator rules or
+// grep-parsing reason strings. Call shape matches the internal call
+// sites above: (perVersionSignal, publisherOutput, provenanceOutput,
+// transitionIndex).
+export { hasProvenanceEscalator };

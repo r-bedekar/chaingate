@@ -29,6 +29,10 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import publisher from '../patterns/publisher.js';
+import provenance, {
+  MIN_PROVENANCE_HISTORY,
+  MIN_BASELINE_STREAK,
+} from '../patterns/provenance.js';
 import { disposition, __thresholds } from './disposition.js';
 import {
   MIN_HISTORY_DEPTH,
@@ -66,6 +70,8 @@ const STARTER_PARAMETERS = {
   SOLO_DOMINANCE,
   HIGH_PRIOR_TENURE: __thresholds.HIGH_PRIOR_TENURE,
   EXCEPTIONAL_PRIOR_TENURE: __thresholds.EXCEPTIONAL_PRIOR_TENURE,
+  MIN_PROVENANCE_HISTORY,
+  MIN_BASELINE_STREAK,
 };
 
 function parseArgs(argv) {
@@ -125,7 +131,7 @@ function loadPackageHistory(db, packageId) {
   const rows = db
     .prepare(
       `SELECT id, version, published_at, publisher_name, publisher_email,
-              provenance_present
+              publisher_tool, provenance_present
        FROM versions
        WHERE package_id = ?`,
     )
@@ -135,6 +141,7 @@ function loadPackageHistory(db, packageId) {
     version: r.version,
     publisher_name: r.publisher_name,
     publisher_email: r.publisher_email,
+    publisher_tool: r.publisher_tool,
     provenance_present: r.provenance_present,
     published_at_ms: r.published_at ? Date.parse(r.published_at) : null,
   }));
@@ -312,7 +319,8 @@ function run(options) {
       const historyById = new Map(history.map((h) => [h.version_id, h]));
 
       const extracted = publisher.extract({ packageName: pkgName, history });
-      const d = disposition(extracted);
+      const provOut = provenance.extract({ packageName: pkgName, history });
+      const d = disposition(extracted, provOut);
       const verdicts = buildTransitionVerdicts(extracted, d);
 
       const isAttack = attackLabeled.has(pkgName);

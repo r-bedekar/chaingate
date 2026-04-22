@@ -15,16 +15,18 @@
     "CHURNING_WINDOW": 5,
     "SOLO_DOMINANCE": 0.8,
     "HIGH_PRIOR_TENURE": 5,
-    "EXCEPTIONAL_PRIOR_TENURE": 20
+    "EXCEPTIONAL_PRIOR_TENURE": 20,
+    "MIN_PROVENANCE_HISTORY": 8,
+    "MIN_BASELINE_STREAK": 3
   },
   "aggregates": {
     "attack_packages_detected": 0,
     "attack_packages_missed": 3,
-    "clean_packages_blocked": 30,
+    "clean_packages_blocked": 31,
     "clean_packages_warned": 44,
-    "clean_packages_allowed": 17,
+    "clean_packages_allowed": 16,
     "recall_packages_point": 0,
-    "false_positive_rate_point": 0.3297,
+    "false_positive_rate_point": 0.3407,
     "precision_packages_point": 0,
     "attack_labels_total": 7,
     "attack_labels_detected": 0,
@@ -96,7 +98,7 @@
       "source": "reconstructed-fixture",
       "provenance_source": "reconstructed",
       "label_kind": "version_pinned",
-      "label_target": "version_id=232110",
+      "label_target": "version_id=232147",
       "candidate_versions": [
         "0.7.29"
       ],
@@ -117,7 +119,7 @@
       "source": "reconstructed-fixture",
       "provenance_source": "reconstructed",
       "label_kind": "version_pinned",
-      "label_target": "version_id=232111",
+      "label_target": "version_id=232148",
       "candidate_versions": [
         "0.8.0"
       ],
@@ -138,7 +140,7 @@
       "source": "reconstructed-fixture",
       "provenance_source": "reconstructed",
       "label_kind": "version_pinned",
-      "label_target": "version_id=232112",
+      "label_target": "version_id=232149",
       "candidate_versions": [
         "1.0.0"
       ],
@@ -214,11 +216,11 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 4621,
+      "observed_versions_count": 4624,
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
-      "warn_transitions": 0
+      "warn_transitions": 109
     },
     {
       "package": "ajv",
@@ -555,7 +557,7 @@
       "attack_labeled": false,
       "disposition": "WARN",
       "shape": "committee",
-      "observed_versions_count": 194,
+      "observed_versions_count": 195,
       "has_sufficient_history": true,
       "transitions": 28,
       "block_transitions": 0,
@@ -603,7 +605,7 @@
       "has_sufficient_history": true,
       "transitions": 20,
       "block_transitions": 0,
-      "warn_transitions": 6
+      "warn_transitions": 5
     },
     {
       "package": "joi",
@@ -687,7 +689,7 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 881,
+      "observed_versions_count": 882,
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 2,
@@ -707,12 +709,12 @@
     {
       "package": "mysql2",
       "attack_labeled": false,
-      "disposition": "ALLOW",
+      "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 281,
+      "observed_versions_count": 282,
       "has_sufficient_history": true,
-      "transitions": 0,
-      "block_transitions": 0,
+      "transitions": 1,
+      "block_transitions": 1,
       "warn_transitions": 0
     },
     {
@@ -724,7 +726,7 @@
       "has_sufficient_history": true,
       "transitions": 59,
       "block_transitions": 0,
-      "warn_transitions": 8
+      "warn_transitions": 5
     },
     {
       "package": "node-fetch",
@@ -775,11 +777,11 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "committee",
-      "observed_versions_count": 5469,
+      "observed_versions_count": 5471,
       "has_sufficient_history": true,
       "transitions": 19,
       "block_transitions": 4,
-      "warn_transitions": 4
+      "warn_transitions": 2
     },
     {
       "package": "postcss",
@@ -830,33 +832,33 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "committee",
-      "observed_versions_count": 990,
+      "observed_versions_count": 991,
       "has_sufficient_history": true,
       "transitions": 15,
       "block_transitions": 1,
-      "warn_transitions": 3
+      "warn_transitions": 2
     },
     {
       "package": "react",
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "committee",
-      "observed_versions_count": 2785,
+      "observed_versions_count": 2787,
       "has_sufficient_history": true,
       "transitions": 112,
       "block_transitions": 2,
-      "warn_transitions": 7
+      "warn_transitions": 4
     },
     {
       "package": "react-dom",
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "committee",
-      "observed_versions_count": 2740,
+      "observed_versions_count": 2742,
       "has_sufficient_history": true,
       "transitions": 109,
       "block_transitions": 2,
-      "warn_transitions": 4
+      "warn_transitions": 1
     },
     {
       "package": "react-redux",
@@ -874,7 +876,7 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 1042,
+      "observed_versions_count": 1044,
       "has_sufficient_history": true,
       "transitions": 8,
       "block_transitions": 3,
@@ -944,7 +946,7 @@
       "has_sufficient_history": true,
       "transitions": 12,
       "block_transitions": 0,
-      "warn_transitions": 5
+      "warn_transitions": 4
     },
     {
       "package": "safer-buffer",
@@ -973,7 +975,7 @@
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 175,
+      "observed_versions_count": 176,
       "has_sufficient_history": true,
       "transitions": 1,
       "block_transitions": 1,
@@ -1109,7 +1111,7 @@
       "has_sufficient_history": true,
       "transitions": 55,
       "block_transitions": 0,
-      "warn_transitions": 3
+      "warn_transitions": 5
     },
     {
       "package": "uuid",
@@ -1131,29 +1133,29 @@
       "has_sufficient_history": true,
       "transitions": 37,
       "block_transitions": 0,
-      "warn_transitions": 4
+      "warn_transitions": 5
     },
     {
       "package": "vitest",
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "committee",
-      "observed_versions_count": 461,
+      "observed_versions_count": 462,
       "has_sufficient_history": true,
       "transitions": 33,
       "block_transitions": 1,
-      "warn_transitions": 3
+      "warn_transitions": 4
     },
     {
       "package": "vue",
       "attack_labeled": false,
       "disposition": "BLOCK",
       "shape": "solo",
-      "observed_versions_count": 567,
+      "observed_versions_count": 568,
       "has_sufficient_history": true,
       "transitions": 5,
       "block_transitions": 2,
-      "warn_transitions": 0
+      "warn_transitions": 1
     },
     {
       "package": "webpack",
@@ -1208,7 +1210,7 @@
       "has_sufficient_history": true,
       "transitions": 4,
       "block_transitions": 0,
-      "warn_transitions": 2
+      "warn_transitions": 15
     }
   ]
 }
