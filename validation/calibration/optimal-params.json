@@ -1,0 +1,25 @@
+{
+  "selected": null,
+  "reason": "no grid point achieves §2 FP ≤ 0.05 target under v2 corpus",
+  "best_achievable_fp": 0.3407,
+  "best_achievable_fp_params": {
+    "MIN_VERIFIED_VERSIONS": 1,
+    "SOLO_DOMINANCE": 0.8
+  },
+  "best_achievable_fp_recall": 0.2857,
+  "calibration_limitations": [
+    {
+      "kind": "fp_target_unmet",
+      "target": 0.05,
+      "best_in_grid": 0.3407,
+      "note": "Starter constants retained; step 14 is a no-op under this outcome."
+    },
+    {
+      "kind": "stage_2_deferred",
+      "rationale": "SOLO_DOMINANCE upper edge hard-pinned by V7 recall constraint; stage-2 extension would not surface a viable optimum under v2 corpus. Implement when corpus version warrants.",
+      "spec_reference": "docs/4_PLAN.md §2 Stage 2 (deferred under v2)"
+    }
+  ],
+  "split_version": 2,
+  "rng_seed": 20260422
+}
