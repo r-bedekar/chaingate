@@ -195,3 +195,112 @@ def _format_ranges(ranges: list[dict[str, Any]]) -> str | None:
         if expr:
             parts.append(expr)
     return " || ".join(parts) if parts else None
+
+
+# LIMITATION: this is a numeric-tuple comparator. It is correct for
+# canonical npm MAJOR.MINOR.PATCH and adequate for PyPI when versions
+# are plain X.Y.Z. Prerelease suffixes (everything after the first
+# '-') and build metadata (after '+') are STRIPPED before comparison,
+# not preserved — so "1.0.0-rc.1" is canonicalized to "1.0.0" and
+# compares equal to the final "1.0.0" release rather than sorting
+# before it. This does NOT implement PEP 440 prerelease/post ordering
+# (1.0rc1 < 1.0 < 1.0.post1 is not preserved). Acceptable today
+# because 0 malicious advisories intersect PyPI seed versions;
+# revisit when PyPI malware or prerelease-sensitive malware lands in
+# the corpus.
+#
+# Used exclusively by matches_range against expressions produced by
+# _format_ranges above. Operator set is intentionally closed: >=, <=,
+# >, <, =, and bare version (= exact).
+
+_OPERATORS: tuple[str, ...] = (">=", "<=", ">", "<", "=")
+
+
+def _parse_version(s: str) -> tuple[int, ...]:
+    """Canonicalize a version string to a comparable tuple.
+
+    Strips anything after the first '-' (npm prerelease tag) or '+'
+    (build metadata), splits the remainder on '.', coerces each
+    segment to int. Non-numeric segments become -1 so they sort
+    before numeric releases.
+
+    Empty string → empty tuple (sorts before all non-empty).
+    """
+    if not s:
+        return ()
+    core = s.split("-", 1)[0].split("+", 1)[0]
+    parts: list[int] = []
+    for seg in core.split("."):
+        if seg.isdigit():
+            parts.append(int(seg))
+        else:
+            parts.append(-1)
+    return tuple(parts)
+
+
+def _cmp_versions(a: str, b: str) -> int:
+    """-1/0/+1 tuple-compare of two version strings, padded with
+    zeros so '1.0' and '1.0.0' compare equal."""
+    ta, tb = _parse_version(a), _parse_version(b)
+    n = max(len(ta), len(tb))
+    pa = ta + (0,) * (n - len(ta))
+    pb = tb + (0,) * (n - len(tb))
+    if pa < pb:
+        return -1
+    if pa > pb:
+        return 1
+    return 0
+
+
+def matches_range(version_str: str, range_str: str | None) -> bool:
+    """Evaluate a _format_ranges()-produced expression against a version.
+
+    Grammar (exclusively what _format_ranges emits):
+      expr        := conjunction ('||' conjunction)*
+      conjunction := comparator (WS comparator)*
+      comparator  := ('>='|'<='|'>'|'<'|'='|'') VERSION
+
+    Semantics: any conjunction True ⇒ True. Within a conjunction all
+    comparators must hold. Empty/None range_str returns False — the
+    caller should skip labels that carry no range.
+    """
+    if not range_str or not version_str:
+        return False
+    for conj in range_str.split("||"):
+        conj = conj.strip()
+        if not conj:
+            continue
+        tokens = conj.split()
+        if not tokens:
+            continue
+        if _conjunction_matches(version_str, tokens):
+            return True
+    return False
+
+
+def _conjunction_matches(version_str: str, tokens: list[str]) -> bool:
+    for token in tokens:
+        op, rhs = _split_comparator(token)
+        if rhs == "":
+            return False  # defensive: malformed token
+        c = _cmp_versions(version_str, rhs)
+        if op == ">=" and not (c >= 0):
+            return False
+        elif op == "<=" and not (c <= 0):
+            return False
+        elif op == ">" and not (c > 0):
+            return False
+        elif op == "<" and not (c < 0):
+            return False
+        elif op == "=" and c != 0:
+            return False
+    return True
+
+
+def _split_comparator(token: str) -> tuple[str, str]:
+    """Return (operator, version) for a single comparator token.
+    Bare version (no operator prefix) is treated as exact '='."""
+    for op in _OPERATORS:
+        if token.startswith(op):
+            return op, token[len(op):].strip()
+    return "=", token.strip()

@@ -146,9 +146,12 @@ CREATE UNIQUE INDEX idx_overrides  ON overrides(package_name, version);
 CREATE INDEX idx_attack_labels_pkg ON attack_labels(package_id);
 CREATE INDEX idx_attack_labels_ver ON attack_labels(version_id);
 CREATE INDEX idx_attack_labels_mal ON attack_labels(is_malicious) WHERE is_malicious = 1;
-CREATE UNIQUE INDEX idx_attack_labels_adv_pkg
+CREATE UNIQUE INDEX idx_attack_labels_adv_pkg_pkglvl
     ON attack_labels(advisory_id, package_id)
-    WHERE advisory_id IS NOT NULL;
+    WHERE advisory_id IS NOT NULL AND version_id IS NULL;
+CREATE UNIQUE INDEX idx_attack_labels_adv_pkg_verlvl
+    ON attack_labels(advisory_id, package_id, version_id)
+    WHERE advisory_id IS NOT NULL AND version_id IS NOT NULL;
 CREATE INDEX idx_versions_reconstructed
     ON versions(provenance_source)
     WHERE provenance_source = 'reconstructed';

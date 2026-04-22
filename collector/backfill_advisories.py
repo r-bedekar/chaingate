@@ -186,6 +186,52 @@ def _ingest_vuln(
             if is_mal:
                 counters["malicious_rows"] += 1
 
+            # Version-pinned resolution: for malicious advisories only,
+            # intersect the advisory's affected set with our observed
+            # versions and emit one pinned row per hit. The package-level
+            # row above stays — both views serve different consumers
+            # (range-based enumeration vs. direct version→lag lookup).
+            #
+            # Resolution strategy, in order:
+            #   1. explicit affected_versions[] (direct set intersection)
+            #   2. affected_range via osv.matches_range()
+            # First entry of `affected_entries` is used for consistency
+            # with the package-level row above (same `first` dict).
+            if is_mal:
+                existing = db.existing_version_ids(conn, package_id)
+                explicit = first.get("affected_versions") or []
+                range_str = first.get("affected_range")
+                explicit_set = set(explicit)
+                hits: list[int] = []
+                for ver_str, ver_id in existing.items():
+                    if ver_str in explicit_set:
+                        hits.append(ver_id)
+                    elif range_str and osv.matches_range(ver_str, range_str):
+                        hits.append(ver_id)
+                if not hits:
+                    counters["version_pinned_skipped_no_match"] += 1
+                for ver_id in hits:
+                    pinned_inserted = db.insert_version_pinned_attack_label(
+                        conn,
+                        advisory_id=vid,
+                        package_id=package_id,
+                        version_id=ver_id,
+                        is_malicious=is_mal,
+                        attack_name=attack_name,
+                        source="osv-version-resolved",
+                        severity=severity,
+                        summary=summary,
+                        affected_range=first.get("affected_range"),
+                        aliases=aliases,
+                        url=primary_url,
+                        modified_at=modified,
+                        raw_advisory=vuln,
+                    )
+                    if pinned_inserted:
+                        counters["version_pinned_inserted"] += 1
+                    else:
+                        counters["version_pinned_updated"] += 1
+
 
 async def run() -> int:
     started = time.monotonic()
@@ -202,6 +248,9 @@ async def run() -> int:
         "updated": 0,
         "unmatched_affected": 0,
         "malicious_rows": 0,
+        "version_pinned_inserted": 0,
+        "version_pinned_updated": 0,
+        "version_pinned_skipped_no_match": 0,
     }
 
     cache: dict[str, dict[str, Any]] = {}

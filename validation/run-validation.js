@@ -147,6 +147,15 @@ function loadAttackLabels(db, packageId) {
               advisory_id, source, provenance_source, summary
        FROM attack_labels
        WHERE package_id = ? AND is_malicious = 1
+         AND (
+           version_id IS NOT NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM attack_labels a2
+             WHERE a2.advisory_id = attack_labels.advisory_id
+               AND a2.package_id = attack_labels.package_id
+               AND a2.version_id IS NOT NULL
+           )
+         )
        ORDER BY id`,
     )
     .all(packageId);

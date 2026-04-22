@@ -522,14 +522,91 @@ def upsert_attack_label(
 ) -> bool:
     """Upsert an advisory-driven attack_labels row.
 
-    Keyed on (advisory_id, package_id) via the partial unique index. On
-    conflict we refresh the mutable fields (severity/summary/range/raw)
-    because OSV advisories can be revised upstream. `first_seen_at` is
-    preserved because it's only set on INSERT.
+    Keyed on (advisory_id, package_id) via the `_pkglvl` partial
+    unique index (predicate: advisory_id IS NOT NULL AND version_id
+    IS NULL). Version-pinned rows use a disjoint `_verlvl` index and
+    a dedicated helper (`insert_version_pinned_attack_label`); they
+    never conflict with this upsert. On conflict we refresh the
+    mutable fields (severity/summary/range/raw) because OSV
+    advisories can be revised upstream. `first_seen_at` is preserved
+    because it's only set on INSERT.
 
     version_id is NULL by default — most advisories describe *ranges* of
     versions, not a single pinned release, so we keep the mapping at the
     package level and let consumers interpret `affected_range`.
+    """
+    assert version_id is None, (
+        "upsert_attack_label is for package-level rows only; use "
+        "insert_version_pinned_attack_label for version-pinned rows"
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO attack_labels (
+                package_id, version_id, is_malicious, attack_name, source,
+                labeled_at, advisory_id, aliases, severity, summary,
+                affected_range, url, raw_advisory, modified_at, first_seen_at
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                NOW(), %s, %s, %s, %s,
+                %s, %s, %s, %s, NOW()
+            )
+            ON CONFLICT (advisory_id, package_id)
+              WHERE advisory_id IS NOT NULL AND version_id IS NULL
+            DO UPDATE SET
+                is_malicious = EXCLUDED.is_malicious,
+                severity = EXCLUDED.severity,
+                summary = EXCLUDED.summary,
+                affected_range = EXCLUDED.affected_range,
+                url = EXCLUDED.url,
+                raw_advisory = EXCLUDED.raw_advisory,
+                modified_at = EXCLUDED.modified_at,
+                aliases = EXCLUDED.aliases
+             RETURNING (xmax = 0) AS inserted
+            """,
+            (
+                package_id, version_id, is_malicious, attack_name, source,
+                advisory_id, _json_or_none(aliases), severity, summary,
+                affected_range, url, _json_or_none(raw_advisory), modified_at,
+            ),
+        )
+        row = cur.fetchone()
+        return bool(row[0]) if row else False
+
+
+def insert_version_pinned_attack_label(
+    conn,
+    *,
+    advisory_id: str,
+    package_id: int,
+    version_id: int,
+    is_malicious: bool,
+    attack_name: str | None,
+    source: str,
+    severity: str | None,
+    summary: str | None,
+    affected_range: str | None,
+    aliases: list[str] | None,
+    url: str | None,
+    modified_at: Any,
+    raw_advisory: dict[str, Any] | None,
+) -> bool:
+    """Insert a version-pinned advisory row.
+
+    Companion to `upsert_attack_label` for the version-resolution
+    path (OSV malicious advisories whose range intersects a known
+    version in `versions`). Keyed on (advisory_id, package_id,
+    version_id) via the `_verlvl` partial unique index. On conflict
+    we refresh the mutable fields to keep parity with the
+    package-level upsert semantics — OSV advisories can be revised
+    upstream.
+
+    `version_id` is required (not Optional). Callers routing a
+    package-level row must use `upsert_attack_label` with
+    version_id=None instead; the two indexes are disjoint by
+    version_id presence.
+
+    Returns True if a new row was inserted, False on UPDATE.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -543,7 +620,8 @@ def upsert_attack_label(
                 NOW(), %s, %s, %s, %s,
                 %s, %s, %s, %s, NOW()
             )
-            ON CONFLICT (advisory_id, package_id) WHERE advisory_id IS NOT NULL
+            ON CONFLICT (advisory_id, package_id, version_id)
+              WHERE advisory_id IS NOT NULL AND version_id IS NOT NULL
             DO UPDATE SET
                 is_malicious = EXCLUDED.is_malicious,
                 severity = EXCLUDED.severity,
@@ -588,6 +666,19 @@ _SCHEMA_MIGRATIONS: tuple[str, ...] = (
     "ADD COLUMN IF NOT EXISTS advisory_published_at TIMESTAMPTZ",
     "ALTER TABLE attack_labels "
     "ADD COLUMN IF NOT EXISTS detection_lag_days INTEGER",
+    # 2026-04-22: split the (advisory_id, package_id) uniqueness by
+    # version_id presence so version-pinned rows (OSV malicious range-
+    # to-version resolution) can coexist with the package-level row
+    # for the same advisory. Package-level uniqueness is preserved via
+    # the `_pkglvl` index (one row per advisory+package with
+    # version_id IS NULL); version-pinned rows are keyed on the triple.
+    "DROP INDEX IF EXISTS idx_attack_labels_adv_pkg",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_attack_labels_adv_pkg_pkglvl "
+    "ON attack_labels(advisory_id, package_id) "
+    "WHERE advisory_id IS NOT NULL AND version_id IS NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_attack_labels_adv_pkg_verlvl "
+    "ON attack_labels(advisory_id, package_id, version_id) "
+    "WHERE advisory_id IS NOT NULL AND version_id IS NOT NULL",
 )
 
 
