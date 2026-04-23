@@ -183,33 +183,53 @@
 //   what makes it usable in regulated environments where ML confidence
 //   scores are rejected.
 //
-// Validation corpus (packages confirmed present in the 130-entry
-// seed — collector/seeds/npm_top.txt):
+// Validation corpus (v2, commits d7adcd7 + f6ebe0a + e71e511 + 94510ca).
+// Source of truth: validation/calibration/train-test-split.json
+// (split_version=2, rng.seed=20260422).
 //
-//   Attack fixtures:
-//     axios          — 2026, email → protonmail.me (tenure + provider)
-//     event-stream   — 2018, dominictarr → right9ctrl handoff
-//                       (canonical tenure-weighted case)
-//     ua-parser-js   — 2021, token theft with same publisher
-//                       (NEGATIVE: publisher pattern must NOT fire)
-//     chalk          — MAL-2025-46969
+//   Corpus: 104 packages, split 98 train / 6 test.
+//     Train attack-labeled (7): chalk, coa, debug, eslint-config-prettier,
+//                               node-ipc, rc, ua-parser-js
+//     Train clean: 91
+//     Test attack-labeled (2, held-out): axios, event-stream
+//     Test clean (4): ajv, async, vite, yargs
+//     Train-locked attacks (in TRAIN_SET_LOCKED_ATTACKS):
+//       chalk, coa, eslint-config-prettier, rc
+//     Held-out attacks (in TEST_SET_HELD_OUT_ATTACKS):
+//       axios, event-stream
 //
-//   Legitimate-evolution fixtures:
-//     moment   — multi-maintainer, committee shape
-//     express  — committee shape
-//     lodash   — solo / dominant maintainer baseline
-//     debug    — TJ Holowaychuk era, legitimate later transitions
+//   Attack fixtures (detected under v2 starter constants):
+//     axios          — 2026 cold handoff, provenance regression pattern
+//                       (new_domain + privacy + machine_to_human)
+//     event-stream   — 2018 dominictarr → right9ctrl handoff
+//                       (canonical publisher cold-handoff case)
+//     chalk          — 2025 MAL-2025-46969, publisher cold-handoff
+//     eslint-config-prettier — 2025 MAL-2025-6022, publisher cold-handoff
 //
-//   NOT in the seed — do not use as fixtures without adding to the
-//   collector or building a synthetic test harness:
-//     faker (marak → mikemcneil handoff), request
+//   Attack fixtures (known miss under v2 — architectural scope):
+//     ua-parser-js   — 2021 same-publisher token theft; no v2 publisher
+//                       signature. Documented defer in methodology
+//                       (reason: same_publisher_token_theft_no_publisher_signal).
+//
+//   Attack fixtures (known miss under v2 — label attribution only):
+//     coa, debug, node-ipc, rc — range-only or null-target advisory
+//                       labels with no seed-version anchor; the
+//                       detection pattern has no version to fire at.
+//
+//   Clean-pool false positives under starter constants: 1 test
+//     (async, publisher cold-handoff false-positive), 31 train;
+//     full false-positive breakdown in validation/reports/validation.md §4.
+//
+//   See validation/METHODOLOGY.md and validation/reports/validation.md
+//   for full v2 methodology + results.
 //
 // Deferment registry (live in docs/V2_DESIGN.md §0 — mirrored here so
 // anyone editing this file sees what's intentionally NOT done yet):
-//   sub-step 4  — calibrate.js (derive K, W, MIN_VERIFIED_VERSIONS,
-//                  CHURNING_WINDOW from seed) + corpus validation +
-//                  identity_profile.similarity (domain-similarity /
-//                  homograph scoring — deferred from 3a)
+//   identity_profile.similarity — domain-similarity / homograph
+//                  scoring (deferred from 3a). Sub-step 4
+//                  calibration + corpus validation completed at
+//                  commits d7adcd7 + f6ebe0a + e71e511 + 94510ca;
+//                  similarity work carried forward.
 //   sub-step 5  — cross-package campaign detection (STRETCH)
 //   step 3      — V2 publisher-identity gate wiring
 
@@ -815,8 +835,9 @@ function computeDomainStability(rowDomains) {
 //
 // Decision cascade — 5 steps, short-circuit on first match. Future
 // additions (e.g., a "lead-with-deputies" refinement, or collapsing
-// alternating into committee after corpus validation in sub-step 4)
-// MUST slot into this order so the branch semantics stay explicit:
+// alternating into committee — no longer gated on sub-step 4, which
+// has closed; remains future work) MUST slot into this order so
+// the branch semantics stay explicit:
 //
 //   1. !hasSufficientHistory              → 'unknown'
 //        Conservative gate stance: insufficient history means shape is
