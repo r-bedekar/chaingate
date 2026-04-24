@@ -9,6 +9,7 @@ coa
 rc
 node-ipc
 event-stream
+@bitwarden/cli
 
 # === Foundational utilities (top by downloads) ===
 lodash
