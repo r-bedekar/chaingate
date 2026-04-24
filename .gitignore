@@ -1,7 +1,11 @@
 # AI development tools — NEVER commit
 claude.md
+CLAUDE.md
 .claude/
 .cursorrules
+
+# Local planning / scratch (never commit)
+tracker/
 
 # Internal design docs (implementation context, not public)
 docs/V2_DESIGN.md
@@ -43,8 +47,3 @@ test/witness/fixtures/
 
 # OS
 .DS_Store
-
-# Internal working notes — never commit
-claude.md
-CLAUDE.md
-.claude/
