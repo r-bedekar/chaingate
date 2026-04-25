@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 // ── Seed download ──────────────────────────────────────────────────
 export const SEED_RELEASE_URL =
-  'https://github.com/r-bedekar/chaingate/releases/latest/download';
+  'https://github.com/r-bedekar/chaingate-ops/releases/latest/download';
 
 export const SEED_FILES = [
   'chaingate-seed.db',

@@ -1,6 +1,0 @@
-# Lifecycle test seed: packages with known deprecated versions
-ua-parser-js
-request
-left-pad
-express-generator
-bower

@@ -61,7 +61,7 @@ Everything below runs on a fresh clone in under five minutes.
 
 **Witness store.** Append-only log backed by SQLite. Content hashes, dependency trees, publisher metadata, provenance status for 209 packages × 69,964 versions × 181,240 version files.
 
-**Collector.** Pulls live npm and PyPI data, OSV advisories, PyPI attestations. Produces a signed (Ed25519) seed bundle ready for distribution.
+**Seed consumption.** Runtime fetches and verifies signed seed bundles (Ed25519) produced by separate infrastructure; end users do not run an ingestion pipeline locally. The seed is published as a GitHub Release artifact and pulled in by `chaingate update-seed`.
 
 **Validation harness.** Runs the detection engine against train/test splits on the corpus and emits metrics to `validation/results.json`. Golden snapshot tests guard the numbers.
 
@@ -82,13 +82,6 @@ cd chaingate && npm install
 npm test                                           # 482 tests pass
 node validation/run-validation.js --mode=test      # run detection on held-out set
 cat validation/results.json | jq '.aggregates'     # see the numbers
-```
-
-The Python collector stack is optional (needed only to rebuild the seed from scratch):
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r collector/requirements.txt
-.venv/bin/pytest test/collector/test_osv.py -v     # 35 tests pass
 ```
 
 ## What's Next

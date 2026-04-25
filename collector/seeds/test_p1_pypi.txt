@@ -1,6 +1,0 @@
-# Lifecycle test seed: packages with known yanked versions
-setuptools
-numpy
-urllib3
-cryptography
-pip
