@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import Database from 'better-sqlite3';
 
 import { openWitnessDB } from '../../witness/db.js';
 
@@ -264,5 +266,82 @@ test('package uniqueness across ecosystems enforced by CHECK', () => {
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Regression: Phase 5a §6 — readonly pragma writes
+//
+// WitnessDB constructor used to write three pragmas (journal_mode=WAL,
+// foreign_keys=ON, synchronous=NORMAL) unconditionally. SQLite rejects
+// pragma writes through readonly handles when the file isn't already
+// in the requested mode. Surfaced when chaingate update-seed opened a
+// freshly-exported delete-mode bundle DB readonly to read seed_version.
+
+test('readonly open of fresh delete-mode DB does not write pragmas', () => {
+  // Seed the file with the witness schema RW so CREATE TABLE IF NOT EXISTS
+  // is a no-op when the readonly handle later runs createSchema(). Then
+  // force the file's journal_mode back to delete — this matches the shape
+  // produced by collector/export_seed.py: schema present, journal_mode=delete.
+  const path = join(tmpdir(), `chaingate-test-delete-${randomBytes(4).toString('hex')}.db`);
+  try {
+    const seeded = openWitnessDB(path);
+    seeded.close();
+    const reset = new Database(path);
+    reset.pragma('journal_mode = delete');
+    reset.close();
+
+    const probe = new Database(path, { readonly: true });
+    const beforeMode = probe.pragma('journal_mode', { simple: true });
+    probe.close();
+    assert.equal(beforeMode, 'delete');
+
+    const db = openWitnessDB(path, { readonly: true });
+    assert.ok(db);
+    db.close();
+
+    const probeAfter = new Database(path, { readonly: true });
+    const afterMode = probeAfter.pragma('journal_mode', { simple: true });
+    probeAfter.close();
+    assert.equal(afterMode, 'delete', 'journal_mode should remain delete after readonly open');
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
+test('readonly open of existing WAL-mode DB does not error', () => {
+  const path = join(tmpdir(), `chaingate-test-wal-${randomBytes(4).toString('hex')}.db`);
+  try {
+    const seeded = openWitnessDB(path);
+    seeded.close();
+
+    const db = openWitnessDB(path, { readonly: true });
+    assert.ok(db);
+    db.close();
+  } finally {
+    rmSync(path, { force: true });
+    rmSync(`${path}-shm`, { force: true });
+    rmSync(`${path}-wal`, { force: true });
+  }
+});
+
+test('RW open still applies WAL/foreign_keys/synchronous pragmas', () => {
+  const path = join(tmpdir(), `chaingate-test-rw-${randomBytes(4).toString('hex')}.db`);
+  try {
+    const setup = new Database(path);
+    setup.pragma('journal_mode = delete');
+    setup.exec('CREATE TABLE marker (id INTEGER PRIMARY KEY)');
+    setup.close();
+
+    const db = openWitnessDB(path);
+    assert.ok(db);
+    const journalMode = db.db.pragma('journal_mode', { simple: true });
+    const foreignKeys = db.db.pragma('foreign_keys', { simple: true });
+    db.close();
+    assert.equal(journalMode, 'wal', 'RW open should set WAL mode');
+    assert.equal(foreignKeys, 1, 'RW open should enable foreign keys');
+  } finally {
+    rmSync(path, { force: true });
+    rmSync(`${path}-shm`, { force: true });
+    rmSync(`${path}-wal`, { force: true });
   }
 });

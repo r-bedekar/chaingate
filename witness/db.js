@@ -142,9 +142,14 @@ function decodeRow(row) {
 export class WitnessDB {
   constructor(dbPath, { readonly = false, timeoutMs = 5000 } = {}) {
     this.db = new Database(dbPath, { readonly, timeout: timeoutMs });
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.db.pragma('synchronous = NORMAL');
+    // Pragma writes fail when the underlying file isn't already in the
+    // requested mode and the connection is readonly. Skip pragmas in
+    // readonly mode — the file's existing settings are what we read.
+    if (!readonly) {
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('foreign_keys = ON');
+      this.db.pragma('synchronous = NORMAL');
+    }
     this._stmts = null;
   }
 
