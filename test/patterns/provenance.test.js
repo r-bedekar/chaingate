@@ -722,7 +722,9 @@ test('fixture: timestamp-tie (two versions, same published_at_ms → determinist
 
 test('canonical: axios@1.14.1 — regression + escalators (a,b,d) → BLOCK-class', { skip: !HAS_SEED }, () => {
   // Loads the 11-version axios 1.13.0→1.15.1 train from the seed
-  // (reconstructed 1.14.1 attack row merged by collector/export_seed.py).
+  // (reconstructed 1.14.1 attack row merged into the seed at build time
+  // by chaingate-ops/collector/export_seed.py; fixture lives at
+  // chaingate-ops/validation/fixtures/reconstructed-attacks.json).
   const history = loadSeedHistory('axios', (v) => /^1\.1[345]\./.test(v));
   const out = provenance.extract({ packageName: 'axios', history });
   const v = findVersion(out.perVersion, '1.14.1');
