@@ -2,7 +2,8 @@ import { createWriteStream, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
-import { SEED_RELEASE_URL, SEED_FILES } from './constants.js';
+import { SEED_FILES } from './constants.js';
+import { resolveLatestSeedAssets } from './seed-resolver.js';
 
 function formatMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1);
@@ -57,18 +58,20 @@ async function downloadStream(url, dest, filename) {
 
 /**
  * Download seed bundle (db + sha256 + sig) to a temp directory.
- * Streams the large DB file with a progress bar on TTYs.
+ * Resolves the latest seed release dynamically via the GitHub API,
+ * then streams each asset (large DB file with a progress bar on TTYs).
  *
- * @param {string} [baseUrl] Override the release URL.
- * @returns {Promise<{dir: string, dbPath: string, sha256Path: string, sigPath: string}>}
+ * @returns {Promise<{dir: string, dbPath: string, sha256Path: string, sigPath: string, tagName: string}>}
  */
-export async function fetchSeedBundle(baseUrl = SEED_RELEASE_URL) {
+export async function fetchSeedBundle() {
+  const { tagName, urls } = await resolveLatestSeedAssets();
+
   const dir = join(tmpdir(), `chaingate-seed-${randomBytes(6).toString('hex')}`);
   mkdirSync(dir, { recursive: true });
 
   const paths = {};
   for (const filename of SEED_FILES) {
-    const url = `${baseUrl}/${filename}`;
+    const url = urls[filename];
     const dest = join(dir, filename);
     await downloadStream(url, dest, filename);
 
@@ -77,5 +80,5 @@ export async function fetchSeedBundle(baseUrl = SEED_RELEASE_URL) {
     else paths.dbPath = dest;
   }
 
-  return { dir, ...paths };
+  return { dir, ...paths, tagName };
 }

@@ -84,6 +84,19 @@ node validation/run-validation.js --mode=test      # run detection on held-out s
 cat validation/results.json | jq '.aggregates'     # see the numbers
 ```
 
+## Seed bundles
+
+ChainGate's runtime fetches a signed corpus bundle (the "seed")
+from this repository's GitHub Releases. The seed is built and
+signed on private collector infrastructure, then published here
+for distribution. Users do not need to interact with the releases
+page directly — `chaingate update-seed` handles fetching and
+verification automatically. Each bundle's Ed25519 signature is
+verified against a pinned public key in the runtime; an
+unauthorized seed cannot be installed regardless of where it
+appears to come from. See [SECURITY.md](SECURITY.md) for the
+full trust model.
+
 ## What's Next
 
 **P5 — Proxy, CLI, and gate runner.** The part that turns the detection engine into an installable tool. Ten-day build.

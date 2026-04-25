@@ -2,8 +2,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 // ── Seed download ──────────────────────────────────────────────────
-export const SEED_RELEASE_URL =
-  'https://github.com/r-bedekar/chaingate-ops/releases/latest/download';
+// chaingate's CLI dynamically resolves the latest seed release via GitHub API,
+// rather than relying on a fixed download URL. This handles the future case
+// where CLI version releases (vN.M.K) and seed releases (seed-vN.M) coexist
+// on the same repo: the CLI filters by SEED_TAG_PATTERN and picks the most
+// recently published matching release.
+export const SEED_REPO = 'r-bedekar/chaingate';
+export const SEED_TAG_PATTERN = /^seed-v\d+(\.\d+)*$/;
 
 export const SEED_FILES = [
   'chaingate-seed.db',

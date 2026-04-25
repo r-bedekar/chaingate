@@ -1,7 +1,12 @@
-# ChainGate — Architecture (HLD + LLD)
+# ChainGate — Seed and Collector Architecture
 
-_Snapshot: 2026-04-13. Covers the data-collection foundation (Phases P1–P4).
-Proxy + gates (P5) not yet built — placeholder section at the bottom._
+_Snapshot: 2026-04-13. Describes the upstream pipeline that produces
+seed bundles consumed by the chaingate runtime. The collector and
+seed production code live on private infrastructure (chaingate-ops);
+this document is preserved here for reader context. See
+[SECURITY.md](../SECURITY.md) for the current trust model._
+
+_Covers the data-collection foundation (Phases P1–P4)._
 
 ---
 
