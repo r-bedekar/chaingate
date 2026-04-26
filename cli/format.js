@@ -25,6 +25,7 @@ export const fmt = {
   ok: (t) => c(CODES.green, `✓ ${t}`),
   warn: (t) => c(CODES.yellow, `⚠ ${t}`),
   fail: (t) => c(CODES.red, `✗ ${t}`),
+  skip: (t) => c(CODES.cyan, `○ ${t}`),
   block: (t) => c(CODES.red, `🚫 ${t}`),
 };
 

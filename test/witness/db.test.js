@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 
 import { openWitnessDB } from '../../witness/db.js';
@@ -61,12 +61,12 @@ function axiosFixture(version = '1.7.9') {
   };
 }
 
-test('createSchema is idempotent', () => {
+test('applySchema is idempotent', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
-    db.createSchema();
-    db.createSchema();
+    db.applySchema();
+    db.applySchema();
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -77,6 +77,7 @@ test('recordBaseline → getBaseline round-trip preserves JSON columns', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const fixture = axiosFixture();
     db.recordBaseline('axios', '1.7.9', fixture);
 
@@ -104,6 +105,7 @@ test('getBaseline returns null for unknown package/version', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     assert.equal(db.getBaseline('ghost-pkg', '0.0.0'), null);
     db.recordBaseline('axios', '1.7.9', axiosFixture());
     assert.equal(db.getBaseline('axios', '9.9.9'), null);
@@ -117,6 +119,7 @@ test('recordBaseline is idempotent (INSERT OR IGNORE)', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const id1 = db.recordBaseline('axios', '1.7.9', axiosFixture());
     const id2 = db.recordBaseline('axios', '1.7.9', axiosFixture());
     assert.equal(id1, id2, 'second call returns same version_id');
@@ -135,6 +138,7 @@ test('recordBaseline bumps last_seen_at on re-observe', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     db.recordBaseline('axios', '1.7.9', axiosFixture());
     const first = db.getBaseline('axios', '1.7.9').last_seen_at;
     assert.ok(first, 'last_seen_at populated on first record');
@@ -152,6 +156,7 @@ test('getHistory orders newest-first and decodes JSON', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const v1 = axiosFixture('1.7.8');
     v1.published_at = '2024-10-01T00:00:00.000Z';
     v1.integrity_hash = 'sha512-old==';
@@ -175,6 +180,7 @@ test('insertGateDecision + gate_decisions is append-only', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const gates = [
       { gate: 'content-hash', result: 'SKIP', detail: 'first-seen' },
       { gate: 'dep-structure', result: 'WARN', detail: 'new dep: form-data' },
@@ -198,6 +204,7 @@ test('insertGateDecision rejects invalid disposition', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     assert.throws(
       () => db.insertGateDecision('axios', '1.7.9', 'MAYBE', []),
       /CHECK/i,
@@ -212,6 +219,7 @@ test('getOverride returns null when absent, row after insert', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     assert.equal(db.getOverride('axios', '1.14.1'), null);
     db.insertOverride('axios', '1.14.1', 'allowed per incident #42');
     const row = db.getOverride('axios', '1.14.1');
@@ -227,6 +235,7 @@ test('insertOverride updates reason on conflict', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     db.insertOverride('axios', '1.14.1', 'first reason');
     db.insertOverride('axios', '1.14.1', 'second reason');
     assert.equal(db.getOverride('axios', '1.14.1').reason, 'second reason');
@@ -242,6 +251,7 @@ test('seed_metadata get/set round-trip', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     assert.equal(db.getSeedMetadata('seed_version'), null);
     db.setSeedMetadata('seed_version', '2026-04-14');
     db.setSeedMetadata('signing_key_fingerprint', 'ed25519:abcd…');
@@ -259,6 +269,7 @@ test('package uniqueness across ecosystems enforced by CHECK', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     db.recordBaseline('axios', '1.7.9', axiosFixture());
     db.recordBaseline('axios', '1.7.9', axiosFixture());
     const n = db.db.prepare('SELECT COUNT(*) AS n FROM packages').get().n;
@@ -279,7 +290,7 @@ test('package uniqueness across ecosystems enforced by CHECK', () => {
 
 test('readonly open of fresh delete-mode DB does not write pragmas', () => {
   // Seed the file with the witness schema RW so CREATE TABLE IF NOT EXISTS
-  // is a no-op when the readonly handle later runs createSchema(). Then
+  // is a no-op when the readonly handle later runs applySchema(). Then
   // force the file's journal_mode back to delete — this matches the shape
   // produced by collector/export_seed.py: schema present, journal_mode=delete.
   const path = join(tmpdir(), `chaingate-test-delete-${randomBytes(4).toString('hex')}.db`);
@@ -339,6 +350,59 @@ test('RW open still applies WAL/foreign_keys/synchronous pragmas', () => {
     db.close();
     assert.equal(journalMode, 'wal', 'RW open should set WAL mode');
     assert.equal(foreignKeys, 1, 'RW open should enable foreign keys');
+  } finally {
+    rmSync(path, { force: true });
+    rmSync(`${path}-shm`, { force: true });
+    rmSync(`${path}-wal`, { force: true });
+  }
+});
+
+// Contract: openWitnessDB(path, { readonly: true }) on an existing DB file
+// must not mutate the file. Subsumes hop-1 (pragma writes) and hop-2
+// (createSchema writes) regression coverage in a single byte-level check.
+test('readonly open does not mutate the underlying DB file', () => {
+  const path = join(tmpdir(), `chaingate-test-ro-nomut-${randomBytes(4).toString('hex')}.db`);
+  try {
+    const seeded = openWitnessDB(path);
+    seeded.applySchema();
+    seeded.close();
+
+    const before = readFileSync(path);
+    const beforeHash = createHash('sha256').update(before).digest('hex');
+    const beforeSize = statSync(path).size;
+
+    const db = openWitnessDB(path, { readonly: true });
+    db.close();
+
+    const after = readFileSync(path);
+    const afterHash = createHash('sha256').update(after).digest('hex');
+    const afterSize = statSync(path).size;
+
+    assert.equal(afterSize, beforeSize, 'file size unchanged');
+    assert.equal(afterHash, beforeHash, 'file bytes unchanged');
+  } finally {
+    rmSync(path, { force: true });
+    rmSync(`${path}-shm`, { force: true });
+    rmSync(`${path}-wal`, { force: true });
+  }
+});
+
+test('applySchema throws on a readonly handle', () => {
+  const path = join(tmpdir(), `chaingate-test-ro-throw-${randomBytes(4).toString('hex')}.db`);
+  try {
+    const seeded = openWitnessDB(path);
+    seeded.applySchema();
+    seeded.close();
+
+    const db = openWitnessDB(path, { readonly: true });
+    try {
+      assert.throws(
+        () => db.applySchema(),
+        /applySchema called on a readonly handle/,
+      );
+    } finally {
+      db.close();
+    }
   } finally {
     rmSync(path, { force: true });
     rmSync(`${path}-shm`, { force: true });

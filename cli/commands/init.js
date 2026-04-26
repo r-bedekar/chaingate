@@ -140,6 +140,7 @@ export default async function init(args) {
   } else if (opts.noSeed) {
     // Create empty DB with schema
     const db = openWitnessDB(paths.witnessDb);
+    db.applySchema();
     db.close();
     console.log(fmt.ok('Empty witness database created'));
   }

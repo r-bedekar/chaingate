@@ -1,11 +1,11 @@
 import { existsSync, renameSync, unlinkSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fmt } from '../format.js';
-import { resolvePaths } from '../paths.js';
-import { fetchSeedBundle } from '../seed-download.js';
-import { verifySeed } from '../../witness/seed_verify.js';
+import { resolvePaths as defaultResolvePaths } from '../paths.js';
+import { fetchSeedBundle as defaultFetchSeedBundle } from '../seed-download.js';
+import { verifySeed as defaultVerifySeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
-import { assertIntegrity } from '../integrity-gate.js';
+import { assertIntegrity as defaultAssertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -17,9 +17,17 @@ function parseArgs(args) {
   return opts;
 }
 
-export default async function updateSeed(args) {
+export default async function updateSeed(
+  args,
+  deps = {
+    fetchSeedBundle: defaultFetchSeedBundle,
+    verifySeed: defaultVerifySeed,
+    assertIntegrity: defaultAssertIntegrity,
+    resolvePaths: defaultResolvePaths,
+  },
+) {
   const opts = parseArgs(args);
-  const paths = resolvePaths(opts.scope);
+  const paths = deps.resolvePaths(opts.scope);
 
   if (!existsSync(paths.witnessDb)) {
     console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));
@@ -29,14 +37,14 @@ export default async function updateSeed(args) {
   // Refuse to run if the installed chaingate + current seed don't pass
   // self-witness / seed-signature checks. Fetching and swapping the witness
   // on a tampered install would launder the attack.
-  const gate = await assertIntegrity(paths, { command: 'update-seed' });
+  const gate = await deps.assertIntegrity(paths, { command: 'update-seed' });
   if (!gate.ok) return gate.exit;
 
   // 1. Download + verify
   console.log('Downloading latest seed...');
   let bundle;
   try {
-    bundle = await fetchSeedBundle();
+    bundle = await deps.fetchSeedBundle();
   } catch (err) {
     console.error(fmt.fail(`Download failed: ${err.message}`));
     return EXIT.ERROR;
@@ -44,7 +52,7 @@ export default async function updateSeed(args) {
 
   console.log('Verifying signature...');
   try {
-    await verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
+    await deps.verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
   } catch (err) {
     console.error(fmt.fail(`Verification failed: ${err.message}`));
     return EXIT.ERROR;
@@ -96,6 +104,13 @@ export default async function updateSeed(args) {
     return EXIT.ERROR;
   }
   try { unlinkSync(backupPath); } catch { /* ok */ }
+
+  // Forward-migrate the swapped-in bundle: covers the case where the bundle
+  // predates a runtime schema addition (e.g. dep_first_publish). Idempotent —
+  // runs CREATE TABLE IF NOT EXISTS, no-op when bundle already matches.
+  const migrateDb = openWitnessDB(paths.witnessDb);
+  migrateDb.applySchema();
+  migrateDb.close();
 
   // Refresh persisted sig artifacts so doctor can re-verify the new bundle.
   try {

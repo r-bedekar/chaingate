@@ -264,6 +264,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     }
     try {
       witnessDb = openWitnessDB(config.witnessDbPath);
+      witnessDb.applySchema();
     } catch (err) {
       const msg =
         `chaingate-proxy: failed to open witness DB at ${config.witnessDbPath}: ${err.message}\n` +

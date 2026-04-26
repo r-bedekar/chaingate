@@ -16,6 +16,7 @@ function tmpDb() {
 function withCache(fn, opts = {}) {
   const { path, cleanup } = tmpDb();
   const db = openWitnessDB(path);
+  db.applySchema();
   const cache = new DepCache(db, opts);
   try {
     fn(cache, db);

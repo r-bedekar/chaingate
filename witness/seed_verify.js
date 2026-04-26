@@ -33,15 +33,21 @@ export function sha256File(path) {
 }
 
 /**
- * Verify a seed bundle.
+ * Verify a persisted .sha256/.sig pair without touching any DB file.
  *
- * @param {string} dbPath       Path to chaingate-seed.db
- * @param {string} sha256Path   Path to chaingate-seed.db.sha256 (hex string, trailing newline OK)
- * @param {string} sigPath      Path to chaingate-seed.db.sig (raw 64-byte Ed25519 signature)
+ * Reads the .sha256 (hex string) and .sig (raw 64-byte Ed25519 signature)
+ * and verifies the signature is over the .sha256 contents using the pinned
+ * pubkey. Decoupled from any live DB state by design — this is the
+ * post-install primitive (doctor / integrity-gate) where witness.db is a
+ * mutable runtime database and re-hashing it is meaningless.
+ *
+ * @param {string} sha256Path
+ * @param {string} sigPath
  * @param {{pubkey?: import('node:crypto').KeyObject}} [opts]  Inject alt pubkey for tests only.
  * @throws {SeedVerificationError}
+ * @returns {Promise<{sha256: string, fingerprint: string}>}
  */
-export async function verifySeed(dbPath, sha256Path, sigPath, opts = {}) {
+export async function verifyPersistedSignature(sha256Path, sigPath, opts = {}) {
   const pubkey = opts.pubkey ?? PUBKEY;
 
   let claimedHash;
@@ -76,14 +82,6 @@ export async function verifySeed(dbPath, sha256Path, sigPath, opts = {}) {
     );
   }
 
-  const localHash = await sha256File(dbPath);
-  if (localHash !== claimedHash) {
-    throw new SeedVerificationError(
-      `seed hash mismatch: local=${localHash} claimed=${claimedHash}`,
-      { code: 'SEED_HASH_MISMATCH' },
-    );
-  }
-
   // Ed25519: the `algorithm` parameter MUST be null — Ed25519 is pre-hashed
   // by the signing primitive itself. We sign the hex string bytes (ASCII).
   const ok = cryptoVerify(null, Buffer.from(claimedHash, 'ascii'), pubkey, sig);
@@ -97,6 +95,42 @@ export async function verifySeed(dbPath, sha256Path, sigPath, opts = {}) {
   return {
     sha256: claimedHash,
     fingerprint: CHAINGATE_SEED_PUBKEY_FINGERPRINT,
+  };
+}
+
+/**
+ * Verify a seed bundle at install time.
+ *
+ * Composes verifyPersistedSignature (signature over claimed hash) with a
+ * live re-hash of the bundle's DB file (defends against transit corruption
+ * and registry tampering of the bundle bytes). Intended for install-time
+ * paths only (init, update-seed). Post-install callers should use
+ * verifyPersistedSignature directly — see its docstring.
+ *
+ * @param {string} dbPath       Path to chaingate-seed.db
+ * @param {string} sha256Path   Path to chaingate-seed.db.sha256 (hex string, trailing newline OK)
+ * @param {string} sigPath      Path to chaingate-seed.db.sig (raw 64-byte Ed25519 signature)
+ * @param {{pubkey?: import('node:crypto').KeyObject}} [opts]  Inject alt pubkey for tests only.
+ * @throws {SeedVerificationError}
+ */
+export async function verifySeed(dbPath, sha256Path, sigPath, opts = {}) {
+  const { sha256: claimedHash, fingerprint } = await verifyPersistedSignature(
+    sha256Path,
+    sigPath,
+    opts,
+  );
+
+  const localHash = await sha256File(dbPath);
+  if (localHash !== claimedHash) {
+    throw new SeedVerificationError(
+      `seed hash mismatch: local=${localHash} claimed=${claimedHash}`,
+      { code: 'SEED_HASH_MISMATCH' },
+    );
+  }
+
+  return {
+    sha256: claimedHash,
+    fingerprint,
     dbPath,
   };
 }

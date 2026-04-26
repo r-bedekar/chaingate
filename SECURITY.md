@@ -44,6 +44,39 @@ or with elevated trust requirements may:
   the published Ed25519 fingerprint manually
 - Verify the seed's SHA-256 against the published `.sha256` file
 
+### Verification properties
+
+ChainGate performs cryptographic verification at two distinct
+moments, and it is worth being precise about what each one does
+and does not prove.
+
+At install time — invoked from `chaingate init` and `chaingate
+update-seed` — the CLI does the full bundle check: it streams the
+freshly-fetched `chaingate-seed.db`, computes its SHA-256, and
+compares the result to the published `.sha256` file. It then
+verifies that the `.sha256` contents are signed by the pinned
+Ed25519 key. This combination defends against transit corruption
+of the bundle bytes and against registry tampering of any of the
+three artifacts in isolation. A failure at install time aborts
+the install before any state is written.
+
+Post-install — invoked from `chaingate doctor` and the integrity
+gate that runs before mutating commands — the CLI verifies only
+the persisted `.sha256/.sig` pair against the pinned key. It does
+not re-hash the live `witness.db`. This is deliberate: `witness.db`
+is a mutable runtime database. Schema migrations apply when the
+runtime version moves ahead of an older bundle; gate decisions
+get appended in normal use; both legitimately change the file's
+bytes. A post-install check that compared the live hash to the
+install-time hash would fire false-positive on every healthy
+installation. What the post-install check does prove — and the
+property that matters at this layer — is that this install was
+seeded from a bundle signed by the project's pinned key.
+Defending the local `witness.db` against an attacker who already has filesystem
+write access is outside the cryptographic threat model; the
+relevant defense at that layer is filesystem permissions on
+`~/.chaingate/`.
+
 ## Build and signing
 
 Seed bundles are produced by a private collector infrastructure

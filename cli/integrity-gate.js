@@ -3,8 +3,12 @@
 //
 //   1. self-witness: installed chaingate's npm integrity matches the witness
 //      baseline for its version (npm publish pipeline ↔ seed signing key).
-//   2. seed-signature: the local witness.db hash still matches the persisted
-//      .sha256, and the .sig verifies with the embedded Ed25519 pubkey.
+//   2. seed-signature: the persisted .sha256/.sig pair was produced by the
+//      embedded Ed25519 pubkey (proves "this install came from a bundle
+//      signed by the project's pinned key"). The live witness.db is NOT re-hashed
+//      here — it legitimately mutates after install (applySchema, gate
+//      decisions). Install-time bundle hashing still happens via
+//      verifySeed inside init/update-seed.
 //
 // Commands that mutate state (init, update-seed) or start long-lived processes
 // (start) call this before proceeding. If either signal reports tamper, the
@@ -20,7 +24,7 @@
 import { existsSync } from 'node:fs';
 import { fmt } from './format.js';
 import { openWitnessDB } from '../witness/db.js';
-import { verifySeed } from '../witness/seed_verify.js';
+import { verifyPersistedSignature } from '../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness } from './self-witness.js';
 import { EXIT } from './constants.js';
 
@@ -60,7 +64,7 @@ export async function assertIntegrity(paths, { startFileUrl, command } = {}) {
   // Seed-signature: only enforced when the persisted artifacts exist.
   if (existsSync(paths.witnessDbSha256) && existsSync(paths.witnessDbSig)) {
     try {
-      await verifySeed(paths.witnessDb, paths.witnessDbSha256, paths.witnessDbSig);
+      await verifyPersistedSignature(paths.witnessDbSha256, paths.witnessDbSig);
     } catch (err) {
       printTamperBanner(command, `seed-signature: ${err.code ?? 'verify_failed'}: ${err.message}`);
       return { ok: false, exit: EXIT.INTEGRITY_TAMPER };

@@ -150,10 +150,18 @@ export class WitnessDB {
       this.db.pragma('foreign_keys = ON');
       this.db.pragma('synchronous = NORMAL');
     }
+    this.readonly = readonly;
     this._stmts = null;
   }
 
-  createSchema() {
+  applySchema() {
+    if (this.readonly) {
+      throw new Error(
+        'applySchema called on a readonly handle. Open the ' +
+        'witness DB in read-write mode (and only at known ' +
+        'migration sites) before applying schema.',
+      );
+    }
     this.db.exec(SCHEMA_SQL);
     this._prepare();
     return this;
@@ -402,7 +410,5 @@ export class WitnessDB {
 }
 
 export function openWitnessDB(dbPath, opts) {
-  const db = new WitnessDB(dbPath, opts);
-  db.createSchema();
-  return db;
+  return new WitnessDB(dbPath, opts);
 }

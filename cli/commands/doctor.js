@@ -6,8 +6,8 @@ import { resolvePaths } from '../paths.js';
 import { npmrcPath } from '../npmrc.js';
 import { readPid, isPortInUse } from '../proxy-control.js';
 import { openWitnessDB } from '../../witness/db.js';
-import { verifySeed } from '../../witness/seed_verify.js';
-import { checkSelfWitness } from '../self-witness.js';
+import { verifyPersistedSignature } from '../../witness/seed_verify.js';
+import { checkSelfWitness, hasAnyChaingateInWitness } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,13 +33,35 @@ async function fetchProxySelf(host, port, timeoutMs = 1500) {
 
 // Each check pushes { name, pass, detail, severity? } where severity is:
 //   'tamper'        — cryptographic disagreement, an attack signal (exit 5)
-//   'unverifiable'  — check could not complete (pre-publish, dev install) (exit 6)
+//   'unverifiable'  — check should have run but could not (real problem) (exit 6)
+//   'skipped'       — check does not apply in this environment (exit 0,
+//                     informational only, e.g. --no-seed install lacks
+//                     .sha256/.sig; pre-publish chaingate isn't yet in the
+//                     witness store)
 //   (absent)        — hard pass/fail in the pre-V2 operational sense (exit 0 or 1)
-function aggregateExit(checks) {
+//
+// Ordering: tamper > non-severity-fails > unverifiable > OK. 'skipped'
+// coexists with OK as a no-op for exit determination.
+export function aggregateExit(checks) {
   if (checks.some((c) => c.severity === 'tamper')) return EXIT.INTEGRITY_TAMPER;
   if (checks.some((c) => !c.pass && !c.severity)) return EXIT.ERROR;
   if (checks.some((c) => c.severity === 'unverifiable')) return EXIT.INTEGRITY_UNVERIFIABLE;
   return EXIT.OK;
+}
+
+// Translate a self-witness check result + witness state into a doctor
+// display severity. Pure function, exported for testing. Two reasons can
+// be skipped: lockfile_missing (non-npm install path, e.g. tarball-style
+// global install) and not_in_witness when the witness has zero chaingate
+// entries (pre-publish, expected). Any other unverifiable reason — or
+// not_in_witness when the witness already knows about chaingate (stale
+// local seed) — is a real problem.
+export function classifySelfWitnessSeverity(selfResult, witnessHasChaingate) {
+  if (selfResult.status === 'verified') return null;
+  if (selfResult.status === 'tamper') return 'tamper';
+  if (selfResult.reason === 'lockfile_missing') return 'skipped';
+  if (selfResult.reason === 'not_in_witness' && !witnessHasChaingate) return 'skipped';
+  return 'unverifiable';
 }
 
 function parseArgs(args) {
@@ -119,9 +141,13 @@ export default async function doctor(args) {
     checks.push({ name: 'npmrc-block', pass, detail });
   }
 
-  // 6. Seed signature — full Ed25519 re-verification against persisted artifacts.
-  //    `--no-seed` installs legitimately have no sig files; treat as unverifiable.
-  //    A hash/signature disagreement is a tamper signal (exit 5).
+  // 6. Seed signature — Ed25519 verification of the persisted .sha256/.sig
+  //    pair only. Does NOT re-hash the live witness.db: that file legitimately
+  //    mutates after install (applySchema migrations, gate decisions), so a
+  //    live-DB hash check fires false-positive TAMPER under normal use. What
+  //    this proves is "the install came from a bundle signed by the pinned
+  //    Ed25519 key" — the trust anchor that matters post-install. Install-time
+  //    bundle hashing still happens via verifySeed in init/update-seed.
   {
     if (!existsSync(paths.witnessDb)) {
       checks.push({
@@ -134,12 +160,15 @@ export default async function doctor(args) {
       checks.push({
         name: 'seed-signature',
         pass: false,
-        severity: 'unverifiable',
-        detail: 'no persisted .sha256/.sig (--no-seed install, or init pre-dates sig persistence)',
+        severity: 'skipped',
+        detail: 'no persisted .sha256/.sig (expected for --no-seed installs)',
       });
     } else {
       try {
-        const result = await verifySeed(paths.witnessDb, paths.witnessDbSha256, paths.witnessDbSig);
+        const result = await verifyPersistedSignature(
+          paths.witnessDbSha256,
+          paths.witnessDbSig,
+        );
         checks.push({
           name: 'seed-signature',
           pass: true,
@@ -157,8 +186,11 @@ export default async function doctor(args) {
   }
 
   // 7. Self-witness — installed chaingate integrity vs witness-recorded baseline.
-  //    Pre-publish: witness has no chaingate entry → unverifiable (exit 6).
-  //    Post-publish mismatch → tamper (exit 5). See cli/self-witness.js.
+  //    Severity comes from classifySelfWitnessSeverity, which separates
+  //    "check found a problem" (tamper / unverifiable) from "check doesn't
+  //    apply here" (skipped). Pre-publish state and tarball-style global
+  //    installs are skipped, not unverifiable. See cli/self-witness.js for
+  //    the underlying status/reason codes.
   {
     if (!existsSync(paths.witnessDb)) {
       checks.push({
@@ -172,24 +204,19 @@ export default async function doctor(args) {
       try {
         db = openWitnessDB(paths.witnessDb, { readonly: true });
         const r = checkSelfWitness(db);
-        if (r.status === 'verified') {
+        const witnessHasCG = hasAnyChaingateInWitness(db);
+        const severity = classifySelfWitnessSeverity(r, witnessHasCG);
+        if (severity === null) {
           checks.push({
             name: 'self-witness',
             pass: true,
-            detail: r.detail,
-          });
-        } else if (r.status === 'tamper') {
-          checks.push({
-            name: 'self-witness',
-            pass: false,
-            severity: 'tamper',
             detail: r.detail,
           });
         } else {
           checks.push({
             name: 'self-witness',
             pass: false,
-            severity: 'unverifiable',
+            severity,
             detail: r.detail,
           });
         }
@@ -260,14 +287,21 @@ export default async function doctor(args) {
     if (c.pass) icon = fmt.ok(c.name);
     else if (c.severity === 'tamper') icon = fmt.fail(`${c.name} [TAMPER]`);
     else if (c.severity === 'unverifiable') icon = fmt.warn(`${c.name} [unverifiable]`);
+    else if (c.severity === 'skipped') icon = fmt.skip(`${c.name} [skipped]`);
     else icon = fmt.fail(c.name);
     console.log(`  ${icon}  ${fmt.dim(c.detail)}`);
   }
 
   const exitCode = aggregateExit(checks);
+  const skippedCount = checks.filter((c) => c.severity === 'skipped').length;
   console.log('');
   if (exitCode === EXIT.OK) {
-    console.log(fmt.green('All checks passed.'));
+    if (skippedCount > 0) {
+      console.log(fmt.green('All applicable checks passed.'));
+      console.log(fmt.dim(`  ${skippedCount} check(s) skipped (not applicable to this install).`));
+    } else {
+      console.log(fmt.green('All checks passed.'));
+    }
   } else if (exitCode === EXIT.INTEGRITY_TAMPER) {
     console.log(fmt.red('TAMPER signal — cryptographic checks disagree.'));
     console.log(fmt.red('  Do not use this installation. Reinstall chaingate from a trusted source.'));
