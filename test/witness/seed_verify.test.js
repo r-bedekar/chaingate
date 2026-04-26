@@ -19,6 +19,7 @@ import Database from 'better-sqlite3';
 
 import {
   verifySeed,
+  verifyPersistedSignature,
   sha256File,
   SeedVerificationError,
 } from '../../witness/seed_verify.js';
@@ -221,6 +222,155 @@ test('wrong-length signature → SEED_SIG_MALFORMED', async () => {
         return true;
       },
     );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+// ---- verifyPersistedSignature --------------------------------------------
+//
+// The post-install primitive: verifies .sha256/.sig cryptographically over
+// each other, deliberately decoupled from any live DB state. Doctor and
+// integrity-gate use this; install paths still use verifySeed.
+
+test('verifyPersistedSignature: passes on correctly-signed artifacts', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+    const result = await verifyPersistedSignature(
+      bundle.shaPath,
+      bundle.sigPath,
+      { pubkey: bundle.publicKey },
+    );
+    assert.match(result.sha256, /^[0-9a-f]{64}$/);
+    assert.equal(typeof result.fingerprint, 'string');
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyPersistedSignature: sig from wrong key → SEED_SIG_INVALID', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+    const { privateKey: otherPriv } = generateKeyPairSync('ed25519');
+    signBundle(bundle.dbPath, bundle.shaPath, bundle.sigPath, otherPriv);
+
+    await assert.rejects(
+      () => verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+        pubkey: bundle.publicKey,
+      }),
+      (err) => {
+        assert.ok(err instanceof SeedVerificationError);
+        assert.equal(err.code, 'SEED_SIG_INVALID');
+        return true;
+      },
+    );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyPersistedSignature: missing .sha256 → SEED_SHA256_READ_FAILED', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+    rmSync(bundle.shaPath);
+    await assert.rejects(
+      () => verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+        pubkey: bundle.publicKey,
+      }),
+      (err) => {
+        assert.equal(err.code, 'SEED_SHA256_READ_FAILED');
+        return true;
+      },
+    );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyPersistedSignature: missing .sig → SEED_SIG_READ_FAILED', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+    rmSync(bundle.sigPath);
+    await assert.rejects(
+      () => verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+        pubkey: bundle.publicKey,
+      }),
+      (err) => {
+        assert.equal(err.code, 'SEED_SIG_READ_FAILED');
+        return true;
+      },
+    );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyPersistedSignature: malformed .sha256 → SEED_SHA256_MALFORMED', async () => {
+  const bundle = makeBundle();
+  try {
+    writeFileSync(bundle.shaPath, 'not a hash\n');
+    writeFileSync(bundle.sigPath, randomBytes(64));
+    await assert.rejects(
+      () => verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+        pubkey: bundle.publicKey,
+      }),
+      (err) => {
+        assert.equal(err.code, 'SEED_SHA256_MALFORMED');
+        return true;
+      },
+    );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyPersistedSignature: wrong-length sig → SEED_SIG_MALFORMED', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+    writeFileSync(bundle.sigPath, randomBytes(32));
+    await assert.rejects(
+      () => verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+        pubkey: bundle.publicKey,
+      }),
+      (err) => {
+        assert.equal(err.code, 'SEED_SIG_MALFORMED');
+        return true;
+      },
+    );
+  } finally {
+    rmSync(bundle.dir, { recursive: true, force: true });
+  }
+});
+
+// The property that fixes Gate-3: post-install, witness.db legitimately
+// mutates (applySchema, gate decisions). verifyPersistedSignature must
+// remain a pass for the same .sha256/.sig regardless of dbPath bytes.
+test('verifyPersistedSignature: result is decoupled from DB state', async () => {
+  const bundle = makeBundle();
+  try {
+    await finalize(bundle);
+
+    const before = await verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+      pubkey: bundle.publicKey,
+    });
+    assert.match(before.sha256, /^[0-9a-f]{64}$/);
+
+    // Mutate the DB bytes — this is what applySchema effectively does to a
+    // live witness.db post-init.
+    const buf = readFileSync(bundle.dbPath);
+    buf[100] = buf[100] ^ 0xff;
+    writeFileSync(bundle.dbPath, buf);
+
+    const after = await verifyPersistedSignature(bundle.shaPath, bundle.sigPath, {
+      pubkey: bundle.publicKey,
+    });
+    assert.equal(after.sha256, before.sha256);
+    assert.equal(after.fingerprint, before.fingerprint);
   } finally {
     rmSync(bundle.dir, { recursive: true, force: true });
   }

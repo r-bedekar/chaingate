@@ -6,7 +6,7 @@ import { resolvePaths } from '../paths.js';
 import { npmrcPath } from '../npmrc.js';
 import { readPid, isPortInUse } from '../proxy-control.js';
 import { openWitnessDB } from '../../witness/db.js';
-import { verifySeed } from '../../witness/seed_verify.js';
+import { verifyPersistedSignature } from '../../witness/seed_verify.js';
 import { checkSelfWitness } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
 
@@ -119,9 +119,17 @@ export default async function doctor(args) {
     checks.push({ name: 'npmrc-block', pass, detail });
   }
 
-  // 6. Seed signature — full Ed25519 re-verification against persisted artifacts.
-  //    `--no-seed` installs legitimately have no sig files; treat as unverifiable.
-  //    A hash/signature disagreement is a tamper signal (exit 5).
+  // 6. Seed signature — Ed25519 verification of the persisted .sha256/.sig
+  //    pair only. Does NOT re-hash the live witness.db: that file legitimately
+  //    mutates after install (applySchema migrations, gate decisions), so a
+  //    live-DB hash check fires false-positive TAMPER under normal use. What
+  //    this proves is "the install came from a bundle signed by the pinned
+  //    Ed25519 key" — the trust anchor that matters post-install. Install-time
+  //    bundle hashing still happens via verifySeed in init/update-seed.
+  //
+  //    Severity 'skipped' is added in commit F (self-witness display rework).
+  //    Until then, skipped checks render via the visual fail branch but won't
+  //    affect exit code: aggregateExit treats unrecognized severities as OK.
   {
     if (!existsSync(paths.witnessDb)) {
       checks.push({
@@ -134,12 +142,15 @@ export default async function doctor(args) {
       checks.push({
         name: 'seed-signature',
         pass: false,
-        severity: 'unverifiable',
-        detail: 'no persisted .sha256/.sig (--no-seed install, or init pre-dates sig persistence)',
+        severity: 'skipped',
+        detail: 'no persisted .sha256/.sig (expected for --no-seed installs)',
       });
     } else {
       try {
-        const result = await verifySeed(paths.witnessDb, paths.witnessDbSha256, paths.witnessDbSig);
+        const result = await verifyPersistedSignature(
+          paths.witnessDbSha256,
+          paths.witnessDbSig,
+        );
         checks.push({
           name: 'seed-signature',
           pass: true,
