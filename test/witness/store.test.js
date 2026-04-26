@@ -47,6 +47,7 @@ test('observePackument on empty DB → N baselines, N first-seen decisions', () 
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const w = createWitness({ db, runGates: allowRunner, config: {} });
     const result = w.observePackument('axios', axiosPackument());
     assert.equal(result.versionsSeen, 2);
@@ -70,6 +71,7 @@ test('re-observe same packument → 0 new baselines, 0 new decisions (sparsity)'
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const w = createWitness({ db, runGates: allowRunner, config: {} });
     w.observePackument('axios', axiosPackument());
     const second = w.observePackument('axios', axiosPackument());
@@ -88,6 +90,7 @@ test('mixed new + known → only new gets baseline + decision row', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const w = createWitness({ db, runGates: allowRunner, config: {} });
     w.observePackument('axios', axiosPackument({ versions: ['1.7.8'] }));
     const second = w.observePackument('axios', axiosPackument({ versions: ['1.7.8', '1.7.9'] }));
@@ -107,6 +110,7 @@ test('runGates throws per-version → caught, other versions still processed', (
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const runGates = (input) => {
       if (input.version === '1.7.8') throw new Error('gate boom');
       return { disposition: 'ALLOW', results: [] };
@@ -127,6 +131,7 @@ test('getHistory called exactly once per observePackument', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     let callCount = 0;
     const origGetHistory = db.getHistory.bind(db);
     db.getHistory = (name) => {
@@ -146,6 +151,7 @@ test('observeTarball returns ALLOW (pass-through; tarball blocking lives in prox
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const w = createWitness({ db, runGates: allowRunner, config: {} });
     assert.deepEqual(w.observeTarball('axios', 'axios-1.7.9.tgz'), { disposition: 'ALLOW' });
     w.close();
@@ -158,6 +164,7 @@ test('sparsity: 10× observations → exactly N decision rows', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const w = createWitness({ db, runGates: allowRunner, config: {} });
     for (let i = 0; i < 10; i += 1) {
       w.observePackument('axios', axiosPackument());
@@ -176,6 +183,7 @@ test('disposition flip → new decision row appended', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     let mode = 'ALLOW';
     const runGates = () => ({ disposition: mode, results: [{ gate: 'stub', result: mode, detail: '' }] });
     const w = createWitness({ db, runGates, config: {} });
@@ -200,6 +208,7 @@ test('per-version catch does not roll back other versions in transaction', () =>
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     // Runner returns ALLOW for all. We simulate a per-version failure by monkey
     // patching getBaseline to throw for one specific version.
     const origGetBaseline = db.getBaseline.bind(db);
@@ -223,6 +232,7 @@ test('config wiring: witness.config === injected config', () => {
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const cfg = { foo: 'bar' };
     const w = createWitness({ db, runGates: allowRunner, config: cfg });
     assert.equal(w.config, cfg);
@@ -243,6 +253,7 @@ test('zero-module runner (P5.5 default) + first-seen still records ALLOW', () =>
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     const runGates = createGateRunner({
       modules: [],
       getOverride: (pkg, ver) => db.getOverride(pkg, ver),
@@ -261,6 +272,7 @@ test('override row → runner short-circuits, decision log includes override ent
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     // Gate that would BLOCK, paired with an override that rescues it.
     const blockingModule = {
       name: 'always-block',
@@ -290,6 +302,7 @@ test('runner flips ALLOW→BLOCK on second observation → new BLOCK decision ro
   const { path, cleanup } = tmpDb();
   try {
     const db = openWitnessDB(path);
+    db.applySchema();
     let mode = 'ALLOW';
     // Named `content-hash` so it's exempt from the first-seen poisoning-
     // protection depth gate (only content-hash can BLOCK in V1 anyway, so

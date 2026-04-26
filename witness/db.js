@@ -155,6 +155,13 @@ export class WitnessDB {
   }
 
   applySchema() {
+    if (this.readonly) {
+      throw new Error(
+        'applySchema called on a readonly handle. Open the ' +
+        'witness DB in read-write mode (and only at known ' +
+        'migration sites) before applying schema.',
+      );
+    }
     this.db.exec(SCHEMA_SQL);
     this._prepare();
     return this;
@@ -403,7 +410,5 @@ export class WitnessDB {
 }
 
 export function openWitnessDB(dbPath, opts) {
-  const db = new WitnessDB(dbPath, opts);
-  db.applySchema();
-  return db;
+  return new WitnessDB(dbPath, opts);
 }
