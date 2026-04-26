@@ -61,12 +61,12 @@ function axiosFixture(version = '1.7.9') {
   };
 }
 
-test('createSchema is idempotent', () => {
+test('applySchema is idempotent', () => {
   const { path, dir } = tmpDbPath();
   try {
     const db = openWitnessDB(path);
-    db.createSchema();
-    db.createSchema();
+    db.applySchema();
+    db.applySchema();
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -279,7 +279,7 @@ test('package uniqueness across ecosystems enforced by CHECK', () => {
 
 test('readonly open of fresh delete-mode DB does not write pragmas', () => {
   // Seed the file with the witness schema RW so CREATE TABLE IF NOT EXISTS
-  // is a no-op when the readonly handle later runs createSchema(). Then
+  // is a no-op when the readonly handle later runs applySchema(). Then
   // force the file's journal_mode back to delete — this matches the shape
   // produced by collector/export_seed.py: schema present, journal_mode=delete.
   const path = join(tmpdir(), `chaingate-test-delete-${randomBytes(4).toString('hex')}.db`);

@@ -97,6 +97,13 @@ export default async function updateSeed(args) {
   }
   try { unlinkSync(backupPath); } catch { /* ok */ }
 
+  // Forward-migrate the swapped-in bundle: covers the case where the bundle
+  // predates a runtime schema addition (e.g. dep_first_publish). Idempotent —
+  // runs CREATE TABLE IF NOT EXISTS, no-op when bundle already matches.
+  const migrateDb = openWitnessDB(paths.witnessDb);
+  migrateDb.applySchema();
+  migrateDb.close();
+
   // Refresh persisted sig artifacts so doctor can re-verify the new bundle.
   try {
     copyFileSync(bundle.sha256Path, paths.witnessDbSha256);

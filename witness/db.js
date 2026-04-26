@@ -150,10 +150,11 @@ export class WitnessDB {
       this.db.pragma('foreign_keys = ON');
       this.db.pragma('synchronous = NORMAL');
     }
+    this.readonly = readonly;
     this._stmts = null;
   }
 
-  createSchema() {
+  applySchema() {
     this.db.exec(SCHEMA_SQL);
     this._prepare();
     return this;
@@ -403,6 +404,6 @@ export class WitnessDB {
 
 export function openWitnessDB(dbPath, opts) {
   const db = new WitnessDB(dbPath, opts);
-  db.createSchema();
+  db.applySchema();
   return db;
 }
