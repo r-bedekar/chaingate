@@ -31,6 +31,11 @@ const FIXTURE_DB = join(FIXTURE_DIR, 'chaingate-seed.db');
 const FIXTURE_SHA256 = join(FIXTURE_DIR, 'chaingate-seed.db.sha256');
 const FIXTURE_SIG = join(FIXTURE_DIR, 'chaingate-seed.db.sig');
 
+const DRIFT_FIXTURE_DIR = join(__dirname, '..', 'fixtures', 'test-seed-bundle-drifted');
+const DRIFT_FIXTURE_DB = join(DRIFT_FIXTURE_DIR, 'chaingate-seed.db');
+const DRIFT_FIXTURE_SHA256 = join(DRIFT_FIXTURE_DIR, 'chaingate-seed.db.sha256');
+const DRIFT_FIXTURE_SIG = join(DRIFT_FIXTURE_DIR, 'chaingate-seed.db.sig');
+
 function mkTmpHome() {
   return mkdtempSync(join(tmpdir(), 'chaingate-update-seed-int-'));
 }
@@ -60,14 +65,16 @@ function seedLocalDb(paths, { existingSeedVersion = '2026.test.0' } = {}) {
   db.close();
 }
 
-function stageBundle(stageDir) {
+function stageBundle(stageDir, sources = {
+  db: FIXTURE_DB, sha256: FIXTURE_SHA256, sig: FIXTURE_SIG,
+}) {
   mkdirSync(stageDir, { recursive: true });
   const dbPath = join(stageDir, 'chaingate-seed.db');
   const sha256Path = join(stageDir, 'chaingate-seed.db.sha256');
   const sigPath = join(stageDir, 'chaingate-seed.db.sig');
-  copyFileSync(FIXTURE_DB, dbPath);
-  copyFileSync(FIXTURE_SHA256, sha256Path);
-  copyFileSync(FIXTURE_SIG, sigPath);
+  copyFileSync(sources.db, dbPath);
+  copyFileSync(sources.sha256, sha256Path);
+  copyFileSync(sources.sig, sigPath);
   return { dbPath, sha256Path, sigPath };
 }
 
@@ -158,6 +165,111 @@ test('update-seed integration: fixture bundle → swap, applySchema, decisions/o
     assert.equal(decisionCount, 1, 'gate_decisions row must survive the swap');
 
     // 3d. overrides row from the pre-swap local DB preserved.
+    const override = inspector.getOverride('preserved-pkg', '0.2.0');
+    assert.ok(override, 'overrides row must survive the swap');
+    assert.equal(override.reason, 'allowed per fixture');
+  } finally {
+    inspector.close();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('schema-gap recovery: bundle missing dep_first_publish gets the table after applySchema post-swap', async () => {
+  const home = mkTmpHome();
+  const stage = join(home, 'stage');
+  const paths = buildPaths(home);
+
+  seedLocalDb(paths);
+  const bundle = stageBundle(stage, {
+    db: DRIFT_FIXTURE_DB, sha256: DRIFT_FIXTURE_SHA256, sig: DRIFT_FIXTURE_SIG,
+  });
+
+  // Pre-swap audit: confirm the staged bundle (the file that's about to be
+  // renamed into place as the new local witness DB) genuinely lacks
+  // dep_first_publish. Without this, an accidentally-happy fixture would
+  // silently neuter the recovery assertion below into a tautology.
+  {
+    const probe = openWitnessDB(bundle.dbPath, { readonly: true });
+    const hit = probe.db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='dep_first_publish'`)
+      .all();
+    probe.close();
+    console.log(`pre-swap dep_first_publish present: ${hit.length > 0}`);
+    assert.equal(hit.length, 0, 'drift fixture must lack dep_first_publish before the swap');
+  }
+
+  const deps = {
+    fetchSeedBundle: async () => bundle,
+    verifySeed: async () => ({ fingerprint: 'ed25519:test-fixture' }),
+    assertIntegrity: async () => ({ ok: true }),
+    resolvePaths: () => paths,
+  };
+
+  const cap = captureConsole();
+  let exitCode;
+  try {
+    exitCode = await updateSeed([], deps);
+  } finally {
+    cap.restore();
+  }
+
+  assert.equal(exitCode, EXIT.OK, 'updateSeed should exit OK');
+
+  const flat = cap.captured.map(([, msg]) => msg).join('\n');
+  assert.ok(
+    !/SQLITE_READONLY/.test(flat),
+    `unexpected SQLITE_READONLY in output:\n${flat}`,
+  );
+  assert.ok(
+    !/SQLITE_BUSY/.test(flat),
+    `unexpected SQLITE_BUSY in output:\n${flat}`,
+  );
+
+  const inspector = openWitnessDB(paths.witnessDb, { readonly: true });
+  try {
+    // Drifted bundle landed (not the happy-path one).
+    assert.equal(
+      inspector.getSeedMetadata('seed_version'),
+      '2026.test.1.drifted',
+      'seed_version should match drift fixture',
+    );
+
+    // Critical assertion: dep_first_publish was absent from the bundle (proven
+    // above), the swap placed an absent-it DB at the local path, then
+    // applySchema post-swap created it. This is the install-ceremony recovery
+    // mechanism that hop-2 of Phase 5a was about.
+    const tables = new Set(
+      inspector.db
+        .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)
+        .all()
+        .map((r) => r.name),
+    );
+    console.log(`post-swap dep_first_publish present: ${tables.has('dep_first_publish')}`);
+    assert.ok(
+      tables.has('dep_first_publish'),
+      'dep_first_publish must be created by applySchema post-swap',
+    );
+
+    // Shape check, not just presence: column names match runtime contract.
+    const cols = inspector.db.pragma('table_info(dep_first_publish)');
+    const colNames = cols.map((c) => c.name).sort();
+    assert.deepEqual(
+      colNames,
+      ['attempts', 'cached_at', 'first_publish', 'package_name', 'status'],
+      'dep_first_publish columns must match the runtime SCHEMA contract',
+    );
+    const pk = cols.find((c) => c.name === 'package_name');
+    assert.equal(pk.pk, 1, 'package_name must be the primary key');
+
+    // Preserved across swap.
+    const decisionCount = inspector.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM gate_decisions
+         WHERE package_name = ? AND version = ?`,
+      )
+      .get('preserved-pkg', '0.1.0').n;
+    assert.equal(decisionCount, 1, 'gate_decisions row must survive the swap');
+
     const override = inspector.getOverride('preserved-pkg', '0.2.0');
     assert.ok(override, 'overrides row must survive the swap');
     assert.equal(override.reason, 'allowed per fixture');

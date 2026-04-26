@@ -33,3 +33,24 @@ This rewrites all three `.db`, `.sha256`, `.sig` files. The SHA-256 and
 signature change every regeneration (different ephemeral key, different
 DB header timestamps); commit the new files alongside the change that
 prompted regeneration.
+
+## Drifted variant
+
+A sibling fixture lives at `../test-seed-bundle-drifted/`. It simulates
+a pre-Option-C bundle (e.g., seed-v2.1) that predates the
+`dep_first_publish` table — the bundle SCHEMA exec'd at build time has
+that CREATE TABLE removed in-memory before the SQLite DB is built.
+
+Used by the schema-gap recovery integration test to prove that
+`applySchema` running post-swap in `update-seed.js` correctly fills in
+the missing table.
+
+Both fixtures share this `build.js`. Regenerate the drifted variant:
+```
+node test/fixtures/test-seed-bundle/build.js --drift
+```
+
+Identity differences from the happy-path fixture: `seed_version =
+"2026.test.1.drifted"`, `dep_first_publish` table absent in the `.db`,
+otherwise structurally identical (one package, one version,
+seed_metadata, throwaway-key signature).

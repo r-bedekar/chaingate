@@ -8,14 +8,19 @@
 // signature verification is covered by test/witness/seed_verify.test.js;
 // the integration test mocks verifySeed and exercises everything downstream.
 //
-// Regenerate:  node test/fixtures/test-seed-bundle/build.js
+// Regenerate (happy path):  node test/fixtures/test-seed-bundle/build.js
+// Regenerate (drift variant): node test/fixtures/test-seed-bundle/build.js --drift
+//
+// --drift writes to ../test-seed-bundle-drifted/ instead, with the
+// dep_first_publish CREATE TABLE removed from SCHEMA before exec — used
+// by the schema-gap recovery integration test.
 
 import {
   generateKeyPairSync,
   createHash,
   sign as cryptoSign,
 } from 'node:crypto';
-import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
@@ -23,14 +28,21 @@ import Database from 'better-sqlite3';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_SCHEMA_PATH = join(__dirname, '..', 'bundle-schema.sql');
 
-const DB_PATH = join(__dirname, 'chaingate-seed.db');
-const SHA256_PATH = join(__dirname, 'chaingate-seed.db.sha256');
-const SIG_PATH = join(__dirname, 'chaingate-seed.db.sig');
+const drift = process.argv.includes('--drift');
+const OUT_DIR = drift
+  ? join(__dirname, '..', 'test-seed-bundle-drifted')
+  : __dirname;
+const DB_PATH = join(OUT_DIR, 'chaingate-seed.db');
+const SHA256_PATH = join(OUT_DIR, 'chaingate-seed.db.sha256');
+const SIG_PATH = join(OUT_DIR, 'chaingate-seed.db.sig');
 
-const SEED_VERSION = '2026.test.1';
+const SEED_VERSION = drift ? '2026.test.1.drifted' : '2026.test.1';
 const EXPORTED_AT = '2026-04-26T00:00:00Z';
 
 function main() {
+  if (drift) {
+    mkdirSync(OUT_DIR, { recursive: true });
+  }
   for (const p of [DB_PATH, SHA256_PATH, SIG_PATH]) {
     if (existsSync(p)) unlinkSync(p);
   }
@@ -40,7 +52,21 @@ function main() {
     .export({ type: 'spki', format: 'der' })
     .toString('base64');
 
-  const schema = readFileSync(BUNDLE_SCHEMA_PATH, 'utf8');
+  let schema = readFileSync(BUNDLE_SCHEMA_PATH, 'utf8');
+  if (drift) {
+    // Simulates a pre-Option-C bundle (e.g., seed-v2.1) that predates the
+    // dep_first_publish addition. The post-swap applySchema in update-seed.js
+    // is the recovery mechanism this fixture exists to test. Same in-memory
+    // mutation as schema-compat.test.js's deliberate-drift test, kept
+    // structurally identical so a reviewer can recognize the pattern.
+    schema = schema.replace(
+      /CREATE TABLE dep_first_publish \([^;]*?\);\s*/,
+      '',
+    );
+    if (/dep_first_publish/.test(schema)) {
+      throw new Error('drift mutation failed to remove all dep_first_publish references');
+    }
+  }
   const db = new Database(DB_PATH);
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(schema);
@@ -94,7 +120,7 @@ function main() {
   }
   writeFileSync(SIG_PATH, sig);
 
-  console.log(`built fixture seed bundle:`);
+  console.log(`built fixture seed bundle${drift ? ' (drifted: no dep_first_publish)' : ''}:`);
   console.log(`  ${DB_PATH}`);
   console.log(`  ${SHA256_PATH}    ${sha256Hex}`);
   console.log(`  ${SIG_PATH}    (${sig.length} bytes)`);
