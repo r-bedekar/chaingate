@@ -1,4 +1,17 @@
-import { request, errors as undiciErrors } from 'undici';
+import { request, Agent, errors as undiciErrors } from 'undici';
+
+// Upstream traffic goes through an Agent from the pinned undici. Without an explicit dispatcher,
+// request() uses the process-wide global dispatcher, and on Node 22 importing `node:http` installs
+// Node's own bundled undici there first, so the pinned version's HTTP/1.1 client would never run
+// and its fixes (unterminated chunked bodies, header validation) would not apply.
+//
+// `pipelining: 0` disables keep-alive: every request is sent with `connection: close` on its own
+// connection, which is closed after the response. An upstream can otherwise leave an unsolicited
+// response on an idle socket for the next request to receive; on undici 6.28.1 we reproduced that
+// on reused sockets (test/proxy/u031-upstream-hardening.test.js). Packuments, tarballs, background
+// dependency lookups and the raw fallback all come through upstreamRequest() and share this Agent.
+// The global dispatcher is left alone.
+const upstreamAgent = new Agent({ pipelining: 0 });
 
 const RELAY_REQUEST_HEADERS = ['authorization', 'if-none-match', 'if-modified-since'];
 const RELAY_RESPONSE_HEADERS = [
@@ -68,6 +81,7 @@ async function upstreamRequest(url, { headers = {}, config }) {
       headersTimeout: config.headersTimeoutMs,
       bodyTimeout: config.bodyTimeoutMs,
       maxRedirections: 2,
+      dispatcher: upstreamAgent,
     });
   } catch (err) {
     if (

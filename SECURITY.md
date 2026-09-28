@@ -174,6 +174,43 @@ GitHub Actions) with `--provenance`. Until releases are published
 that way, compare a release with its tagged source commit to verify
 it; each release names the exact commit it was built from.
 
+## Upstream registry connections
+
+The proxy trusts its configured upstream registry for content. The
+measures below remove one connection-reuse condition. They do not
+make an untrusted registry trustworthy.
+
+- **Pinned HTTP client.** All upstream requests use an Agent from the
+  pinned `undici` (0.1.1: exactly 6.28.1). These are packuments,
+  tarballs, background dependency lookups and the fail-open raw
+  fallback. The Agent is set explicitly because on Node 22 importing
+  `node:http` installs Node's own bundled undici as the process-wide
+  default. Without that, the pinned version would never handle
+  upstream traffic. The process-wide default itself is left
+  unchanged.
+- **No upstream connection reuse.** Keep-alive is disabled
+  (`pipelining: 0`). Every upstream request uses its own connection,
+  sends `connection: close`, and the connection is closed after the
+  response.
+
+  This is our mitigation for behaviour we reproduced locally. It is
+  not an upstream advisory update. An upstream that writes an
+  unsolicited response onto an idle keep-alive socket can have it
+  delivered for the next request (GHSA-35p6-xmwp-9g52). undici 6.28.1
+  fixed the case of a socket's first reuse. In loopback tests the
+  later-reuse case still reproduced on 6.28.1 at the same rate as on
+  6.25.0. The cost is one new connection (and TLS handshake) per
+  upstream request.
+
+### Node's bundled HTTP client (separate limitation)
+
+`chaingate init` and `update-seed` download legacy witness seeds with
+Node's built-in `fetch()`. That uses the undici bundled with Node
+(6.24.1 in Node 22.22.2), not the pinned package, so a package update
+cannot patch it. It follows the Node version installed. Downloaded
+legacy seeds are still checked against their SHA-256 and Ed25519
+signature before use (see above).
+
 ## Disclosure
 
 This document represents the current state. The trust model is
