@@ -1,14 +1,19 @@
 > **Research prototype. Not production-ready.**
 > Metadata deviations provide explainable warning and gating inputs but do not
 > independently establish malicious intent. The runtime is built and runs
-> end-to-end — local proxy, CLI, witness store, six deterministic gates, signed
-> seed verification, and ALLOW / WARN / BLOCK enforcement, with 532 passing
-> tests. See [What's built today](#whats-built-today) for what actually runs and
+> end-to-end — local proxy, CLI, witness store, six deterministic gates, seed
+> verification (legacy seeds signed; the current v3 seed unsigned and reported as such), and ALLOW / WARN / BLOCK enforcement, with a passing test
+> suite. See [What's built today](#whats-built-today) for what actually runs and
 > [What's next](#whats-next) for what does not exist yet.
 
 # ChainGate
 
+**ChainGate by CGSec.** npm package: `@cgsec/chaingate` · command: `chaingate`
+
 **Supply chain integrity gate that compares a package against its own history.**
+
+> **Install the scoped package.** The unscoped `chaingate` package on npm is an
+> unrelated project, a cryptocurrency SDK. It is not this tool.
 
 Every supply chain security tool asks: *"Is this package known to be bad?"*
 ChainGate asks: *"Is this package different from what it looked like yesterday?"*
@@ -74,7 +79,7 @@ The full path from `npm install` to an explainable decision runs today.
 **Local npm proxy.** `undici`-based packument rewriter that sits between the client
 and the upstream registry, evaluating every version it resolves.
 
-**CLI.** Eleven commands: `init`, `status`, `check`, `why`, `history`, `allow`,
+**CLI.** Ten commands: `init`, `status`, `check`, `why`, `history`, `allow`,
 `overrides`, `update-seed`, `doctor`, `stop`.
 
 **Witness store.** Append-only log backed by SQLite — content hashes, dependency
@@ -84,11 +89,13 @@ trees, publisher metadata, provenance status.
 verdict and reason string.
 
 **ALLOW / WARN / BLOCK enforcement** with a persisted decision log, per-version
-overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3).
+overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = tool error). `chaingate check --json`
+emits a versioned `chaingate.check/1` record; `examples/ci/` has an offline CI consumer for it.
 
-**Signed seed verification.** The runtime fetches a signed corpus bundle and verifies
-its Ed25519 signature against a pinned public key before installing it; an
-unauthorized seed cannot be installed regardless of where it appears to come from.
+**Seed verification.** Every seed is checked against its `.sha256` sidecar before use. A seed is
+**authenticated** only when its Ed25519 signature verifies against a key pinned in the runtime;
+an unsigned v3 seed can be used only with `--unsigned-development`, which the tool reports as
+`authenticated: false`. A present signature that cannot be checked is refused, never ignored.
 
 **Detection engine.** Two pattern layers — publisher identity (tenure blocks, cold
 handoffs, domain classification) and per-major provenance (attestation baselines,
@@ -99,7 +106,7 @@ observed history.
 corpus and emits metrics to `validation/results.json`. Golden snapshot tests guard
 the numbers.
 
-**Tests.** 534 tests, 532 passing, 2 skipped.
+**Tests.** `npm test` runs the full suite; release candidates record their results in the release notes.
 
 **Pilot numbers on the held-out test split.** Small-n results from a 209-package
 research corpus — a pilot measurement, not a population estimate:
@@ -116,88 +123,94 @@ research corpus — a pilot measurement, not a population estimate:
 Five minutes, no account, no feed subscription. The seed bundle is verified locally,
 so this flow works without fetching a bundle over the network.
 
+From npm, once a release is published (none is yet):
+
+```bash
+npm install -g @cgsec/chaingate
+chaingate --help
+```
+
+From source:
+
 ```bash
 git clone https://github.com/r-bedekar/chaingate.git
 cd chaingate && npm install
-npm test                        # 534 tests, 532 passing, 2 skipped
+npm test
 ```
 
-**1. Initialize** — installs a verified seed, starts the proxy, points npm at it.
-`--scope project` keeps everything inside the current directory:
+**You supply the v3 detection seed.** The v3 detection seed is a local file (about 1.9 GB for the full
+corpus). **It is not downloaded automatically and no v3 seed is published yet**: pass it with
+`--seed`. The current release candidate seed is **unsigned**, so it needs `--unsigned-development`,
+which the tool reports as `authenticated: false`. See [SECURITY.md](SECURITY.md).
+
+**1. Initialize** — installs the v3 bundle, starts the proxy, points npm at it:
 
 ```console
-$ chaingate init --scope project --seed ./seed_export/chaingate-seed.db
-Verifying local seed...
-✓ Local seed verified and copied
-✓ .npmrc updated (/path/to/project/.npmrc)
-✓ Proxy running on http://127.0.0.1:6173 (pid 2366434)
-
-Ready. 104 packages, 50521 versions in witness store.
+$ chaingate init --seed ./seed-v3/chaingate-seed.db --unsigned-development
+✓ v3 seed bundle bf5b8bf1ec68897e active
+  sha256 974c7d7ea2f24ef6…  snapshot d47e8679d6dd…  trust unsigned-development
+  policy on_unusable_input=BLOCK on_no_evidence=WARN
+✓ .npmrc updated
 ```
 
-Without `--seed`, `chaingate init` fetches and verifies the signed bundle from this
-repository's GitHub Releases instead.
+Opening and verifying a full seed takes tens of seconds before the proxy listens; `init` waits
+while the process is alive. `--scope project` keeps everything inside the current directory.
 
-**2. Resolve a package through the proxy.** Any `npm install` does this; so does a
-direct packument fetch. Every version in the packument is gated as it is resolved:
+**2. Install through the proxy.** Any `npm install` now resolves through ChainGate, and every
+version in the packument is gated as it is resolved.
 
-```console
-$ curl -s -o /dev/null http://127.0.0.1:6173/axios
-$ chaingate status --scope project
-  Witness store:  104 packages, 50530 versions, 50525 files
-  Seed version:   2026.04.22.1 (exported 2026-04-22T08:56:10Z)
-  Proxy:          running on 127.0.0.1:6173 (pid 2366434)
-  Decisions:      144 total · 12 ALLOW · 132 WARN · 0 BLOCK
-```
-
-**3. Explain a decision.** Every gate reports its own verdict and the evidence behind
-it — this is the whole point of the tool:
+**3. Check a release, fresh.** `chaingate check` evaluates the release described by a packument
+file against the active seed. It never reports a stored decision:
 
 ```console
-$ chaingate why axios@1.20.0 --scope project
-axios@1.20.0  WARN  2026-08-31 12:07:06
-
-  ALLOW first-seen — baseline recorded on first observation
-  SKIP content-hash — first-seen: no baseline to compare
-  WARN dep-structure — new runtime dep(s): https-proxy-agent (not in prior 136 version(s))
-  ALLOW publisher-identity — publisher unchanged: npm-oidc-no-reply@github.com
-  ALLOW provenance-continuity — OIDC provenance present (continuous with 46/136 prior versions)
-  ALLOW release-age — release age 123h ≥ threshold 72h
-  ALLOW scope-boundary — 1 new dep(s) but no install scripts — low risk
-```
-
-`chaingate check` gives the same decision with a CI-friendly exit code:
-
-```console
-$ chaingate check axios@1.20.0 --scope project
-axios@1.20.0: WARN
+$ chaingate check express@4.22.3 --packument ./express.json
+express@4.22.3: ALLOW
+  evaluated disposition: ALLOW under cft-policy-1.0
+  placement: recorded
+  ...
 $ echo $?
-2
+0
 ```
 
-**4. Stop and restore.** Puts your npm configuration back the way it was:
+Exit codes: 0 ALLOW, 2 WARN, 3 BLOCK, 4 tool error. `--json` gives the `chaingate.check/1` record.
+
+**4. Explain.** `chaingate why` explains and never re-decides:
+
+- `chaingate why <pkg>@<ver> --packument <file>` evaluates, then explains;
+- `chaingate why --from <check.json>` explains a saved `check --json` result without evaluating;
+- `chaingate why <pkg>@<ver> --cached` shows a legacy stored decision, labelled **CACHED — UNBOUND**
+  (it carries no seed, rule or policy identity), and exits 4.
+
+Every group and predicate that could not be evaluated is named with its reason. Missing evidence is
+never shown as a clean result.
+
+**5. Stop and restore:**
 
 ```console
-$ chaingate stop --scope project
+$ chaingate stop
 ✓ Proxy stopped
-✓ .npmrc restored (/path/to/project/.npmrc)
+✓ .npmrc restored
 ```
 
-Two things this walkthrough shows honestly. A seed older than the packages you resolve
-produces many first-seen WARNs — the store had no baseline for those versions, and the
-reason string says so; run `chaingate update-seed` for a current bundle. And
-`chaingate why axios@1.14.1` returns no decision at all, because that version is no
-longer present in the registry's current packument. A tool that reads only current
-registry state cannot reason about a version that has been erased from it. That is
-exactly why the witness log exists.
+**Updating the seed.** Install another v3 bundle you have with
+`chaingate update-seed --seed <bundle>/chaingate-seed.db [--unsigned-development]`, and return to
+the previous one with `chaingate update-seed --rollback`. Activation never reaches into a running
+proxy; restart it (`chaingate stop && chaingate init`) to load the new bundle. Plain
+`chaingate update-seed`, without `--seed`, **refuses** on a host that uses a v3 bundle, because
+automatic v3 download is not available.
 
 ## Seed bundles
 
-ChainGate's runtime fetches a signed corpus bundle (the "seed") from this repository's
-GitHub Releases. The seed is built and signed on private collector infrastructure, then
-published here for distribution. Users do not need to interact with the releases page
-directly — `chaingate update-seed` handles fetching and verification automatically.
-Each bundle's Ed25519 signature is verified against a pinned public key in the runtime.
+There are two kinds of seed.
+
+- **v3 detection seed** (what `init --seed` / `update-seed --seed` install). Built on private
+  collector infrastructure from public registry metadata. **Supplied locally; not downloaded
+  automatically; none published yet.** Opened read-only and verified against its `.sha256` sidecar;
+  authenticated only when a signature verifies against the pinned key (see SECURITY.md).
+- **Legacy witness seed** (`seed-v2.x` GitHub Releases). A plain `chaingate init` without `--seed`
+  downloads this signed bundle for the legacy witness store; it does **not** install v3 detection,
+  and `init` says so.
+
 See [SECURITY.md](SECURITY.md) for the full trust model.
 
 ## What's Next

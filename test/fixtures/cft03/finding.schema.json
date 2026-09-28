@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chaingate.dev/schemas/finding-1.0.json",
+  "title": "ChainGate detection finding (contract v1)",
+  "description": "Findings, constituent evidence, group counts and coverage states ONLY. No ALLOW/WARN/BLOCK: the mapping to actions is consumer policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "timestamp_precision",
+    "candidate",
+    "corpus_context",
+    "channel_a",
+    "dac_trajectory",
+    "seed"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "cft-detection-contract-1.0"
+    },
+    "timestamp_precision": {
+      "const": "unix_seconds_utc"
+    },
+    "corpus_context": {
+      "const": "unavailable"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "version",
+        "published_s",
+        "lineage_id",
+        "ord",
+        "candidate_digest",
+        "provider_class"
+      ],
+      "properties": {
+        "package": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "published_s": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lineage_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ord": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "candidate_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provider_class": {
+          "enum": [
+            "unknown",
+            "privacy",
+            "free-webmail",
+            "verified-corporate",
+            "unverified"
+          ]
+        },
+        "publisher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "OPTIONAL, customer-controlled: raw candidate publisher. Never emitted by default (Q6 output boundary)."
+        }
+      }
+    },
+    "channel_a": {
+      "$ref": "#/$defs/family_channel_a"
+    },
+    "dac_trajectory": {
+      "$ref": "#/$defs/family_dac"
+    },
+    "seed": {
+      "type": "object",
+      "minProperties": 1,
+      "required": [
+        "corpus_snapshot_digest",
+        "contract_version"
+      ],
+      "properties": {
+        "corpus_snapshot_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contract_version": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tri": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "coverage"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "coverage": {
+          "enum": [
+            "EVALUATED",
+            "NOT_EVALUATED"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "cold_start",
+            "zero_history",
+            "beyond_spine",
+            "ambiguous_order",
+            "missing_publication_time",
+            "uncovered_package",
+            "stale_seed",
+            "unsupported_field"
+          ]
+        },
+        "evidence": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "coverage": {
+                "const": "NOT_EVALUATED"
+              }
+            },
+            "required": [
+              "coverage"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "coverage": {
+                "const": "EVALUATED"
+              }
+            },
+            "required": [
+              "coverage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "not": {
+              "required": [
+                "reason"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "M",
+        "n_broke",
+        "n_evaluable",
+        "n_unevaluable",
+        "thresholds"
+      ],
+      "properties": {
+        "M": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "n_broke": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_evaluable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_unevaluable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "thresholds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "threshold",
+              "threshold_result",
+              "threshold_determinacy",
+              "interval"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "threshold": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "threshold_result": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "threshold_determinacy": {
+                "enum": [
+                  "determinate",
+                  "indeterminate"
+                ]
+              },
+              "interval": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "family_channel_a": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/aggregate"
+        }
+      ],
+      "type": "object",
+      "required": [
+        "predecessor_version",
+        "groups",
+        "publisher_constituents",
+        "install_body"
+      ],
+      "properties": {
+        "predecessor_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "groups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "publisher",
+            "provenance",
+            "install",
+            "size",
+            "git"
+          ],
+          "properties": {
+            "publisher": {
+              "$ref": "#/$defs/tri"
+            },
+            "provenance": {
+              "$ref": "#/$defs/tri"
+            },
+            "install": {
+              "$ref": "#/$defs/tri"
+            },
+            "size": {
+              "$ref": "#/$defs/tri"
+            },
+            "git": {
+              "$ref": "#/$defs/tri"
+            }
+          }
+        },
+        "publisher_constituents": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "maintainers",
+            "tool_downgrade"
+          ],
+          "properties": {
+            "identity": {
+              "$ref": "#/$defs/tri"
+            },
+            "maintainers": {
+              "$ref": "#/$defs/tri"
+            },
+            "tool_downgrade": {
+              "$ref": "#/$defs/tri"
+            }
+          }
+        },
+        "install_body": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "predecessor_body_digest": {
+              "type": "string"
+            },
+            "candidate_body_digest": {
+              "type": "string"
+            },
+            "changed": {
+              "type": "boolean"
+            },
+            "counts_toward_n": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "family_dac": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/aggregate"
+        }
+      ],
+      "type": "object",
+      "required": [
+        "predicates",
+        "history"
+      ],
+      "properties": {
+        "predicates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "install_introduced",
+            "size_jump_5x",
+            "prov_dropped",
+            "first_pkg_appearance_new_publisher"
+          ],
+          "properties": {
+            "install_introduced": {
+              "$ref": "#/$defs/tri"
+            },
+            "size_jump_5x": {
+              "$ref": "#/$defs/tri"
+            },
+            "prov_dropped": {
+              "$ref": "#/$defs/tri"
+            },
+            "first_pkg_appearance_new_publisher": {
+              "$ref": "#/$defs/tri"
+            }
+          }
+        },
+        "history": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

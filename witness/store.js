@@ -54,16 +54,59 @@ export function createWitness({ db, runGates, config, logger }) {
   const log = logger ?? noopLogger();
   const witnessConfig = config ?? {};
 
+  /**
+   * What a failure means, as the configured gates declare it -- never a manufactured ALLOW.
+   * `runGates.failureDecision` is provided by createGateRunner; a caller that injects a bare
+   * function (tests do) falls back to the previous behaviour, which is what it always was.
+   */
+  function failureDecision(err, detail) {
+    if (typeof runGates.failureDecision === 'function') {
+      const d = runGates.failureDecision(err);
+      return {
+        disposition: d.disposition,
+        results: [{ gate: 'observation_error', result: 'SKIP', detail }, ...d.results],
+      };
+    }
+    return {
+      disposition: 'ALLOW',
+      results: [{ gate: 'observation_error', result: 'SKIP', detail }],
+    };
+  }
+
   function observePackument(packageName, packument) {
     if (typeof packageName !== 'string' || !packageName) {
       throw new Error('observePackument: packageName required');
     }
     const parsedVersions = parseVersionsFromPackument(packument);
+
+    // The RAW manifest, verbatim. `parseVersionsFromPackument` projects each version object onto the
+    // fields the v1/v2 gates read; a gate that consumes the registry document itself (the seed-v3
+    // path reads `scripts{}`, `_nodeVersion` and `dist.attestations`) cannot recover them from that
+    // projection, and must never guess at what it cannot see.
+    const rawVersions = packument && typeof packument === 'object' && packument.versions
+      && typeof packument.versions === 'object' ? packument.versions : {};
+    const rawTimes = packument && typeof packument === 'object' && packument.time
+      && typeof packument.time === 'object' ? packument.time : {};
+
+    // A document whose manifests are ALL unreadable still contains versions, and serving it raw
+    // would serve every one of them unexamined.
     if (parsedVersions.length === 0) {
-      return { decisions: new Map(), newBaselines: 0, versionsSeen: 0 };
+      const decisions = new Map();
+      for (const versionStr of Object.keys(rawVersions)) {
+        const err = new Error(`packument manifest for ${versionStr} could not be parsed`);
+        decisions.set(versionStr, failureDecision(err, err.message));
+      }
+      if (decisions.size) log.warn(`[witness] ${packageName}: no readable manifests in packument`);
+      return { decisions, newBaselines: 0, versionsSeen: 0 };
     }
 
-    const txn = db.db.transaction((versions) => {
+    // The transaction is CONSTRUCTED here, and better-sqlite3 throws from `db.transaction()` itself
+    // when the handle is closed — outside the try below, so `observePackument` still threw for the
+    // commonest database failure and the proxy fell back to serving raw bytes. Everything that can
+    // throw is now inside one guard.
+    let txn;
+    try {
+      txn = db.db.transaction((versions) => {
       const history = db.getHistory(packageName);
       const decisions = new Map();
       let newBaselines = 0;
@@ -76,6 +119,14 @@ export function createWitness({ db, runGates, config, logger }) {
             packageName,
             version: incoming.version,
             incoming,
+            rawManifest: Object.prototype.hasOwnProperty.call(rawVersions, incoming.version)
+              ? rawVersions[incoming.version] : null,
+            // The whole versions map, for gates that need PACKAGE-SCOPED context rather than one
+            // manifest -- the domain version count behind provider_class is counted over exactly
+            // this population.
+            rawVersions,
+            publishedAt: typeof rawTimes[incoming.version] === 'string'
+              ? rawTimes[incoming.version] : null,
             baseline: existing,
             history,
             config: witnessConfig,
@@ -88,16 +139,10 @@ export function createWitness({ db, runGates, config, logger }) {
             log.warn(
               `[witness] runGates threw for ${packageName}@${incoming.version}: ${err.message}`,
             );
-            result = {
-              disposition: 'ALLOW',
-              results: [
-                {
-                  gate: 'runner_error',
-                  result: 'SKIP',
-                  detail: `runner threw: ${err.message}`,
-                },
-              ],
-            };
+            // ASK, do not assume. Manufacturing ALLOW here discarded whatever a fail-closed gate
+            // would have said -- including a recorded-advisory BLOCK. With no such gate configured
+            // this still aggregates to ALLOW, exactly as before.
+            result = failureDecision(err, `runner threw: ${err.message}`);
           }
           const disposition = result?.disposition ?? 'ALLOW';
           const gateResults = Array.isArray(result?.results) ? result.results : [];
@@ -121,24 +166,37 @@ export function createWitness({ db, runGates, config, logger }) {
           log.warn(
             `[witness] version ${packageName}@${incoming.version} failed: ${err.message}`,
           );
-          // Fail-open for this version. Leave any partial state untouched —
-          // better-sqlite3 transactions wrap this whole block, so a THROW here
-          // would roll back EVERY version, not just this one. We deliberately
-          // swallow to keep per-version isolation.
-          decisions.set(incoming.version, { disposition: 'ALLOW', results: [] });
+          // Swallowed to keep per-version isolation -- better-sqlite3 wraps this whole block, so a
+          // THROW here would roll back EVERY version. But the swallowed version no longer becomes a
+          // bare ALLOW: what the failure means is whatever the configured gates declare it means.
+          decisions.set(incoming.version, failureDecision(err, `version failed: ${err.message}`));
         }
       }
 
-      return { decisions, newBaselines, versionsSeen: versions.length };
-    });
+      // A version the parser could not read at all never reached the loop above, so it had NO
+      // decision -- and the rewriter keeps a version with no decision. That is a release nobody
+      // looked at being served as though it had passed.
+      for (const versionStr of Object.keys(rawVersions)) {
+        if (decisions.has(versionStr)) continue;
+        const err = new Error(`packument manifest for ${versionStr} could not be parsed`);
+        log.warn(`[witness] ${packageName}@${versionStr}: unparseable manifest`);
+        decisions.set(versionStr, failureDecision(err, err.message));
+      }
 
-    try {
+        return { decisions, newBaselines, versionsSeen: versions.length };
+      });
       return txn(parsedVersions);
     } catch (err) {
-      // Transaction-level failure (DB error, schema drift). Caller decides
-      // whether to fail-open; we surface it as a throw so the proxy logs it
-      // and the response still goes out.
-      throw err;
+      // Transaction-level failure (DB error, schema drift). Previously this threw, the proxy caught
+      // it, and the packument was served RAW -- every BLOCK in it lost, silently. The failure is
+      // still reported, but it now carries a decision for every version the document contains, so a
+      // fail-closed gate's declaration survives a database error.
+      log.error(`[witness] ${packageName}: observation transaction failed: ${err.message}`);
+      const decisions = new Map();
+      for (const versionStr of Object.keys(rawVersions)) {
+        decisions.set(versionStr, failureDecision(err, `observation failed: ${err.message}`));
+      }
+      return { decisions, newBaselines: 0, versionsSeen: parsedVersions.length, failed: true };
     }
   }
 
@@ -154,9 +212,25 @@ export function createWitness({ db, runGates, config, logger }) {
     db.close();
   }
 
+  /**
+   * The decisions to use when observation could not happen at all. The proxy previously answered
+   * that case by serving the packument RAW, which discards every BLOCK the document would have
+   * earned; it can now ask what the configured gates say a total failure means.
+   */
+  function failureDecisionsFor(packument, err) {
+    const versions = packument && typeof packument === 'object' && packument.versions
+      && typeof packument.versions === 'object' ? packument.versions : {};
+    const decisions = new Map();
+    for (const versionStr of Object.keys(versions)) {
+      decisions.set(versionStr, failureDecision(err, `observation failed: ${err.message}`));
+    }
+    return { decisions, newBaselines: 0, versionsSeen: 0, failed: true };
+  }
+
   return {
     observePackument,
     observeTarball,
+    failureDecisionsFor,
     close,
     get config() { return witnessConfig; },
   };

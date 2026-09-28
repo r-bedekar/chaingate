@@ -1,0 +1,2259 @@
+{
+ "_note": "Ground truth from the producer's normalisation. The JS adapter is tested against these; they are never generated from the JS implementation.",
+ "identity_domain_sep": "chaingate-seed-v3/identity/1",
+ "norm_email": [
+  {
+   "in": "alice@example.com",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "  Alice@Example.COM  ",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "ALICE@EXAMPLE.COM",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "Alice@example.com",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "﻿Alice@example.com﻿",
+   "out": "﻿alice@example.com﻿"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "alice@example.com"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "​Alice@example.com",
+   "out": "​alice@example.com"
+  },
+  {
+   "in": "\tAlice@example.com\n",
+   "out": "alice@example.com"
+  },
+  {
+   "in": "bob@gmail.com",
+   "out": "bob@gmail.com"
+  },
+  {
+   "in": "carol@protonmail.com",
+   "out": "carol@protonmail.com"
+  },
+  {
+   "in": "dave@corp.internal",
+   "out": "dave@corp.internal"
+  },
+  {
+   "in": "eve@sub.domain.co.uk",
+   "out": "eve@sub.domain.co.uk"
+  },
+  {
+   "in": "no-at-sign",
+   "out": "no-at-sign"
+  },
+  {
+   "in": "weird@@double.com",
+   "out": "weird@@double.com"
+  },
+  {
+   "in": "trailing.dot@example.com.",
+   "out": "trailing.dot@example.com."
+  },
+  {
+   "in": "a@b.c",
+   "out": "a@b.c"
+  }
+ ],
+ "norm_name": [
+  {
+   "in": "Alice",
+   "out": "alice"
+  },
+  {
+   "in": "  alice  ",
+   "out": "alice"
+  },
+  {
+   "in": "ALICE",
+   "out": "alice"
+  },
+  {
+   "in": "",
+   "out": ""
+  },
+  {
+   "in": null,
+   "out": ""
+  },
+  {
+   "in": "Ünïcode Näme",
+   "out": "ünïcode näme"
+  },
+  {
+   "in": "name with  spaces",
+   "out": "name with  spaces"
+  },
+  {
+   "in": "ß-sharp",
+   "out": "ss-sharp"
+  },
+  {
+   "in": "ς",
+   "out": "σ"
+  },
+  {
+   "in": "Σςσ",
+   "out": "σσσ"
+  },
+  {
+   "in": "Ꭰ",
+   "out": "Ꭰ"
+  },
+  {
+   "in": "ᎠᎡABC",
+   "out": "ᎠᎡabc"
+  },
+  {
+   "in": "ẞ",
+   "out": "ss"
+  },
+  {
+   "in": "İ",
+   "out": "i̇"
+  },
+  {
+   "in": "ı",
+   "out": "ı"
+  }
+ ],
+ "email_domain": [
+  {
+   "in": "alice@example.com",
+   "out": "example.com"
+  },
+  {
+   "in": "  Alice@Example.COM  ",
+   "out": "example.com"
+  },
+  {
+   "in": "ALICE@EXAMPLE.COM",
+   "out": "example.com"
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "Alice@example.com",
+   "out": "example.com"
+  },
+  {
+   "in": "﻿Alice@example.com﻿",
+   "out": "example.com﻿"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "example.com"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "example.com"
+  },
+  {
+   "in": "​Alice@example.com",
+   "out": "example.com"
+  },
+  {
+   "in": "\tAlice@example.com\n",
+   "out": "example.com"
+  },
+  {
+   "in": "bob@gmail.com",
+   "out": "gmail.com"
+  },
+  {
+   "in": "carol@protonmail.com",
+   "out": "protonmail.com"
+  },
+  {
+   "in": "dave@corp.internal",
+   "out": "corp.internal"
+  },
+  {
+   "in": "eve@sub.domain.co.uk",
+   "out": "sub.domain.co.uk"
+  },
+  {
+   "in": "no-at-sign",
+   "out": null
+  },
+  {
+   "in": "weird@@double.com",
+   "out": "double.com"
+  },
+  {
+   "in": "trailing.dot@example.com.",
+   "out": "example.com."
+  },
+  {
+   "in": "a@b.c",
+   "out": "b.c"
+  }
+ ],
+ "identity_digest": [
+  {
+   "in": "alice@example.com",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "  Alice@Example.COM  ",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "ALICE@EXAMPLE.COM",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "Alice@example.com",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "﻿Alice@example.com﻿",
+   "out": "653edd05d434d4f278da3f4f00c72529b4d5f2afbcac0f36c648e4b9eb5e63ce"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": " Alice@example.com ",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "​Alice@example.com",
+   "out": "a2746ced96b0ee8cc126d7663583c0b9a29511970decd49224e11a4cd009942e"
+  },
+  {
+   "in": "\tAlice@example.com\n",
+   "out": "6fc81d48f5a3321b4ac857f52c08fa1666d4d6d955958397e231b56d1e97dc7c"
+  },
+  {
+   "in": "bob@gmail.com",
+   "out": "a42315659205def5e04a9047ef63a9a6ef7a642dc56a0cc056e2972b47e6f605"
+  },
+  {
+   "in": "carol@protonmail.com",
+   "out": "4ec93c47ee6493227735c89e724cb0f7e9e28ebd46d4c45107e07dadba6fc471"
+  },
+  {
+   "in": "dave@corp.internal",
+   "out": "fec0d67d41cdcea4b73c4772bd87be667ca791e287cbaf58cda555b9fd447d1e"
+  },
+  {
+   "in": "eve@sub.domain.co.uk",
+   "out": "4e172d401e5e848cd7f7252478beef05a7a5f610af9f383f8df1bb80e7020eb4"
+  },
+  {
+   "in": "no-at-sign",
+   "out": "ae3d51575766f62e0ee5b818e1ec92bd571afd6876580cccdb3a3da4ed95b53a"
+  },
+  {
+   "in": "weird@@double.com",
+   "out": "864b66062a603131904e708621eb1a38481d6ca20897e2701a31108fd0dc38b8"
+  },
+  {
+   "in": "trailing.dot@example.com.",
+   "out": "9fc7c48300926f65e19aacdf6782f5c10a74a9361f8e8369c06bf0095070ae82"
+  },
+  {
+   "in": "a@b.c",
+   "out": "7db4c56ab70cf7699266a093b4f79e40f02680f592e7778f2ac3e49adad1bf85"
+  }
+ ],
+ "tuple_digest": [
+  {
+   "name": "Alice",
+   "email": "alice@example.com",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "Alice",
+   "email": "  Alice@Example.COM  ",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "Alice",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "Alice",
+   "email": "",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "Alice",
+   "email": "   ",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "Alice",
+   "email": null,
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "  alice  ",
+   "email": "alice@example.com",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "  alice  ",
+   "email": "  Alice@Example.COM  ",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "  alice  ",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "  alice  ",
+   "email": "",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "  alice  ",
+   "email": "   ",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "  alice  ",
+   "email": null,
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "ALICE",
+   "email": "alice@example.com",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "ALICE",
+   "email": "  Alice@Example.COM  ",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "ALICE",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "5fbaaeb1181cea3fd69429f764f3461fa1131bc733ec488b16de84f4d5b59603"
+  },
+  {
+   "name": "ALICE",
+   "email": "",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "ALICE",
+   "email": "   ",
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "ALICE",
+   "email": null,
+   "out": "8f08cb5fc71c369ff851e245d8fe44e76178ca4c33dee71fba59629d0bba1b9f"
+  },
+  {
+   "name": "",
+   "email": "alice@example.com",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": "",
+   "email": "  Alice@Example.COM  ",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": "",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": "",
+   "email": "",
+   "out": null
+  },
+  {
+   "name": "",
+   "email": "   ",
+   "out": null
+  },
+  {
+   "name": "",
+   "email": null,
+   "out": null
+  },
+  {
+   "name": null,
+   "email": "alice@example.com",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": null,
+   "email": "  Alice@Example.COM  ",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": null,
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "e4ea7fd1d37d2d687a9ae42843c29c2796b53492d24a9b9b78e5446fbd2f7aa5"
+  },
+  {
+   "name": null,
+   "email": "",
+   "out": null
+  },
+  {
+   "name": null,
+   "email": "   ",
+   "out": null
+  },
+  {
+   "name": null,
+   "email": null,
+   "out": null
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": "alice@example.com",
+   "out": "a57ddfb4ef7759ebaf281f96d24dbc0831768dde17a831721a9c1fcdfdd1b868"
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": "  Alice@Example.COM  ",
+   "out": "a57ddfb4ef7759ebaf281f96d24dbc0831768dde17a831721a9c1fcdfdd1b868"
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "a57ddfb4ef7759ebaf281f96d24dbc0831768dde17a831721a9c1fcdfdd1b868"
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": "",
+   "out": "dd5020c9999eb1f92986991154a5d4a739c3ed465bd955ff48322810ff824e86"
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": "   ",
+   "out": "dd5020c9999eb1f92986991154a5d4a739c3ed465bd955ff48322810ff824e86"
+  },
+  {
+   "name": "Ünïcode Näme",
+   "email": null,
+   "out": "dd5020c9999eb1f92986991154a5d4a739c3ed465bd955ff48322810ff824e86"
+  },
+  {
+   "name": "name with  spaces",
+   "email": "alice@example.com",
+   "out": "a1267f8c8c5abf770601bcffe8f60d204c042fba4b137916948ce15cda0f29cc"
+  },
+  {
+   "name": "name with  spaces",
+   "email": "  Alice@Example.COM  ",
+   "out": "a1267f8c8c5abf770601bcffe8f60d204c042fba4b137916948ce15cda0f29cc"
+  },
+  {
+   "name": "name with  spaces",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "a1267f8c8c5abf770601bcffe8f60d204c042fba4b137916948ce15cda0f29cc"
+  },
+  {
+   "name": "name with  spaces",
+   "email": "",
+   "out": "286d22526716abbd4516b665f784185eda9dd3f6d57ef3eaaec5d1d285cf11b7"
+  },
+  {
+   "name": "name with  spaces",
+   "email": "   ",
+   "out": "286d22526716abbd4516b665f784185eda9dd3f6d57ef3eaaec5d1d285cf11b7"
+  },
+  {
+   "name": "name with  spaces",
+   "email": null,
+   "out": "286d22526716abbd4516b665f784185eda9dd3f6d57ef3eaaec5d1d285cf11b7"
+  },
+  {
+   "name": "ß-sharp",
+   "email": "alice@example.com",
+   "out": "688327edf113ac07ec2c658fbf533e346c296c1fd050b9f778d921a2029c7706"
+  },
+  {
+   "name": "ß-sharp",
+   "email": "  Alice@Example.COM  ",
+   "out": "688327edf113ac07ec2c658fbf533e346c296c1fd050b9f778d921a2029c7706"
+  },
+  {
+   "name": "ß-sharp",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "688327edf113ac07ec2c658fbf533e346c296c1fd050b9f778d921a2029c7706"
+  },
+  {
+   "name": "ß-sharp",
+   "email": "",
+   "out": "ee961222652d0a77444572d8b60e097fd95b0137e25ce0834684479311c4740d"
+  },
+  {
+   "name": "ß-sharp",
+   "email": "   ",
+   "out": "ee961222652d0a77444572d8b60e097fd95b0137e25ce0834684479311c4740d"
+  },
+  {
+   "name": "ß-sharp",
+   "email": null,
+   "out": "ee961222652d0a77444572d8b60e097fd95b0137e25ce0834684479311c4740d"
+  },
+  {
+   "name": "ς",
+   "email": "alice@example.com",
+   "out": "0e498c6bd23d8f2189e69de96dfe3159a41d03fa7f764129c4d1b9c8b41bbad5"
+  },
+  {
+   "name": "ς",
+   "email": "  Alice@Example.COM  ",
+   "out": "0e498c6bd23d8f2189e69de96dfe3159a41d03fa7f764129c4d1b9c8b41bbad5"
+  },
+  {
+   "name": "ς",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "0e498c6bd23d8f2189e69de96dfe3159a41d03fa7f764129c4d1b9c8b41bbad5"
+  },
+  {
+   "name": "ς",
+   "email": "",
+   "out": "37800b02ecfd6807106397a2bff4803fc55e005c3f38a3940a600b0ade23ee8d"
+  },
+  {
+   "name": "ς",
+   "email": "   ",
+   "out": "37800b02ecfd6807106397a2bff4803fc55e005c3f38a3940a600b0ade23ee8d"
+  },
+  {
+   "name": "ς",
+   "email": null,
+   "out": "37800b02ecfd6807106397a2bff4803fc55e005c3f38a3940a600b0ade23ee8d"
+  },
+  {
+   "name": "Σςσ",
+   "email": "alice@example.com",
+   "out": "0293e9b136d5dde5d3c97dcee9ac7afdff78f5d5e13e1d7e2b733247a05d32aa"
+  },
+  {
+   "name": "Σςσ",
+   "email": "  Alice@Example.COM  ",
+   "out": "0293e9b136d5dde5d3c97dcee9ac7afdff78f5d5e13e1d7e2b733247a05d32aa"
+  },
+  {
+   "name": "Σςσ",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "0293e9b136d5dde5d3c97dcee9ac7afdff78f5d5e13e1d7e2b733247a05d32aa"
+  },
+  {
+   "name": "Σςσ",
+   "email": "",
+   "out": "5bccf46233472a1e7f2029e68217b7e900f6b98c1e9ba7b76b8a61e28f5e8701"
+  },
+  {
+   "name": "Σςσ",
+   "email": "   ",
+   "out": "5bccf46233472a1e7f2029e68217b7e900f6b98c1e9ba7b76b8a61e28f5e8701"
+  },
+  {
+   "name": "Σςσ",
+   "email": null,
+   "out": "5bccf46233472a1e7f2029e68217b7e900f6b98c1e9ba7b76b8a61e28f5e8701"
+  },
+  {
+   "name": "Ꭰ",
+   "email": "alice@example.com",
+   "out": "0058d2c78c6c73f1052bf4cbcb5eb1a38f79ee52d02f07882108643ecda9ad5b"
+  },
+  {
+   "name": "Ꭰ",
+   "email": "  Alice@Example.COM  ",
+   "out": "0058d2c78c6c73f1052bf4cbcb5eb1a38f79ee52d02f07882108643ecda9ad5b"
+  },
+  {
+   "name": "Ꭰ",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "0058d2c78c6c73f1052bf4cbcb5eb1a38f79ee52d02f07882108643ecda9ad5b"
+  },
+  {
+   "name": "Ꭰ",
+   "email": "",
+   "out": "80731d431c6db3215f3ec98ec2afbf63e85adee13d2d3b4b2813f67f78006c81"
+  },
+  {
+   "name": "Ꭰ",
+   "email": "   ",
+   "out": "80731d431c6db3215f3ec98ec2afbf63e85adee13d2d3b4b2813f67f78006c81"
+  },
+  {
+   "name": "Ꭰ",
+   "email": null,
+   "out": "80731d431c6db3215f3ec98ec2afbf63e85adee13d2d3b4b2813f67f78006c81"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": "alice@example.com",
+   "out": "6c0ca26e1427a7b4a9f8d022c26eca99cc315e363370e12f75f871643782ab08"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": "  Alice@Example.COM  ",
+   "out": "6c0ca26e1427a7b4a9f8d022c26eca99cc315e363370e12f75f871643782ab08"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "6c0ca26e1427a7b4a9f8d022c26eca99cc315e363370e12f75f871643782ab08"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": "",
+   "out": "3b9950e5cf7f1d5498232f12d7563f72b29aeec07a2116a25db4e1ac7231ce2d"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": "   ",
+   "out": "3b9950e5cf7f1d5498232f12d7563f72b29aeec07a2116a25db4e1ac7231ce2d"
+  },
+  {
+   "name": "ᎠᎡABC",
+   "email": null,
+   "out": "3b9950e5cf7f1d5498232f12d7563f72b29aeec07a2116a25db4e1ac7231ce2d"
+  },
+  {
+   "name": "ẞ",
+   "email": "alice@example.com",
+   "out": "3d192c327a96cac26fd01ea3b09c55dc5f597385a5961f82f8ae503efe2224c8"
+  },
+  {
+   "name": "ẞ",
+   "email": "  Alice@Example.COM  ",
+   "out": "3d192c327a96cac26fd01ea3b09c55dc5f597385a5961f82f8ae503efe2224c8"
+  },
+  {
+   "name": "ẞ",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "3d192c327a96cac26fd01ea3b09c55dc5f597385a5961f82f8ae503efe2224c8"
+  },
+  {
+   "name": "ẞ",
+   "email": "",
+   "out": "526aa4662c2d64796c3957b7b67cbde37250dc17c177d594707a559119b2b5a9"
+  },
+  {
+   "name": "ẞ",
+   "email": "   ",
+   "out": "526aa4662c2d64796c3957b7b67cbde37250dc17c177d594707a559119b2b5a9"
+  },
+  {
+   "name": "ẞ",
+   "email": null,
+   "out": "526aa4662c2d64796c3957b7b67cbde37250dc17c177d594707a559119b2b5a9"
+  },
+  {
+   "name": "İ",
+   "email": "alice@example.com",
+   "out": "24856f5c2a610fc9bbfb34ff64cc9c3cab53698f5837d74fde2369104f911c5a"
+  },
+  {
+   "name": "İ",
+   "email": "  Alice@Example.COM  ",
+   "out": "24856f5c2a610fc9bbfb34ff64cc9c3cab53698f5837d74fde2369104f911c5a"
+  },
+  {
+   "name": "İ",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "24856f5c2a610fc9bbfb34ff64cc9c3cab53698f5837d74fde2369104f911c5a"
+  },
+  {
+   "name": "İ",
+   "email": "",
+   "out": "64dba0c21811e734f95d038d25fa0eeb7b979ac84e08d7568ca9ca59016749e1"
+  },
+  {
+   "name": "İ",
+   "email": "   ",
+   "out": "64dba0c21811e734f95d038d25fa0eeb7b979ac84e08d7568ca9ca59016749e1"
+  },
+  {
+   "name": "İ",
+   "email": null,
+   "out": "64dba0c21811e734f95d038d25fa0eeb7b979ac84e08d7568ca9ca59016749e1"
+  },
+  {
+   "name": "ı",
+   "email": "alice@example.com",
+   "out": "e61f0132424a45ffdda1bedb07247a1087102cb267c0f7f5d453b1dd1886ed97"
+  },
+  {
+   "name": "ı",
+   "email": "  Alice@Example.COM  ",
+   "out": "e61f0132424a45ffdda1bedb07247a1087102cb267c0f7f5d453b1dd1886ed97"
+  },
+  {
+   "name": "ı",
+   "email": "ALICE@EXAMPLE.COM",
+   "out": "e61f0132424a45ffdda1bedb07247a1087102cb267c0f7f5d453b1dd1886ed97"
+  },
+  {
+   "name": "ı",
+   "email": "",
+   "out": "8e1a2357e912b5cc96672ea694198db7799ef38e0f65ed0dc12963417fb00350"
+  },
+  {
+   "name": "ı",
+   "email": "   ",
+   "out": "8e1a2357e912b5cc96672ea694198db7799ef38e0f65ed0dc12963417fb00350"
+  },
+  {
+   "name": "ı",
+   "email": null,
+   "out": "8e1a2357e912b5cc96672ea694198db7799ef38e0f65ed0dc12963417fb00350"
+  }
+ ],
+ "maintainers_digest": [
+  {
+   "in": null,
+   "out": [
+    "",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [],
+   "out": [
+    "",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": "not-a-list",
+   "out": [
+    "",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": {},
+   "out": [
+    "",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "alice",
+     "email": "alice@example.com"
+    }
+   ],
+   "out": [
+    "7a11fcbef37bd0c185724379d19bbf80",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "Alice",
+     "email": "  ALICE@example.com "
+    }
+   ],
+   "out": [
+    "7a11fcbef37bd0c185724379d19bbf80",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "alice",
+     "email": "alice@example.com"
+    },
+    {
+     "name": "bob",
+     "email": "bob@example.com"
+    }
+   ],
+   "out": [
+    "1db3620c242a52ecd456673e6671f385",
+    2
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "bob",
+     "email": "bob@example.com"
+    },
+    {
+     "name": "alice",
+     "email": "alice@example.com"
+    }
+   ],
+   "out": [
+    "1db3620c242a52ecd456673e6671f385",
+    2
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "alice",
+     "email": "alice@example.com",
+     "url": "https://x"
+    }
+   ],
+   "out": [
+    "7a11fcbef37bd0c185724379d19bbf80",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "alice"
+    }
+   ],
+   "out": [
+    "dedc0d3cd93e5f16966d46ac821c4cfa",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "email": "alice@example.com"
+    }
+   ],
+   "out": [
+    "e96af2299ba211a06d71f666d8b0d991",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {}
+   ],
+   "out": [
+    "7f3efc0d5554d5bf36c7efc0551a2294",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    "alice",
+    "bob"
+   ],
+   "out": [
+    "4b737d97e49b13a89b168cb00a593656",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    "bob",
+    "alice"
+   ],
+   "out": [
+    "4b737d97e49b13a89b168cb00a593656",
+    0
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": 123,
+     "email": "x@y.z"
+    }
+   ],
+   "out": [
+    "10faa2e115a24bea1813febe80d132b4",
+    1
+   ],
+   "representable_in_js": false
+  },
+  {
+   "in": [
+    {
+     "name": "Ünïcode Näme",
+     "email": "u@example.com"
+    }
+   ],
+   "out": [
+    "5f89dc76e08b07c267a523f6e3d442c4",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "北京",
+     "email": "b@example.com"
+    }
+   ],
+   "out": [
+    "211f90a437342a102d3196d60a2f9a15",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "emoji 😀",
+     "email": "e@example.com"
+    }
+   ],
+   "out": [
+    "687737389154c35a6e72b3ff9508d0bd",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "quote'name",
+     "email": "q@example.com"
+    }
+   ],
+   "out": [
+    "7a4a1f46702288d88fcd6c72dae27025",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "email": "alice@example.com"
+    }
+   ],
+   "out": [
+    "b7ea82d20562d2410deaeda9aa3f0b75",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "2": "b",
+     "1": "a"
+    }
+   ],
+   "out": [
+    "27db23350db75bfbff373fd0633a350a",
+    0
+   ],
+   "representable_in_js": false
+  },
+  {
+   "in": [
+    {
+     "name": 1.0
+    }
+   ],
+   "out": [
+    "451fb2e42c462881d80011b762fe0805",
+    1
+   ],
+   "representable_in_js": false
+  },
+  {
+   "in": [
+    {
+     "name": 123,
+     "email": "x@y.z"
+    }
+   ],
+   "out": [
+    "10faa2e115a24bea1813febe80d132b4",
+    1
+   ],
+   "representable_in_js": false
+  },
+  {
+   "in": [
+    {
+     "name": "back\\slash",
+     "email": "s@example.com"
+    }
+   ],
+   "out": [
+    "c606e38b25c08e47e5e212c3e3a45290",
+    1
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": ""
+    },
+    {
+     "name": "𐀀"
+    }
+   ],
+   "out": [
+    "c988f548fd272cd88f9e7e0404f7509b",
+    2
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "𐀀"
+    },
+    {
+     "name": ""
+    }
+   ],
+   "out": [
+    "c988f548fd272cd88f9e7e0404f7509b",
+    2
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    {
+     "name": "😀"
+    },
+    {
+     "name": "￿"
+    }
+   ],
+   "out": [
+    "316c8ad12e33d4aedac5ff520217bb9b",
+    2
+   ],
+   "representable_in_js": true
+  },
+  {
+   "in": [
+    "",
+    "𐀀"
+   ],
+   "out": [
+    "8b9415948621f5c3de3a278311ee5875",
+    0
+   ],
+   "representable_in_js": true
+  }
+ ],
+ "install_body_digest": [
+  {
+   "install": null,
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    0,
+    ""
+   ]
+  },
+  {
+   "install": "",
+   "preinstall": "",
+   "postinstall": "",
+   "out": [
+    0,
+    ""
+   ]
+  },
+  {
+   "install": "node install.js",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "9aec9ea54cbbfcac20bce68117195286"
+   ]
+  },
+  {
+   "install": "NODE   INSTALL.JS",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "9aec9ea54cbbfcac20bce68117195286"
+   ]
+  },
+  {
+   "install": "  node\tinstall.js\n",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "9aec9ea54cbbfcac20bce68117195286"
+   ]
+  },
+  {
+   "install": "a",
+   "preinstall": "b",
+   "postinstall": "c",
+   "out": [
+    1,
+    "900150983cd24fb0d6963f7d28e17f72"
+   ]
+  },
+  {
+   "install": "abc",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "900150983cd24fb0d6963f7d28e17f72"
+   ]
+  },
+  {
+   "install": null,
+   "preinstall": null,
+   "postinstall": "curl http://x | sh",
+   "out": [
+    1,
+    "883331ca459cb141923f8475ee337629"
+   ]
+  },
+  {
+   "install": "ΟΣ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "ad85086fbae15c5c89b8fbce5a8a83ae"
+   ]
+  },
+  {
+   "install": "ΟΣΑ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "8c0eb94b8cc9180a5bbc1f9a21a0b007"
+   ]
+  },
+  {
+   "install": "Σ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "3122c41ebe889f745cb9bbe1c92165c3"
+   ]
+  },
+  {
+   "install": "ΣΣ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "4c66d4e0d27cbf7bac5a14ec82171fa2"
+   ]
+  },
+  {
+   "install": "A.Σ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "6d988c14aecf33b647a89a755aff326e"
+   ]
+  },
+  {
+   "install": "AΣ.B",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "cf7934a043c31448d7610df41ba1437f"
+   ]
+  },
+  {
+   "install": "ͅΣ",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "cbf2f35ef6f105487311c31585c9e677"
+   ]
+  },
+  {
+   "install": "run ΟΣ.js --flag",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "007290c40e1e974a6fd3ce01ff78ab66"
+   ]
+  },
+  {
+   "install": "nodeinstall.js",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "9aec9ea54cbbfcac20bce68117195286"
+   ]
+  },
+  {
+   "install": "node﻿install.js",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "ac368c029332a105c05ee265d402f835"
+   ]
+  },
+  {
+   "install": "İnstall",
+   "preinstall": null,
+   "postinstall": null,
+   "out": [
+    1,
+    "28a3fbc12937d9d1445fb21c59558270"
+   ]
+  }
+ ],
+ "python_lower": [
+  {
+   "in": "",
+   "out": ""
+  },
+  {
+   "in": "ABC",
+   "out": "abc"
+  },
+  {
+   "in": "abc",
+   "out": "abc"
+  },
+  {
+   "in": "ΟΣ",
+   "out": "ος"
+  },
+  {
+   "in": "ΟΣΑ",
+   "out": "οσα"
+  },
+  {
+   "in": "Σ",
+   "out": "σ"
+  },
+  {
+   "in": "ΣΣ",
+   "out": "σς"
+  },
+  {
+   "in": "ΣΣΣ",
+   "out": "σσς"
+  },
+  {
+   "in": "A.Σ",
+   "out": "a.ς"
+  },
+  {
+   "in": "AΣ.",
+   "out": "aς."
+  },
+  {
+   "in": "AΣ.B",
+   "out": "aσ.b"
+  },
+  {
+   "in": "ͅΣ",
+   "out": "ͅσ"
+  },
+  {
+   "in": "Σͅ",
+   "out": "σͅ"
+  },
+  {
+   "in": "Σ Σ",
+   "out": "σ σ"
+  },
+  {
+   "in": "ΟΔΥΣΣΕΑΣ",
+   "out": "οδυσσεας"
+  },
+  {
+   "in": "İ",
+   "out": "i̇"
+  },
+  {
+   "in": "İA",
+   "out": "i̇a"
+  },
+  {
+   "in": "ı",
+   "out": "ı"
+  },
+  {
+   "in": "ẞ",
+   "out": "ß"
+  },
+  {
+   "in": "Ꭰ",
+   "out": "ꭰ"
+  },
+  {
+   "in": "ᎠᎡABC",
+   "out": "ꭰꭱabc"
+  },
+  {
+   "in": "ᾳ",
+   "out": "ᾳ"
+  },
+  {
+   "in": "ÁΣ",
+   "out": "áς"
+  },
+  {
+   "in": "ÉΣ",
+   "out": "éς"
+  },
+  {
+   "in": "1Σ",
+   "out": "1σ"
+  },
+  {
+   "in": " Σ",
+   "out": " σ"
+  },
+  {
+   "in": "_Σ",
+   "out": "_σ"
+  },
+  {
+   "in": "Σ_",
+   "out": "σ_"
+  },
+  {
+   "in": null,
+   "out": null
+  }
+ ],
+ "node_major": [
+  {
+   "in": null,
+   "out": ""
+  },
+  {
+   "in": "",
+   "out": ""
+  },
+  {
+   "in": "v18.17.0",
+   "out": "18"
+  },
+  {
+   "in": "18.17.0",
+   "out": "18"
+  },
+  {
+   "in": "v20",
+   "out": "20"
+  },
+  {
+   "in": "nonsense",
+   "out": ""
+  },
+  {
+   "in": "v0.10.48",
+   "out": "0"
+  }
+ ],
+ "provider_class": [
+  {
+   "domain": null,
+   "count": 0,
+   "out": "unknown"
+  },
+  {
+   "domain": "gmail.com",
+   "count": 1,
+   "out": "free-webmail"
+  },
+  {
+   "domain": "gmail.com",
+   "count": 99,
+   "out": "free-webmail"
+  },
+  {
+   "domain": "protonmail.com",
+   "count": 5,
+   "out": "privacy"
+  },
+  {
+   "domain": "corp.example",
+   "count": 1,
+   "out": "unverified"
+  },
+  {
+   "domain": "corp.example",
+   "count": 2,
+   "out": "verified-corporate"
+  },
+  {
+   "domain": "corp.example",
+   "count": 50,
+   "out": "verified-corporate"
+  }
+ ],
+ "canonical_repo_url": [
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": "not a url",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner/repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "https://github.com/owner/repo.git",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "git+https://github.com/owner/repo.git",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "git+ssh://git@github.com/owner/repo.git",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "git@github.com:owner/repo.git",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "ssh://git@gitlab.example.com:22/group/sub/proj.git",
+   "out": "gitlab.example.com/22/group"
+  },
+  {
+   "in": "git://github.com/Owner/Repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "HTTPS://GitHub.COM/Owner/Repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "https://github.com/owner",
+   "out": "github.com/owner"
+  },
+  {
+   "in": "https://github.com/owner/",
+   "out": "github.com/owner"
+  },
+  {
+   "in": "https://github.com/owner/repo?tab=x#frag",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "https://localhost/owner/repo",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner.git/repo.git",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "ftp://files.example.com/o/r",
+   "out": "files.example.com/o/r"
+  },
+  {
+   "in": "https://github.com//owner//repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "github.com/owner/repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "https://github.com/",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner/repo",
+   "out": "github.com/owner/repo"
+  },
+  {
+   "in": "﻿https://github.com/owner/repo﻿",
+   "out": null
+  },
+  {
+   "in": "  https://GitHub.com/ΟΣ/Repo  ",
+   "out": "github.com/ος/repo"
+  },
+  {
+   "in": "https://github.com/İowner/repo",
+   "out": "github.com/i̇owner/repo"
+  }
+ ],
+ "repo_digest": [
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": "not a url",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner/repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "https://github.com/owner/repo.git",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "git+https://github.com/owner/repo.git",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "git+ssh://git@github.com/owner/repo.git",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "git@github.com:owner/repo.git",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "ssh://git@gitlab.example.com:22/group/sub/proj.git",
+   "out": "858a4d89f4bf90ae0d68002ba054c2e7e90301512f45eb588cddfbee26e6dc86"
+  },
+  {
+   "in": "git://github.com/Owner/Repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "HTTPS://GitHub.COM/Owner/Repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "https://github.com/owner",
+   "out": "9974ca5fcf4ece207f8b9ef2528ccbc18903040508ab81f66d4ccde8eebdcbec"
+  },
+  {
+   "in": "https://github.com/owner/",
+   "out": "9974ca5fcf4ece207f8b9ef2528ccbc18903040508ab81f66d4ccde8eebdcbec"
+  },
+  {
+   "in": "https://github.com/owner/repo?tab=x#frag",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "https://localhost/owner/repo",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner.git/repo.git",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "ftp://files.example.com/o/r",
+   "out": "8709a7aca6b766a6354848a0c7ff8a6c278d50467fd9fa72a989720e7273f749"
+  },
+  {
+   "in": "https://github.com//owner//repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "github.com/owner/repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "https://github.com/",
+   "out": null
+  },
+  {
+   "in": "https://github.com/owner/repo",
+   "out": "c37f60310a6204599854b8c28444812d631f8a291fa9a4e24e7536938d773427"
+  },
+  {
+   "in": "﻿https://github.com/owner/repo﻿",
+   "out": null
+  },
+  {
+   "in": "  https://GitHub.com/ΟΣ/Repo  ",
+   "out": "19ddbbdb6b646ef3e4bf6eed811b988ba38f60505e9728134590412f6f583320"
+  },
+  {
+   "in": "https://github.com/İowner/repo",
+   "out": "f88d31ac56c65516c94b0abc4388dbdef0d9dd870252a508541f0232bdbeb973"
+  }
+ ],
+ "parse_publisher_tool": [
+  {
+   "in": null,
+   "out": [
+    "",
+    0.0
+   ]
+  },
+  {
+   "in": "",
+   "out": [
+    "",
+    0.0
+   ]
+  },
+  {
+   "in": "npm",
+   "out": [
+    "npm",
+    0.0
+   ]
+  },
+  {
+   "in": "npm@10.2.3",
+   "out": [
+    "npm",
+    10002003.0
+   ]
+  },
+  {
+   "in": "npm@v10.2.3",
+   "out": [
+    "npm",
+    10002003.0
+   ]
+  },
+  {
+   "in": "npm@10.2",
+   "out": [
+    "npm",
+    10002000.0
+   ]
+  },
+  {
+   "in": "npm@10",
+   "out": [
+    "npm",
+    10000000.0
+   ]
+  },
+  {
+   "in": "yarn@1.22.19",
+   "out": [
+    "yarn",
+    1022019.0
+   ]
+  },
+  {
+   "in": "npm@10.2.3 linux-x64",
+   "out": [
+    "npm",
+    10002003.0
+   ]
+  },
+  {
+   "in": "pnpm@8.15.0",
+   "out": [
+    "pnpm",
+    8015000.0
+   ]
+  },
+  {
+   "in": "@scoped/tool@1.2.3",
+   "out": [
+    "",
+    0.0
+   ]
+  },
+  {
+   "in": "npm@abc",
+   "out": [
+    "npm",
+    0.0
+   ]
+  },
+  {
+   "in": "npm@",
+   "out": [
+    "npm",
+    0.0
+   ]
+  },
+  {
+   "in": "@",
+   "out": [
+    "",
+    0.0
+   ]
+  },
+  {
+   "in": "1.2.3",
+   "out": [
+    "1.2.3",
+    0.0
+   ]
+  }
+ ],
+ "resolve_publisher_email": [
+  {
+   "email": null,
+   "raw_metadata": null,
+   "out": ""
+  },
+  {
+   "email": "",
+   "raw_metadata": null,
+   "out": ""
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": null,
+   "out": "direct@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {},
+   "out": ""
+  },
+  {
+   "email": "",
+   "raw_metadata": {},
+   "out": ""
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {},
+   "out": "direct@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": null
+   },
+   "out": ""
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": null
+   },
+   "out": ""
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": null
+   },
+   "out": "direct@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {}
+   },
+   "out": ""
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {}
+   },
+   "out": ""
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {}
+   },
+   "out": "direct@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "orig@example.com"
+    }
+   },
+   "out": "orig@example.com"
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "orig@example.com"
+    }
+   },
+   "out": "orig@example.com"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "orig@example.com"
+    }
+   },
+   "out": "orig@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "requested_by": "req@example.com"
+    }
+   },
+   "out": "req@example.com"
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {
+     "requested_by": "req@example.com"
+    }
+   },
+   "out": "req@example.com"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "requested_by": "req@example.com"
+    }
+   },
+   "out": "req@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher": {
+      "email": "nested@example.com"
+     }
+    }
+   },
+   "out": "nested@example.com"
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {
+     "publisher": {
+      "email": "nested@example.com"
+     }
+    }
+   },
+   "out": "nested@example.com"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher": {
+      "email": "nested@example.com"
+     }
+    }
+   },
+   "out": "nested@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "",
+     "requested_by": "fallback@example.com"
+    }
+   },
+   "out": "fallback@example.com"
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "",
+     "requested_by": "fallback@example.com"
+    }
+   },
+   "out": "fallback@example.com"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "",
+     "requested_by": "fallback@example.com"
+    }
+   },
+   "out": "fallback@example.com"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher": "not-a-dict"
+    }
+   },
+   "out": ""
+  },
+  {
+   "email": "",
+   "raw_metadata": {
+    "approver": {
+     "publisher": "not-a-dict"
+    }
+   },
+   "out": ""
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher": "not-a-dict"
+    }
+   },
+   "out": "direct@example.com"
+  }
+ ],
+ "identity_digest_with_metadata": [
+  {
+   "email": null,
+   "raw_metadata": null,
+   "out": null
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": null,
+   "out": "edd66726ec8683d70a63e36c375db64ed9e5f12dff76977f3b5422801b8acfbe"
+  },
+  {
+   "email": null,
+   "raw_metadata": {},
+   "out": null
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {},
+   "out": "edd66726ec8683d70a63e36c375db64ed9e5f12dff76977f3b5422801b8acfbe"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": null
+   },
+   "out": null
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": null
+   },
+   "out": "edd66726ec8683d70a63e36c375db64ed9e5f12dff76977f3b5422801b8acfbe"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {}
+   },
+   "out": null
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {}
+   },
+   "out": "edd66726ec8683d70a63e36c375db64ed9e5f12dff76977f3b5422801b8acfbe"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "orig@example.com"
+    }
+   },
+   "out": "d2c1eec17e9b126b0f170db67392adc8d7dd80f330dba838a3ce27d6055b7d31"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "orig@example.com"
+    }
+   },
+   "out": "d2c1eec17e9b126b0f170db67392adc8d7dd80f330dba838a3ce27d6055b7d31"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "requested_by": "req@example.com"
+    }
+   },
+   "out": "c785c507c10b8b2b352adff8c9f4a4d30cbd9000638e5fe7086a66c417197e89"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "requested_by": "req@example.com"
+    }
+   },
+   "out": "c785c507c10b8b2b352adff8c9f4a4d30cbd9000638e5fe7086a66c417197e89"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher": {
+      "email": "nested@example.com"
+     }
+    }
+   },
+   "out": "9c6a7fbca8cef9e70c8f186f28f184a7eba35e9fc9fd73ab94d7efb156ef3803"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher": {
+      "email": "nested@example.com"
+     }
+    }
+   },
+   "out": "9c6a7fbca8cef9e70c8f186f28f184a7eba35e9fc9fd73ab94d7efb156ef3803"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "",
+     "requested_by": "fallback@example.com"
+    }
+   },
+   "out": "83ce77e1d063bcabc42a8aa9492eeda4bd15db84561e0ead35326f922de9c806"
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher_email": "",
+     "requested_by": "fallback@example.com"
+    }
+   },
+   "out": "83ce77e1d063bcabc42a8aa9492eeda4bd15db84561e0ead35326f922de9c806"
+  },
+  {
+   "email": null,
+   "raw_metadata": {
+    "approver": {
+     "publisher": "not-a-dict"
+    }
+   },
+   "out": null
+  },
+  {
+   "email": "direct@example.com",
+   "raw_metadata": {
+    "approver": {
+     "publisher": "not-a-dict"
+    }
+   },
+   "out": "edd66726ec8683d70a63e36c375db64ed9e5f12dff76977f3b5422801b8acfbe"
+  }
+ ],
+ "python_float_repr": [
+  {
+   "in": "0.0",
+   "out": "0.0"
+  },
+  {
+   "in": "-0.0",
+   "out": "-0.0"
+  },
+  {
+   "in": "1.0",
+   "out": "1.0"
+  },
+  {
+   "in": "-1.0",
+   "out": "-1.0"
+  },
+  {
+   "in": "1001000.0",
+   "out": "1001000.0"
+  },
+  {
+   "in": "11006002.0",
+   "out": "11006002.0"
+  },
+  {
+   "in": "12000002.0",
+   "out": "12000002.0"
+  },
+  {
+   "in": "0.5",
+   "out": "0.5"
+  },
+  {
+   "in": "-0.5",
+   "out": "-0.5"
+  },
+  {
+   "in": "1.5",
+   "out": "1.5"
+  },
+  {
+   "in": "1000000000000000.0",
+   "out": "1000000000000000.0"
+  },
+  {
+   "in": "1e+16",
+   "out": "1e+16"
+  },
+  {
+   "in": "1e+17",
+   "out": "1e+17"
+  },
+  {
+   "in": "1e+21",
+   "out": "1e+21"
+  },
+  {
+   "in": "1e+22",
+   "out": "1e+22"
+  },
+  {
+   "in": "0.0001",
+   "out": "0.0001"
+  },
+  {
+   "in": "1e-05",
+   "out": "1e-05"
+  },
+  {
+   "in": "1e-06",
+   "out": "1e-06"
+  },
+  {
+   "in": "1e-07",
+   "out": "1e-07"
+  },
+  {
+   "in": "123456789012345.6",
+   "out": "123456789012345.6"
+  },
+  {
+   "in": "0.1",
+   "out": "0.1"
+  },
+  {
+   "in": "0.2",
+   "out": "0.2"
+  },
+  {
+   "in": "0.30000000000000004",
+   "out": "0.30000000000000004"
+  },
+  {
+   "in": "2.5e-10",
+   "out": "2.5e-10"
+  },
+  {
+   "in": "3.14159265358979",
+   "out": "3.14159265358979"
+  },
+  {
+   "in": "1.2345678901234568e+18",
+   "out": "1.2345678901234568e+18"
+  },
+  {
+   "in": "5e-324",
+   "out": "5e-324"
+  },
+  {
+   "in": "1.7976931348623157e+308",
+   "out": "1.7976931348623157e+308"
+  }
+ ]
+}

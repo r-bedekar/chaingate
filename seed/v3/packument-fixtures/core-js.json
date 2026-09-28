@@ -1,0 +1,1149 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 289,
+  "full_document_sha256": "1dca3f9f2f5c6fd76ab633f58fe881d5ebcb18eb8282d091f2f63b077a6b9506",
+  "kept": 12
+ },
+ "name": "core-js",
+ "dist-tags": {
+  "beta": "3.0.0-beta.20",
+  "latest": "3.50.0",
+  "alpha": "4.0.0-alpha.1"
+ },
+ "time": {
+  "created": "2013-07-18T10:49:42.468Z",
+  "modified": "2026-08-05T08:54:45.491Z",
+  "0.0.3": "2013-12-24T09:45:00.433Z",
+  "0.4.5": "2015-01-16T14:23:25.332Z",
+  "0.9.5": "2015-04-29T21:38:52.134Z",
+  "1.2.6": "2015-11-09T04:47:47.062Z",
+  "2.5.4": "2018-03-27T16:16:31.935Z",
+  "3.0.0-beta.15": "2019-02-09T21:14:34.348Z",
+  "3.3.5": "2019-10-28T17:30:24.646Z",
+  "3.9.1": "2021-02-28T18:33:41.801Z",
+  "3.18.1": "2021-09-26T22:32:29.201Z",
+  "3.23.5": "2022-07-17T19:15:30.893Z",
+  "3.33.1": "2023-10-20T05:38:28.395Z",
+  "3.50.0": "2026-08-05T08:54:45.261Z"
+ },
+ "versions": {
+  "0.0.3": {
+   "name": "core-js",
+   "version": "0.0.3",
+   "_id": "core-js@0.0.3",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "f4e1c0cf19c8c5b287d9b53f91efe0bedecb0c0b",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-0.0.3.tgz",
+    "integrity": "sha512-55bFsI/+YMQlpqGtqZboT9aT8GYoBe1WzOrwkNLsGcaQorpam5NQjDNFApEuG54oYD3KymZgyJvz/fWHJnx1mA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCr+0qUB0oibk1Ss7e76xXOvL5Qwsl3PIiwsmjETlBuQwIhAOqKP4AgbwXjiUl5CB6EgtUGLJHcG7Yu7xSKljA9/qIV",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "1.3.14",
+   "directories": {},
+   "devDependencies": {
+    "grunt": "*",
+    "LiveScript": "*",
+    "grunt-livescript": "*",
+    "load-grunt-tasks": "*",
+    "grunt-contrib-watch": "*",
+    "grunt-contrib-uglify": "*"
+   }
+  },
+  "0.4.5": {
+   "name": "core-js",
+   "version": "0.4.5",
+   "keywords": [
+    "ES6",
+    "ECMAScript 6",
+    "ES7",
+    "ECMAScript 7",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Dict",
+    "Promise",
+    "Symbol",
+    "Array generics",
+    "setImmediate",
+    "console cap",
+    "abstract references",
+    "partial application",
+    "Date formatting"
+   ],
+   "_id": "core-js@0.4.5",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "b6702b018de4691c1f1c04dcdf9742f8d9cd346c",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-0.4.5.tgz",
+    "integrity": "sha512-7wpXN9sgWragd5In1V1wzI1QW4tNFxK5+BgDSNkSKcETAD77sEUNbNYZyMU+fd6vCVO8ASi/jFPcv+9orOSHfg==",
+    "signatures": [
+     {
+      "sig": "MEQCIAwDScmGZ3aDyL0pAFnFkSoTXfctqroAdHNCdK7LGjD3AiAAisUdSdhwkHcmbuFqoX539pD8Z61psNkjzpI7eyCbRg==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "b6702b018de4691c1f1c04dcdf9742f8d9cd346c",
+   "gitHead": "9e90c836b1d6413dc64dc63f7a02d4da130e0bb3",
+   "scripts": {
+    "promises-tests": "promises-aplus-tests tests/promises_tests_adapter"
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.28",
+   "description": "Standard library",
+   "directories": {},
+   "devDependencies": {
+    "grunt": "0.4.x",
+    "karma": "*",
+    "LiveScript": "1.3.x",
+    "karma-qunit": "*",
+    "grunt-livescript": "0.5.x",
+    "load-grunt-tasks": "0.4.x",
+    "karma-ie-launcher": "*",
+    "grunt-contrib-watch": "0.6.x",
+    "grunt-contrib-uglify": "0.4.x",
+    "karma-opera-launcher": "*",
+    "promises-aplus-tests": "*",
+    "karma-chrome-launcher": "*",
+    "karma-firefox-launcher": "*"
+   }
+  },
+  "0.9.5": {
+   "name": "core-js",
+   "version": "0.9.5",
+   "keywords": [
+    "ES5",
+    "ECMAScript 5",
+    "ES6",
+    "ECMAScript 6",
+    "ES7",
+    "ECMAScript 7",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Dict",
+    "Promise",
+    "Symbol",
+    "Array generics",
+    "setImmediate",
+    "partial application",
+    "Date formatting"
+   ],
+   "license": "MIT",
+   "_id": "core-js@0.9.5",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "6382dccfcd8e40d1d505e6dc6dcc0838b4a4ec5a",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-0.9.5.tgz",
+    "integrity": "sha512-+z8Gx0W67mwm1HV4omc7kFyUlglwbxy/lI3h0IBND9MjnA/c1CFcbaqQHol5jOezLWParodfcEQmaqWFU+LVqA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQD3GKkdpkECvwW4YONI45ndMMPgfnq9wJhRRBhAKAU+TQIhAMLuyBTJ0AIzLfaBafRoVvfcfCsfC1eJhJMqz99e3mZ2",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "6382dccfcd8e40d1d505e6dc6dcc0838b4a4ec5a",
+   "gitHead": "cd1698262511ab872ed3ac71a7b52605b64df825",
+   "scripts": {
+    "lint": "eslint es5 es6 es7 js web core fn modules",
+    "test": "npm run lint && grunt client livescript karma:continuous && npm run promises-tests && lsc tests/commonjs",
+    "promises-tests": "promises-aplus-tests tests/promises_tests_adapter"
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "2.7.1",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "1.6.2",
+   "devDependencies": {
+    "grunt": "0.4.x",
+    "karma": "0.12.x",
+    "eslint": "0.20.x",
+    "webpack": "1.8.x",
+    "LiveScript": "1.3.x",
+    "grunt-karma": "0.10.x",
+    "karma-qunit": "0.1.x",
+    "grunt-livescript": "0.5.x",
+    "karma-ie-launcher": "0.1.x",
+    "grunt-contrib-copy": "0.8.x",
+    "grunt-contrib-clean": "0.6.x",
+    "grunt-contrib-watch": "0.6.x",
+    "grunt-contrib-uglify": "0.9.x",
+    "karma-opera-launcher": "0.1.x",
+    "promises-aplus-tests": "2.1.x",
+    "karma-chrome-launcher": "0.1.x",
+    "karma-firefox-launcher": "0.1.x",
+    "karma-phantomjs-launcher": "0.1.x"
+   }
+  },
+  "1.2.6": {
+   "name": "core-js",
+   "version": "1.2.6",
+   "keywords": [
+    "ES5",
+    "ECMAScript 5",
+    "ES6",
+    "ECMAScript 6",
+    "ES7",
+    "ECMAScript 7",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Symbol",
+    "Array generics",
+    "setImmediate",
+    "Dict",
+    "partial application"
+   ],
+   "license": "MIT",
+   "_id": "core-js@1.2.6",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "e2351f6cae764f8c34e5d839acb6a60cef8b4a45",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-1.2.6.tgz",
+    "integrity": "sha512-TUf3jrdcsgHu2qhCR6ve4hC4VHtZ5DWF9vKMn5tPi7MEyAWR4Sf2XS7Ogm6F3P7enSRTdqlW/E85DOFKCKs3fA==",
+    "signatures": [
+     {
+      "sig": "MEUCIERXKKqddglD3ES5Th6LVnvIJBz20MF1VEBXNSrwqHTRAiEA37aTGVAgDN7EdogkTPJj+YBWfh+gnoWW2B+LLU04OZ0=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "e2351f6cae764f8c34e5d839acb6a60cef8b4a45",
+   "gitHead": "280a87d5b3fdbc067c589b2bf960edb1ea12e03c",
+   "scripts": {
+    "lint": "eslint es5 es6 es7 js web core fn modules",
+    "test": "npm run lint && npm run grunt livescript client karma:continuous library karma:continuous-library && npm run promises-tests && lsc tests/commonjs",
+    "grunt": "grunt",
+    "promises-tests": "promises-aplus-tests tests/promises-aplus/adapter"
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "3.3.9",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "4.2.1",
+   "devDependencies": {
+    "grunt": "0.4.x",
+    "karma": "0.13.x",
+    "eslint": "1.9.x",
+    "webpack": "1.12.x",
+    "grunt-cli": "0.1.x",
+    "LiveScript": "1.3.x",
+    "grunt-karma": "0.12.x",
+    "karma-qunit": "0.1.x",
+    "grunt-livescript": "0.5.x",
+    "karma-ie-launcher": "0.2.x",
+    "grunt-contrib-copy": "0.8.x",
+    "grunt-contrib-clean": "0.6.x",
+    "grunt-contrib-watch": "0.6.x",
+    "grunt-contrib-uglify": "0.10.x",
+    "promises-aplus-tests": "2.1.x",
+    "karma-chrome-launcher": "0.2.x",
+    "karma-firefox-launcher": "0.1.x",
+    "karma-phantomjs-launcher": "0.2.x"
+   }
+  },
+  "2.5.4": {
+   "name": "core-js",
+   "version": "2.5.4",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Symbol",
+    "TypedArray",
+    "setImmediate",
+    "Dict",
+    "polyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@2.5.4",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "f2c8bf181f2a80b92f360121429ce63a2f0aeae0",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-2.5.4.tgz",
+    "fileCount": 1473,
+    "integrity": "sha512-lXzWZXAh6OGAjNjtjBVZPDFruWIgP7B+m/wFssG8hyYCZ/ogJ45VjXoySqUNPNEOCBZnDwXulFhcmUeQf0XRgA==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDJq0IDtaSgXvkZeBwleTy7bBiLibv2H6hHMAQjD+4OUwIgfkrUehm5PNpEyA61g+5REqW0W4/d2SvsKV7jySe+cJ0=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 2168837
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "f2c8bf181f2a80b92f360121429ce63a2f0aeae0",
+   "gitHead": "f1e504bf803d777bc1c5d5c0221e6f9bc4f2ddb6",
+   "scripts": {
+    "lint": "eslint ./",
+    "test": "npm run grunt clean copy && npm run lint && npm run grunt livescript client karma:default && npm run grunt library karma:library && npm run promises-tests && npm run observables-tests && lsc tests/commonjs",
+    "grunt": "grunt",
+    "promises-tests": "promises-aplus-tests tests/promises-aplus/adapter",
+    "observables-tests": "node tests/observables/adapter && node tests/observables/adapter-library"
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "4.1.2",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "7.6.0",
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "temp": "^0.8.3",
+    "grunt": "^1.0.2",
+    "karma": "^2.0.0",
+    "qunit": "2.6.x",
+    "eslint": "4.19.x",
+    "webpack": "^3.11.0",
+    "grunt-cli": "^1.2.0",
+    "LiveScript": "1.3.x",
+    "grunt-karma": "^2.0.0",
+    "karma-qunit": "^2.0.1",
+    "grunt-livescript": "0.6.x",
+    "karma-ie-launcher": "^1.0.0",
+    "grunt-contrib-copy": "^1.0.0",
+    "phantomjs-prebuilt": "2.1.x",
+    "es-observable-tests": "0.2.x",
+    "grunt-contrib-clean": "^1.1.0",
+    "grunt-contrib-watch": "^1.0.0",
+    "eslint-plugin-import": "2.9.x",
+    "grunt-contrib-uglify": "3.3.x",
+    "promises-aplus-tests": "^2.1.2",
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-firefox-launcher": "^1.0.1",
+    "karma-phantomjs-launcher": "1.0.x"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_2.5.4_1522167391795_0.054923374457907626",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.0.0-beta.15": {
+   "name": "core-js",
+   "version": "3.0.0-beta.15",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "TypedArray",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@3.0.0-beta.15",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "265c4c74c73b571f81e46c38b381b7938052aa3d",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.0.0-beta.15.tgz",
+    "fileCount": 1576,
+    "integrity": "sha512-1d9F3F8Dpm6lLym3CY/U6m3/dQ1u+9dwXgrd9LrcEaV1qx8lUg7ugWPLOQoZpoIwCWH8zQ0RwMswOMFzfusK7w==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDySBaVc7owIgzN6F2K2ShBHvJZ6UURWkBW3n4Vr0GoqwIhALRWGKJcGOwA76G0uKTu72IErKkpSw2PesNeWqYx82ju",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 529891,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJcX0K6CRA9TVsSAnZWagAAsT0P/2+nagsMhy0ifxEbW1do\nEGq0DUVNCOpoBz4HrXL2YXLhsJRj/HowRgwXqmEpaN7azvX5/bRZVDRpLhho\nejmlLudSK0Wbn7lLD4w+Koa6Qnmn4UfW0ZfE9CaYO4OzcCsjHqOEGMJR26ZV\ni+MNFkzfNESTw7j8MC/iV7QSinlYNCgh8XthSvCbhVoVxm7bfV3Q4ulEcz6o\nz0yRaL3s2tkxtkEsai5gKvgNNwWvyk6ICAjZFKbX2a+py15tUhaEzvITc0+Q\nw4CwU7wDesYeLgOEXkDmc62NWsR2tZc+sY0gBiOyRlPBoJ9ruXX21qtGqnHB\n/5N1LKeCUnG1qBdII20FczGnNZbBVV+6uqApUxmVFnr7B0i5G4sJjNlE2aRC\nEoSQ0iI39B7WtB2B00urQz2blU02lb6VkD5NBKcWHk4LGi+oMEBcWeYL/aNt\nSXoL3iopx3Nj3EaPL2gH8DvDilRY8M+ijWBHXP4WMvtcsaqeCHi+weA7wdOG\nbWT3awenSK6Oir0b0t0fiuzih4maqAqZni64sXvQe/nJ+6wobF7QMM+S3DBN\n7pu/3m+pWVZQyKCpTctEYllBmH/VxRHGTVH+2Wfbtn6qA7GIkb37cW1+jrBX\njc+YUglbbudw8G+fLCQ2DJsqpNy5LAKH4erLGfhUDJlN1siYBltAWb16Y/cK\nOXIN\r\n=hgC+\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.7.0",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "11.7.0",
+   "_hasShrinkwrap": false,
+   "readmeFilename": "README.md",
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.0.0-beta.15_1549746874207_0.6166127052236536",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.3.5": {
+   "name": "core-js",
+   "version": "3.3.5",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "TypedArray",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@3.3.5",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "58d20f48a95a07304b62ff752742b82b56431ed8",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.3.5.tgz",
+    "fileCount": 1677,
+    "integrity": "sha512-0J3K+Par/ZydhKg8pEiTcK/9d65/nqJOzY62uMkjeBmt05fDOt/khUVjDdh8TpeIuGQDy1yLDDCjiWN/8pFIuw==",
+    "signatures": [
+     {
+      "sig": "MEQCIAELrEz2oRmjgI/mGjcbyLiYIx9wVqROLq6sxZ1N0kyEAiAm0WG4EuFlACvc+R52UOL27hM/HCkc8OZumxOZgUFfeQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 626843,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJdtyWxCRA9TVsSAnZWagAA6l8P+wZQ8XDVmXC1IQINHpAE\nz2PK4BAXtuibE7MRHVKAmBEs2xzlmEkiSDY8lJJs7E8bbGxVYa/ImTVKNiNn\ntOXKnFykT/+MILXG30REQzPAuoK+5qqJm6w1sttLnpO6LJEaWCe+CtkUS1lS\n0OYOisL+ccUTTQHvqZDe80F/V6qaIVAL882Eo/JD7HKvpSq5jZMZELkUTPLK\nPMK/C1IYPP4W+SH+Srk4fSgRHz/wlIQt4iEKIcfHtx5m6KjwUAkc+grPTb0y\nqp7EL+xx4WQhoYUEh3JivshJlRKkPaWYyMe+YgEgMxn4ggkRYj4bYaX6WZJ9\n0c0MdFe6vIo0EbDlOo6m9+nCv3dXrlIrPZrw/PyDg7HbGEJAU7TNnPSzFjH4\ncPq3M620cEi1OnH5GKgQ0FkkKtrkbkGLWYF01cIr1QfiaLB/u3BpJLPFCUbT\noqWecA5O+DkM5elqrfKrrzRZsKfSVTM/wx3W3LzgERvC9aydk6lgwgQx5yWq\nrp7PK9VxD1TE4HBZlDmGrXid1zxw/dWdM6LFWZzC6nDM1YuqMK6YQWmnLRs0\nBo879xsFdB2uyqPFVOz5XF9xElhkQpedhxJT2jzszWl7/ZvtO26dvdziWpvP\ni4+5WhfBE055IbJLwRlE9IDvAiWeB1zKr9rqh98SZPz3MFyelb9OGzklut91\nwThD\r\n=cMyr\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "scripts": {
+    "postinstall": "node postinstall || echo \"ignore\""
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.12.0",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "13.0.1",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.3.5_1572283824328_0.8256540441005329",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.9.1": {
+   "name": "core-js",
+   "version": "3.9.1",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "TypedArray",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@3.9.1",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    },
+    {
+     "name": "slowcheetah",
+     "email": "slow_cheetah@inbox.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "cec8de593db8eb2a85ffb0dbdeb312cb6e5460ae",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.9.1.tgz",
+    "fileCount": 1771,
+    "integrity": "sha512-gSjRvzkxQc1zjM/5paAmL4idJBFzuJoo+jDjF1tStYFMV2ERfD02HhahhCGXUyHxQRG4yFKVSdO6g62eoRMcDg==",
+    "signatures": [
+     {
+      "sig": "MEQCIG8HLcmdKd04Z8hkXdbMaI1FgfSq/yMqIBJ/kc16MqQzAiBYpELUulBU9P1dyIIiRgdM01rAVwNT65LWAV1mN8l/XA==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 689543,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJgO+IGCRA9TVsSAnZWagAAfNUP/0aqE6cRKDYiBWrG3ERK\niZWp+DgpPcYFRMuNZV8GFBvT28K/9lZm+KTYic2xO8SNERJV5zqIavrptPY9\nAqFVYMp+CYh6rgf8AyJz0Q65MMwTzli3jpm8pWqcqsyamCGKFLx8FYbuPFsh\nXaqgvAMsKE7d3qBrVTN+76Rom2dakFS7CWW3N42lBhRQ0jjH9r/bfVDthAiH\nf8VR8F699B0UYg2H1uIxPlDXOJeNthgbPK8bZOxPIueycnpqKEETWjWook7C\npTROGRbRa/PldnxnviGjNmV6MaGqHj1cOjSfttZSvVsSqlUS2VpCOTE18txC\n61a41N75dHQECfIykwUZVPJhm50j448pFZOO5wGcCPp/jmeb3wy055QFpMkV\nEWfEvcd5hDjwuBjDH9uHhhK7zljwf0W9e2ACTjS9WXzdxS/hIdil6Z9Vw4lN\nAUKx/kIsLLDZoX9SIeGNtW+MA8mapsJ8+LER7t0pNDftzBh/1Dl0vA1yfMrx\nRv6B05UxrhC9A0iJoctTC0ex4ppULAFTXBxxsKqaxVzLS07Hgio5uuoN4BnU\nJY6mOHORvdsvf8820Gix8aCdbNbMCV5lS18Stw5qsKHXfersem6sbK8ErX+V\nUU/vOouIKMtLwzhklNAHl9nfbuguB1ykT34k0pNpJ8IrevWHgrYQ5XMn/ha8\nnsvM\r\n=Wt5w\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "funding": {
+    "url": "https://opencollective.com/core-js",
+    "type": "opencollective"
+   },
+   "gitHead": "50073b34ee7373eaa8c9cbbcc7313c5236a2f83e",
+   "scripts": {
+    "postinstall": "node -e \"try{require('./postinstall')}catch(e){}\""
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git",
+    "directory": "packages/core-js"
+   },
+   "_npmVersion": "lerna/3.22.1/node@v15.8.0+x64 (win32)",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "15.8.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.9.1_1614537221241_0.41057819165006837",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.18.1": {
+   "name": "core-js",
+   "version": "3.18.1",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "TypedArray",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@3.18.1",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "289d4be2ce0085d40fc1244c0b1a54c00454622f",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.18.1.tgz",
+    "fileCount": 1880,
+    "integrity": "sha512-vJlUi/7YdlCZeL6fXvWNaLUPh/id12WXj3MbkMw5uOyF0PfWPBNOCNbs53YqgrvtujLNlt9JQpruyIKkUZ+PKA==",
+    "signatures": [
+     {
+      "sig": "MEQCICt8MCn/4I4PhGUbVIW7aRAaV2ZhgItHBM0uRT1xtHZeAiBS/s1Xjx6xXCmL3wnkCNudiIV6T0FK8GI/5/NhfkYCdQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 782986
+   },
+   "main": "index.js",
+   "funding": {
+    "url": "https://opencollective.com/core-js",
+    "type": "opencollective"
+   },
+   "gitHead": "1a347bdf0297884ed8d9e32e1971267c6d572822",
+   "scripts": {
+    "postinstall": "node -e \"try{require('./postinstall')}catch(e){}\""
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "deprecated": "core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.",
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "lerna/4.0.0/node@v16.6.0+arm64 (darwin)",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "16.6.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.18.1_1632695548926_0.10880396854726637",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.23.5": {
+   "name": "core-js",
+   "version": "3.23.5",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "Harmony",
+    "Strawman",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "TypedArray",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "license": "MIT",
+   "_id": "core-js@3.23.5",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "1f82b0de5eece800827a2f59d597509c67650475",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.23.5.tgz",
+    "fileCount": 3086,
+    "integrity": "sha512-7Vh11tujtAZy82da4duVreQysIoO2EvVrur7y6IzZkH1IHPSekuDi8Vuw1+YKjkbfWLRD7Nc9ICQ/sIUDutcyg==",
+    "signatures": [
+     {
+      "sig": "MEYCIQC2vlXoL5D3Hu4MprLKIPtVCBbbqi4uDKmEub3bv/QA1AIhAJxPjv0R/jmFR+0ZiLEa8bSX1RYbRKPtchAr4+6WjgZ8",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 1005840,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJi1F/SACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmrJTA//eKWhvSiXTXkPpVLwJSh1SjFldB3dqTxGOmRaLTFRMdqwphFH\r\nWGgF0qJ22Ur8UQnmbxrlH5IGqsRvIQ+YZff263iCO6KVs9mKdg54oBCAdhco\r\nPEkc68WOA1/kJ6hhD0uK5eN/skIjTSItlt188TuLArjtNLNH1ywuYnbmiYHJ\r\nQ6tlDi2tWB277FeCj5RTiXxFQ+UBz0H+rCBLTZQZjKIx9E9TrRbAVphbSKid\r\nGIRkJ8Dc47Z+B1yFMZz2e6fGvE8ZRO27zvT3sFQAOHmdpoXzFhP625sPV73+\r\nAVkn9Ad4ezgUsRgKiHz7w/hC9tjRtxdQuFQLe8xAmakPxi4Fi/jAQxqYyxFk\r\n1lspEeK5WtorYs+pg1Vu80wQ3MZxXcciz6EL3lss+Oq3MRROYy0iPqDuAQVT\r\neyYLRsmxNawwZVA6AREt6rxpCW9OhhHLzOHp5U6Gj2jwuAqm6MnDp7AD8O/W\r\nH9fMFfeSjOoLBOuVPwgFrbSf5DVtTld13fXEhhyCN4A2vTYD+XrLLi5IgaT9\r\nh27VlxCj6LTCnuZhzH7OYSW6xJFYd7g9MogPwZpvhRI+fJGX+BH3MEM224Lj\r\nIqpolBJdDDUVYfnqS5HNP+tgBC38EKXzDgSNTeFn7qbZlQeg/hzHm5PoIwXV\r\nwMVj8Tj2cAt91soUtVcVOfx2ZligIm7yjHg=\r\n=iMVl\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "funding": {
+    "url": "https://opencollective.com/core-js",
+    "type": "opencollective"
+   },
+   "gitHead": "35bfb87ed543b7f89a767121ce484a3b93826ca9",
+   "scripts": {
+    "postinstall": "node -e \"try{require('./postinstall')}catch(e){}\""
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.14.0",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "18.4.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.23.5_1658085330641_0.846517132655727",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.33.1": {
+   "name": "core-js",
+   "version": "3.33.1",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ES2021",
+    "ES2022",
+    "ES2023",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "ECMAScript 2021",
+    "ECMAScript 2022",
+    "ECMAScript 2023",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "TypedArray",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "Iterator",
+    "AsyncIterator",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "structuredClone",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "author": {
+    "url": "http://zloirock.ru",
+    "name": "Denis Pushkarev",
+    "email": "zloirock@zloirock.ru"
+   },
+   "license": "MIT",
+   "_id": "core-js@3.33.1",
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "homepage": "https://github.com/zloirock/core-js#readme",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "ef3766cfa382482d0a2c2bc5cb52c6d88805da52",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.33.1.tgz",
+    "fileCount": 3411,
+    "integrity": "sha512-qVSq3s+d4+GsqN0teRCJtM6tdEEXyWxjzbhVrCHmBS5ZTM0FS2MOS0D13dUXAWDUN6a+lHI/N1hF9Ytz6iLl9Q==",
+    "signatures": [
+     {
+      "sig": "MEQCIDRsgSmxI1MXmbE/Akf41S2j8Eij1uZU8B4ge+pRS8/OAiACXW0YFTPos3ngrvf5l9KclbTTFikKrwo8uCLiRDFWrQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 1202638
+   },
+   "main": "index.js",
+   "type": "commonjs",
+   "funding": {
+    "url": "https://opencollective.com/core-js",
+    "type": "opencollective"
+   },
+   "gitHead": "55bec5621fb38ff554106761869aa245743f35c9",
+   "scripts": {
+    "postinstall": "node -e \"try{require('./postinstall')}catch(e){}\""
+   },
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git",
+    "directory": "packages/core-js"
+   },
+   "_npmVersion": "10.2.0",
+   "description": "Standard library",
+   "directories": {},
+   "_nodeVersion": "21.0.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/core-js_3.33.1_1697780308036_0.6850811197767639",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.50.0": {
+   "_id": "core-js@3.50.0",
+   "bugs": {
+    "url": "https://github.com/zloirock/core-js/issues"
+   },
+   "dist": {
+    "shasum": "a18646fcb0097650189b4504c803e887bcae4c0a",
+    "tarball": "https://registry.npmjs.org/core-js/-/core-js-3.50.0.tgz",
+    "fileCount": 3728,
+    "integrity": "sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCfpKXOUgn3BcnNop1myRw1DnvFv5EakK/C7Hp5hXimuwIgJmFROqwdNxkSzVA8wog8fDUBq1gzBs2KLd2DQsksq0s=",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     },
+     {
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+      "sig": "MEQCIDVoVZk5pwrG8mtH8l00qQNX3Ok1DSBsgZCkFZT2s5gAAiAjSO2aO3JhXxqABG3hwCjEvheXBcb0GiCdptHbLnNSLw=="
+     }
+    ],
+    "unpackedSize": 1360020
+   },
+   "main": "index.js",
+   "name": "core-js",
+   "type": "commonjs",
+   "author": {
+    "url": "http://zloirock.ru",
+    "name": "Denis Pushkarev",
+    "email": "zloirock@zloirock.ru"
+   },
+   "engines": {
+    "node": "*"
+   },
+   "funding": {
+    "url": "https://opencollective.com/core-js",
+    "type": "opencollective"
+   },
+   "gitHead": "486e8d62611aa2f5f2321329b0c168135bf22861",
+   "license": "MIT",
+   "scripts": {
+    "postinstall": "node -e \"try{require('./postinstall')}catch(e){}\""
+   },
+   "version": "3.50.0",
+   "_npmUser": {
+    "name": "zloirock",
+    "email": "zloirock@zloirock.ru"
+   },
+   "homepage": "https://core-js.io",
+   "keywords": [
+    "ES3",
+    "ES5",
+    "ES6",
+    "ES7",
+    "ES2015",
+    "ES2016",
+    "ES2017",
+    "ES2018",
+    "ES2019",
+    "ES2020",
+    "ES2021",
+    "ES2022",
+    "ES2023",
+    "ES2024",
+    "ES2025",
+    "ES2026",
+    "ECMAScript 3",
+    "ECMAScript 5",
+    "ECMAScript 6",
+    "ECMAScript 7",
+    "ECMAScript 2015",
+    "ECMAScript 2016",
+    "ECMAScript 2017",
+    "ECMAScript 2018",
+    "ECMAScript 2019",
+    "ECMAScript 2020",
+    "ECMAScript 2021",
+    "ECMAScript 2022",
+    "ECMAScript 2023",
+    "ECMAScript 2024",
+    "ECMAScript 2025",
+    "ECMAScript 2026",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "TypedArray",
+    "Promise",
+    "Observable",
+    "Symbol",
+    "Iterator",
+    "AsyncIterator",
+    "URL",
+    "URLSearchParams",
+    "queueMicrotask",
+    "setImmediate",
+    "structuredClone",
+    "polyfill",
+    "ponyfill",
+    "shim"
+   ],
+   "repository": {
+    "url": "git+https://github.com/zloirock/core-js.git",
+    "type": "git",
+    "directory": "packages/core-js"
+   },
+   "_npmVersion": "11.18.0",
+   "description": "Standard library",
+   "directories": {},
+   "maintainers": [
+    {
+     "name": "zloirock",
+     "email": "zloirock@zloirock.ru"
+    }
+   ],
+   "sideEffects": true,
+   "_nodeVersion": "26.6.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages-npm-production",
+    "tmp": "tmp/core-js_3.50.0_1785920085155_0.48813566866577385"
+   }
+  }
+ }
+}

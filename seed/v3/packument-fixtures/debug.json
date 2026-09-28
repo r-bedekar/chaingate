@@ -1,0 +1,1089 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 77,
+  "full_document_sha256": "12fed05f2870d2eac2efa669523fbfc6e7ddc2cc16300b52e6f82f903ffda364",
+  "kept": 12
+ },
+ "name": "debug",
+ "dist-tags": {
+  "beta": "4.3.3",
+  "latest": "4.4.3"
+ },
+ "time": {
+  "created": "2011-11-29T01:11:23.618Z",
+  "modified": "2025-09-13T17:25:19.913Z",
+  "0.0.1": "2011-11-29T01:11:25.405Z",
+  "0.6.0": "2012-03-16T21:58:51.296Z",
+  "0.8.1": "2014-04-15T02:04:45.652Z",
+  "2.1.0": "2014-10-15T21:58:41.028Z",
+  "2.3.2": "2016-11-10T06:30:04.055Z",
+  "2.4.5": "2016-12-18T07:13:49.109Z",
+  "2.6.2": "2017-03-10T19:44:26.365Z",
+  "1.0.5": "2017-06-15T00:14:24.388Z",
+  "3.2.2": "2018-09-11T07:50:29.987Z",
+  "3.2.6": "2018-10-10T06:48:00.226Z",
+  "4.3.3": "2021-11-27T13:14:24.425Z",
+  "4.4.3": "2025-09-13T17:25:19.732Z"
+ },
+ "versions": {
+  "0.0.1": {
+   "name": "debug",
+   "version": "0.0.1",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "debug@0.0.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    }
+   ],
+   "dist": {
+    "shasum": "0faa51ad6dec7587159b532cdf18d74261376417",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-0.0.1.tgz",
+    "integrity": "sha512-wm1jCOnbiFSvX8u+NMV+mD6CSOFgGlAPTYw3aoJgDoh2OBSIwMuz0ayedqbNhU3irew6bDBDA+9ia313ZPAEZA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDuay0fYjn6UmRkk1waVRl8oHeMW1CYg8wJkYKiHzoJ0AIhAIWA7WKkaBpZ20RtA3h2omGhFbOqqjE7Sext22nCwbSK",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "engines": {
+    "node": "*"
+   },
+   "_npmUser": {
+    "name": "tjholowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_npmVersion": "1.0.104",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "v0.6.3",
+   "dependencies": {},
+   "_defaultsLoaded": true,
+   "devDependencies": {
+    "mocha": "*"
+   },
+   "_engineSupported": true
+  },
+  "0.6.0": {
+   "name": "debug",
+   "version": "0.6.0",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "debug@0.6.0",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    }
+   ],
+   "dist": {
+    "shasum": "ce9d5d025d5294b3f0748a494bebaf3c9fd8734f",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-0.6.0.tgz",
+    "integrity": "sha512-2vIZf67+gMicLu8McscD1NNhMWbiTSJkhlByoTA1Gw54zOb/9IlxylYG+Kr9z1X2wZTHh1AMSp+YiMjYtLkVUA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCQHcbLA3nClRIksWsULYCfoHldkAkkLa6q/8cKKg/V2gIhAPEEYwNGJ7y/JYVxG9xm5lV5d7oDDzGbBagbQXnVMVJI",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "engines": {
+    "node": "*"
+   },
+   "_npmUser": {
+    "name": "tjholowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_npmVersion": "1.1.9",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "v0.6.12",
+   "dependencies": {},
+   "_defaultsLoaded": true,
+   "devDependencies": {
+    "mocha": "*"
+   },
+   "_engineSupported": true,
+   "optionalDependencies": {}
+  },
+  "0.8.1": {
+   "name": "debug",
+   "version": "0.8.1",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "debug@0.8.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "20ff4d26f5e422cb68a1bacbbb61039ad8c1c130",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-0.8.1.tgz",
+    "integrity": "sha512-HlXEJm99YsRjLJ8xmuz0Lq8YUwrv7hAJkTEr6/Em3sUlSUNl0UdFA+1SrY4fnykeq1FVkUEUtwRGHs9VvlYbGA==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDdkl85fIbnLZdTtzAvbLJMT9LLyaaIPhe4Pncj4W012wIgYC1CZp4bp5DcrhEkVPhKMUdbOWbMAYMOQFaf6fMWpLU=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "lib/debug.js",
+   "_from": ".",
+   "files": [
+    "lib/debug.js",
+    "debug.js"
+   ],
+   "browser": "./debug.js",
+   "engines": {
+    "node": "*"
+   },
+   "_npmUser": {
+    "name": "tjholowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "component": {
+    "scripts": {
+     "debug/index.js": "debug.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "1.3.21",
+   "description": "small debugging utility",
+   "directories": {},
+   "dependencies": {},
+   "devDependencies": {
+    "mocha": "*"
+   }
+  },
+  "2.1.0": {
+   "name": "debug",
+   "version": "2.1.0",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@2.1.0",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "33ab915659d8c2cc8a41443d94d6ebd37697ed21",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-2.1.0.tgz",
+    "integrity": "sha512-mXKNuRulIxh5zRPbJ0znN6gOJljoA1I/pQaZS9QYCwM4LdeInk5sEioHFeLayLJg8YL+FNrwPZbbltDR/HIdGA==",
+    "signatures": [
+     {
+      "sig": "MEQCIG5W1DE04uDl2qreKrTC+q/QryusXSKi9M65wlsOVLQDAiAZhLJNNcR0dpUjTlW44zJ8SNVIr+4hiKQwggX3KYHJgg==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "./node.js",
+   "_from": ".",
+   "_shasum": "33ab915659d8c2cc8a41443d94d6ebd37697ed21",
+   "browser": "./browser.js",
+   "gitHead": "953162b4fa8849268d147f4bac91c737baee55bb",
+   "scripts": {},
+   "_npmUser": {
+    "name": "tootallnate",
+    "email": "nathan@tootallnate.net"
+   },
+   "component": {
+    "scripts": {
+     "debug/debug.js": "debug.js",
+     "debug/index.js": "browser.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "2.1.3",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "0.10.32",
+   "dependencies": {
+    "ms": "0.6.2"
+   },
+   "devDependencies": {
+    "mocha": "*",
+    "browserify": "6.1.0"
+   }
+  },
+  "2.3.2": {
+   "name": "debug",
+   "version": "2.3.2",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@2.3.2",
+   "maintainers": [
+    {
+     "name": "kolban",
+     "email": "kolban1@kolban.com"
+    },
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    },
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "94cb466ef7d6d2c7e5245cdd6e4104f2d0d70d30",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-2.3.2.tgz",
+    "integrity": "sha512-Pi2B3gZGhfmFd8vAAYAI8XTtRrNNkSD3xqwBTjzjNqeVTAcHc8uVMz854KTowlR+Ulzfbz5gu3pudWFGo3LFUQ==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDVQenN0y5zIMXY0BTBVrDpRoynrrGETAKjK8/nBNEjXwIhAIXzWS/49Kti9+pB33qVCP2pu2tiOYSpK1vF4n6DCTHO",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "./index.js",
+   "_from": ".",
+   "_shasum": "94cb466ef7d6d2c7e5245cdd6e4104f2d0d70d30",
+   "browser": "./browser.js",
+   "gitHead": "1c6f45840d0dba8cb14f9975b4633bb685fda400",
+   "scripts": {},
+   "_npmUser": {
+    "name": "tootallnate",
+    "email": "nathan@tootallnate.net"
+   },
+   "component": {
+    "scripts": {
+     "debug/debug.js": "debug.js",
+     "debug/index.js": "browser.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "3.10.8",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "7.0.0",
+   "dependencies": {
+    "ms": "0.7.2"
+   },
+   "devDependencies": {
+    "mocha": "*",
+    "browserify": "9.0.3"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug-2.3.2.tgz_1478759402178_0.8417916153557599",
+    "host": "packages-18-east.internal.npmjs.com"
+   }
+  },
+  "2.4.5": {
+   "name": "debug",
+   "version": "2.4.5",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@2.4.5",
+   "maintainers": [
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "34c7b12a1ca96674428f41fe92c49b4ce7cd0607",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-2.4.5.tgz",
+    "integrity": "sha512-dKKhHsZva2Re+65VIn/PUZJaDmIOjgo98JrgrTVNYmINJIxxLMk0aNIUezJ4NTDf53JvGAxB9JpUjKr31icuIw==",
+    "signatures": [
+     {
+      "sig": "MEYCIQC04QXWKfHQonTWODiB8PAGouKzxxa1D46ZIq/T0LhyqwIhAOpt1gLnurC1/4AVpoSyA7049D1AKCoH7ILcf7llTS8x",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "./index.js",
+   "_from": ".",
+   "_shasum": "34c7b12a1ca96674428f41fe92c49b4ce7cd0607",
+   "browser": "./browser.js",
+   "gitHead": "7e741fcc2f834672796333c97aa15f27f0ea2b5c",
+   "scripts": {},
+   "_npmUser": {
+    "name": "thebigredgeek",
+    "email": "rhyneandrew@gmail.com"
+   },
+   "component": {
+    "scripts": {
+     "debug/debug.js": "debug.js",
+     "debug/index.js": "browser.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "3.10.9",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "7.2.1",
+   "dependencies": {
+    "ms": "0.7.2"
+   },
+   "devDependencies": {
+    "chai": "^3.5.0",
+    "babel": "^6.5.2",
+    "mocha": "^3.2.0",
+    "sinon": "^1.17.6",
+    "eslint": "^3.12.1",
+    "browserify": "9.0.3",
+    "babel-eslint": "^7.1.1",
+    "babel-runtime": "^6.20.0",
+    "babel-polyfill": "^6.20.0",
+    "babel-register": "^6.18.0",
+    "babel-preset-es2015": "^6.18.0",
+    "eslint-plugin-babel": "^4.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug-2.4.5.tgz_1482045228863_0.4158463138155639",
+    "host": "packages-12-west.internal.npmjs.com"
+   }
+  },
+  "2.6.2": {
+   "name": "debug",
+   "version": "2.6.2",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@2.6.2",
+   "maintainers": [
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "dfa96a861ee9b8c2f29349b3bcc41aa599a71e0f",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-2.6.2.tgz",
+    "integrity": "sha512-P3nUmoQmRAgPRGyRWfQxnWcUEwoxznn/4+B1XKgqagoOoC/oQAkkFeOwqQmBgqNxdJwengQ382Tl67gfVLRWPQ==",
+    "signatures": [
+     {
+      "sig": "MEQCIEgzVr7G3d5M/Kj3IVQ5jnxqH+Ac7np27Vhv+/GsIuUfAiAHx0EuCvYElXbpS0g7D4ivzZPYhQTWdPt6srTJ3JE0Cw==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "./src/index.js",
+   "_from": ".",
+   "_shasum": "dfa96a861ee9b8c2f29349b3bcc41aa599a71e0f",
+   "browser": "./src/browser.js",
+   "gitHead": "017a9d68568fd24113bd73a477e0221aa969b732",
+   "scripts": {},
+   "_npmUser": {
+    "name": "thebigredgeek",
+    "email": "rhyneandrew@gmail.com"
+   },
+   "component": {
+    "scripts": {
+     "debug/debug.js": "debug.js",
+     "debug/index.js": "browser.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "4.0.3",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "6.9.0",
+   "dependencies": {
+    "ms": "0.7.2"
+   },
+   "devDependencies": {
+    "chai": "^3.5.0",
+    "karma": "^1.3.0",
+    "mocha": "^3.2.0",
+    "sinon": "^1.17.6",
+    "eslint": "^3.12.1",
+    "rimraf": "^2.5.4",
+    "istanbul": "^0.4.5",
+    "coveralls": "^2.11.15",
+    "browserify": "9.0.3",
+    "karma-chai": "^0.1.0",
+    "sinon-chai": "^2.8.0",
+    "karma-mocha": "^1.3.0",
+    "karma-sinon": "^1.0.5",
+    "concurrently": "^3.1.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "karma-phantomjs-launcher": "^1.0.2"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug-2.6.2.tgz_1489175064296_0.5892612014431506",
+    "host": "packages-18-east.internal.npmjs.com"
+   }
+  },
+  "1.0.5": {
+   "name": "debug",
+   "version": "1.0.5",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "debug@1.0.5",
+   "maintainers": [
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "f7241217430f99dec4c2b473eab92228e874c2ac",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-1.0.5.tgz",
+    "integrity": "sha512-SIKSrp4+XqcUaNWhwaPJbLFnvSXPsZ4xBdH2WRK0Xo++UzMC4eepYghGAVhVhOwmfq3kqowqJ5w45R3pmYZnuA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCxcH0znyOLAAA2O0dGScyzbBlsizzCU7xXj7rYwx9W2QIhAMGecDjDBfJU5KanaUDBjxXFs/EL3GludbjXg3AMDocB",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "./node.js",
+   "_from": ".",
+   "_shasum": "f7241217430f99dec4c2b473eab92228e874c2ac",
+   "browser": "./browser.js",
+   "gitHead": "7e2d77fcd1ebf7773190d51f24e6647ee8f3fa0d",
+   "scripts": {},
+   "_npmUser": {
+    "name": "tootallnate",
+    "email": "nathan@tootallnate.net"
+   },
+   "component": {
+    "scripts": {
+     "debug/debug.js": "debug.js",
+     "debug/index.js": "browser.js"
+    }
+   },
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "4.2.0",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "7.10.0",
+   "dependencies": {
+    "ms": "2.0.0"
+   },
+   "devDependencies": {
+    "mocha": "*",
+    "browserify": "4.1.6"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug-1.0.5.tgz_1497485664264_0.9653687297832221",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.2.2": {
+   "name": "debug",
+   "version": "3.2.2",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@3.2.2",
+   "maintainers": [
+    {
+     "name": "kolban",
+     "email": "kolban1@kolban.com"
+    },
+    {
+     "name": "qix",
+     "email": "i.am.qix@gmail.com"
+    },
+    {
+     "name": "qix-",
+     "email": "i.am.qix@gmail.com"
+    },
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    },
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "1e7ad4d9714bb51e6745c0f15559ee82c0236010",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-3.2.2.tgz",
+    "fileCount": 9,
+    "integrity": "sha512-VDxmXLtYzTDjwoB/XfDYCgN5RaHUEAknclvDu17QVvkID8mpWUt2+I3zAc98xu1XOSCQY9yl072oHFXDhY9gxg==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCu1RPXGrwxBmus13G2316VK2026Tk7m9lS2LOE50+5awIhAIR1+AgIjbSu6EzU3Aztob6UqJ3U37naGwTKURPrHWIH",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 79439,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJbl3PGCRA9TVsSAnZWagAAfw4P/0AbS4UO0xtHtNKXS/Ig\n0LBe4TZuRT3frlo4gCVIGplfK1sqsBWS1jkNEH7MZIb52GiB6CDZadrrMjBI\nZ12azSvVoJD83fnakr8/9VnsT5VdF29B8SLrmaeMPVozKd/TkigQAfEw0HBo\nTkPvfE8Ole1nLaikPySf6qReLi8Fe90FTGFWuLlk3jqMeXwmbSD+LMyBIf3B\n9JWvcVYXsxwrw42hxz9cjBvXnTBSd2H1r2XT7ToboI76y5TCL5iY3AQC+23A\nIZ6EufJA+FoicsiPtxuQpx9TK3l9xyr87Wf4tzzmyWhhJh0SHQkIs8LA+fIf\nrBS52zg1MoXBrxsrXLgYmwx1Saf6oXabY4YizdVQiQx8ngTqksa7LDzCtILz\neAHcRS+RF4MARNYJW5n9NbAPS5eocnG/uAp/fqweZ1Djw/9tSCr4D+pYhHPs\nBaNk+HDRbG+Wr2APVgLayI8nWtM3OCt8zHIYUfw4HwsBraSTh3/tprdX8+j0\nrp+bGBdUoSHQrLZo5wcBQdYMA1VcWle35Um1p7wF/aDXtBeVy7fr8dsF/2/v\nZ3jG9h5TJlclxYlE4Kr8XlplAPhVWIrf9r8mas4g5VuEx0Gpe12f4dCNbPSH\n3XUrEhWLSsRmG75+6Kw8QHA0igD15DGQ6UeDPCFrvKUjcn5R0FZuSCZGaKE6\ntZId\r\n=aiGX\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "./src/index.js",
+   "browser": "./dist/debug.js",
+   "gitHead": "622e5798cbe1b9b48930435f2960d6c2f4684300",
+   "_npmUser": {
+    "name": "qix",
+    "email": "i.am.qix@gmail.com"
+   },
+   "deprecated": "Debug versions >=3.2.0 <3.2.7 || >=4 <4.3.1 have a low-severity ReDos regression when used in a Node.js environment. It is recommended you upgrade to 3.2.7 or 4.3.1. (https://github.com/visionmedia/debug/issues/797)",
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.1.0",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "10.10.0",
+   "dependencies": {
+    "ms": "^2.1.1"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "xo": "^0.23.0",
+    "chai": "^3.5.0",
+    "karma": "^3.0.0",
+    "mocha": "^5.2.0",
+    "rimraf": "^2.5.4",
+    "istanbul": "^0.4.5",
+    "coveralls": "^3.0.2",
+    "@babel/cli": "^7.0.0",
+    "browserify": "14.4.0",
+    "karma-chai": "^0.1.0",
+    "@babel/core": "^7.0.0",
+    "karma-mocha": "^1.3.0",
+    "concurrently": "^3.1.0",
+    "@babel/preset-env": "^7.0.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "karma-phantomjs-launcher": "^1.0.2"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug_3.2.2_1536652229813_0.9493398657476286",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.2.6": {
+   "name": "debug",
+   "version": "3.2.6",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "debug@3.2.6",
+   "maintainers": [
+    {
+     "name": "kolban",
+     "email": "kolban1@kolban.com"
+    },
+    {
+     "name": "qix",
+     "email": "i.am.qix@gmail.com"
+    },
+    {
+     "name": "qix-",
+     "email": "i.am.qix@gmail.com"
+    },
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    },
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "contributors": [
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/debug#readme",
+   "bugs": {
+    "url": "https://github.com/visionmedia/debug/issues"
+   },
+   "dist": {
+    "shasum": "e83d17de16d8a7efb7717edbe5fb10135eee629b",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-3.2.6.tgz",
+    "fileCount": 10,
+    "integrity": "sha512-mel+jf7nrtEl5Pn1Qx46zARXKDpBbvzezse7p7LqINmdoIk8PYP5SySaxEmYv6TZ0JyEKA1hsCId6DIhgITtWQ==",
+    "signatures": [
+     {
+      "sig": "MEQCIHIijGksiciAGHNGP7Bl8bCTvi0L/d4T0wl68sD6akOIAiB0zPnuRu0N595zLWLqrkU3F2zgYDsHQBdTQM7Y/EjViQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 79525,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJbvaCgCRA9TVsSAnZWagAAhucQAJjxFVneDDxkspue4yaR\nlpOoIrP8ms/Oek53bmD1y/qlwsfpS/Y/KnS1yL/qSQkEAL2qYAETIMie3Op5\niP03s2xTTrVwCUDCEtTO7oMnl6kApMiexgUkop4eznA+AfEdz/jInFiN/yDU\ntHoR1UV0bIOSccVhrjH2aTt/96AETu8B7x8J722gjPUGDni2luYM+r2V8XYh\nN/9/kNn6HN1FjfOUl662iZTLE8OAVbrnmfVS6etTiG2SSLI898s+goyOD32K\nduwANgqjKrlvSxlMxKFr46G8GR+Otk9rOwsFO7yiufJ62dYefJIw6sfWYGXa\n8joI2StGT6p9T6iTN9959Y6naoSrN0cb3DocOjGQMrxUoBugoBWKd4fD+ACU\nMN3VA2PN8cZIh5eLu5IsJAECy4frUKpzbPYR129/Rtx0K7syhcvSwBqRE4Pb\nPNDHdddx1bix8m+xyT6sAiaWym9x+WX7GPuQAlCM5xZ4lFzjNpu5LgxpIbHo\njtRF6SLdMDBSImhH6NyPcw374QT+zwOc8l2G506RfBA5bB2fsYUBLrIXLkxm\n/CzEphFk++bPvYDiCy2EFUJW5MjnschBV65QUZBdBSg2YJnl3yGS8QHC8AR0\nM1IcRqI8NUlpTByPVoc7GoevruOjXxk+B+dflYRvBNwBMDatSA0eYT9aILK0\nJp/G\r\n=QKY3\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "./src/index.js",
+   "unpkg": "./dist/debug.js",
+   "browser": "./src/browser.js",
+   "gitHead": "a7a17c9955460435592de2a4d3c722e9b32047a8",
+   "_npmUser": {
+    "name": "qix",
+    "email": "i.am.qix@gmail.com"
+   },
+   "deprecated": "Debug versions >=3.2.0 <3.2.7 || >=4 <4.3.1 have a low-severity ReDos regression when used in a Node.js environment. It is recommended you upgrade to 3.2.7 or 4.3.1. (https://github.com/visionmedia/debug/issues/797)",
+   "repository": {
+    "url": "git://github.com/visionmedia/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.1.0",
+   "description": "small debugging utility",
+   "directories": {},
+   "_nodeVersion": "10.10.0",
+   "dependencies": {
+    "ms": "^2.1.1"
+   },
+   "_hasShrinkwrap": false,
+   "readmeFilename": "README.md",
+   "devDependencies": {
+    "xo": "^0.23.0",
+    "chai": "^3.5.0",
+    "karma": "^3.0.0",
+    "mocha": "^5.2.0",
+    "rimraf": "^2.5.4",
+    "istanbul": "^0.4.5",
+    "coveralls": "^3.0.2",
+    "@babel/cli": "^7.0.0",
+    "browserify": "14.4.0",
+    "karma-chai": "^0.1.0",
+    "@babel/core": "^7.0.0",
+    "karma-mocha": "^1.3.0",
+    "concurrently": "^3.1.0",
+    "@babel/preset-env": "^7.0.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "karma-phantomjs-launcher": "^1.0.2"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug_3.2.6_1539154080132_0.756699343768702",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.3.3": {
+   "name": "debug",
+   "version": "4.3.3",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "Josh Junon",
+    "email": "josh.junon@protonmail.com"
+   },
+   "license": "MIT",
+   "_id": "debug@4.3.3",
+   "maintainers": [
+    {
+     "name": "qix",
+     "email": "josh@junon.me"
+    },
+    {
+     "name": "thebigredgeek",
+     "email": "rhyneandrew@gmail.com"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "url": "http://n8.io",
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/debug-js/debug#readme",
+   "bugs": {
+    "url": "https://github.com/debug-js/debug/issues"
+   },
+   "dist": {
+    "shasum": "04266e0b70a98d4462e6e288e38259213332b664",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-4.3.3.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-/zxw5+vh1Tfv+4Qn7a5nsbcJKPaSvCDhojn6FEl9vupwK2VCSDtEiEtqr8DFtzYFOdz63LBkxec7DYuc2jon6Q==",
+    "signatures": [
+     {
+      "sig": "MEUCIDgwLgAI7itIaQdIOaujVhQRAS2WPkbeANCzrou1tqTFAiEAr1GYNDj09Vuvs8FWn8J3vBrOAWIyAYknyEcKVh3tp4w=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 42039,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJhoi8wCRA9TVsSAnZWagAAMQIQAIBVX5eU9r89GpL0l/jh\nAeLvydJ2+QkHftmS+SqCXxx9d2YYiPGdSdvSt+iVR4oR1YFpa815iJAXeI6Q\n3HvInF5rZh2Xdh4JJN3eJjm0A93jIs0LHpRQw2LCUbbNQfXLprzVcrlFNSJX\nfdTA6yPTU2xJfbE0vCUI7eqY/fopE7j+VywFz1t74k3yQLHjvO6lZdvvH9zZ\nVlGjZA0YRiDVvnHckjiK3req/qxeDHchRaXvOCy7NFk0KWjBNjB4fU+skDJa\nl1TtnsRC4ApvXVKdb4FtzKjVSnybA0pOa6ZCWLwzk1rEKAiKOy6HRka579UX\n5DAv8vfWe6ssdkhTWP76b92TCorKJZGP7V2odekPXMuh5HdD9YyWERWQk+jH\npOQ9nSRriSdGvpq1EpSm35nB/PMe6x/MlRCdTRfWtqXbZrShcuiZQ2DJkpjV\nXXhAl8edrt5mDGS8K6/6ToSFjyApNfdtzBBvtAOmKZnd55prw3CndkAGyA9W\n9h8RTIjaAcN7mfB/VC5rcIqKwHZu3UrYRlDqAAXjR/KWKlLkGal9EPJBUuy8\nTqjXrAQJRh23WFHnskZFwcZ1Jzbq82DgN8j6k+o3Dg5yMXA/uziM0wuf6LKe\nbduB5k1PPHnHusUiJt7L5GQs7JNmQ7nBq1spTjChbMU6LsAt7sxfb+BaUJO4\nmtBR\r\n=LlaO\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "./src/index.js",
+   "browser": "./src/browser.js",
+   "engines": {
+    "node": ">=6.0"
+   },
+   "gitHead": "043d3cd17d30af45f71d2beab4ec7abfc9936e9e",
+   "scripts": {
+    "lint": "xo",
+    "test": "npm run test:node && npm run test:browser && npm run lint",
+    "test:node": "istanbul cover _mocha -- test.js",
+    "test:browser": "karma start --single-run",
+    "test:coverage": "cat ./coverage/lcov.info | coveralls"
+   },
+   "_npmUser": {
+    "name": "qix",
+    "email": "josh@junon.me"
+   },
+   "repository": {
+    "url": "git://github.com/debug-js/debug.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.1.4",
+   "description": "Lightweight debugging utility for Node.js and the browser",
+   "directories": {},
+   "_nodeVersion": "16.0.0",
+   "dependencies": {
+    "ms": "2.1.2"
+   },
+   "_hasShrinkwrap": false,
+   "readmeFilename": "README.md",
+   "devDependencies": {
+    "xo": "^0.23.0",
+    "brfs": "^2.0.1",
+    "karma": "^3.1.4",
+    "mocha": "^5.2.0",
+    "istanbul": "^0.4.5",
+    "coveralls": "^3.0.2",
+    "browserify": "^16.2.3",
+    "karma-mocha": "^1.3.0",
+    "karma-browserify": "^6.0.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "karma-chrome-launcher": "^2.2.0"
+   },
+   "peerDependenciesMeta": {
+    "supports-color": {
+     "optional": true
+    }
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/debug_4.3.3_1638018864282_0.4082672439443171",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.4.3": {
+   "name": "debug",
+   "version": "4.4.3",
+   "repository": {
+    "type": "git",
+    "url": "git://github.com/debug-js/debug.git"
+   },
+   "description": "Lightweight debugging utility for Node.js and the browser",
+   "keywords": [
+    "debug",
+    "log",
+    "debugger"
+   ],
+   "author": {
+    "name": "Josh Junon",
+    "url": "https://github.com/qix-"
+   },
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Nathan Rajlich",
+     "email": "nathan@tootallnate.net",
+     "url": "http://n8.io"
+    },
+    {
+     "name": "Andrew Rhyne",
+     "email": "rhyneandrew@gmail.com"
+    }
+   ],
+   "license": "MIT",
+   "scripts": {
+    "lint": "xo",
+    "test": "npm run test:node && npm run test:browser && npm run lint",
+    "test:node": "mocha test.js test.node.js",
+    "test:browser": "karma start --single-run",
+    "test:coverage": "cat ./coverage/lcov.info | coveralls"
+   },
+   "dependencies": {
+    "ms": "^2.1.3"
+   },
+   "devDependencies": {
+    "brfs": "^2.0.1",
+    "browserify": "^16.2.3",
+    "coveralls": "^3.0.2",
+    "karma": "^3.1.4",
+    "karma-browserify": "^6.0.0",
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-mocha": "^1.3.0",
+    "mocha": "^5.2.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "sinon": "^14.0.0",
+    "xo": "^0.23.0"
+   },
+   "peerDependenciesMeta": {
+    "supports-color": {
+     "optional": true
+    }
+   },
+   "main": "./src/index.js",
+   "browser": "./src/browser.js",
+   "engines": {
+    "node": ">=6.0"
+   },
+   "xo": {
+    "rules": {
+     "import/extensions": "off"
+    }
+   },
+   "_id": "debug@4.4.3",
+   "gitHead": "6b2c5fbdb7d414483d9e306ef234acb4cd7ea67c",
+   "bugs": {
+    "url": "https://github.com/debug-js/debug/issues"
+   },
+   "homepage": "https://github.com/debug-js/debug#readme",
+   "_nodeVersion": "22.15.0",
+   "_npmVersion": "10.9.2",
+   "dist": {
+    "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
+    "shasum": "c6ae432d9bd9662582fce08709b038c58e9e3d6a",
+    "tarball": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+    "fileCount": 7,
+    "unpackedSize": 42793,
+    "signatures": [
+     {
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+      "sig": "MEQCICInafSZ+sajZhfNPQj8Qh6jqz8p8TN8EukVSyY1yMj+AiAptzBLrvHsI3+t0d+QToir6keiBEy9LngkCOpDUm81uA=="
+     }
+    ]
+   },
+   "_npmUser": {
+    "name": "qix",
+    "email": "npm@josh.junon.me"
+   },
+   "directories": {},
+   "maintainers": [
+    {
+     "name": "qix",
+     "email": "npm@josh.junon.me"
+    },
+    {
+     "name": "tootallnate",
+     "email": "nathan@tootallnate.net"
+    }
+   ],
+   "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages-npm-production",
+    "tmp": "tmp/debug_4.4.3_1757784319517_0.5445999490016855"
+   },
+   "_hasShrinkwrap": false
+  }
+ }
+}

@@ -1,0 +1,1109 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 40,
+  "full_document_sha256": "daa55da6a2a7c1d7e72cdc21366501c3ba2376ee58d3c7df0311651973cc9ecd",
+  "kept": 12
+ },
+ "name": "sigstore",
+ "dist-tags": {
+  "latest": "5.0.0"
+ },
+ "time": {
+  "created": "2022-08-08T20:42:14.283Z",
+  "modified": "2026-06-01T21:02:52.569Z",
+  "0.0.0": "2022-08-08T20:42:14.515Z",
+  "0.0.1-alpha.4": "2022-11-01T16:33:51.539Z",
+  "0.1.1": "2022-12-01T17:15:22.640Z",
+  "1.0.0-beta.1": "2023-02-08T16:58:58.889Z",
+  "1.1.1": "2023-03-14T19:36:31.420Z",
+  "1.3.2": "2023-04-20T12:37:07.661Z",
+  "1.5.1": "2023-05-15T16:26:50.515Z",
+  "1.8.0": "2023-07-19T16:10:35.102Z",
+  "2.1.0": "2023-08-29T15:40:24.449Z",
+  "2.3.0": "2024-04-04T19:41:29.992Z",
+  "3.1.0": "2025-02-04T20:35:48.753Z",
+  "5.0.0": "2026-06-01T21:02:52.319Z"
+ },
+ "versions": {
+  "0.0.0": {
+   "name": "sigstore",
+   "version": "0.0.0",
+   "author": {
+    "name": "GitHub LLC",
+    "email": "noreply@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@0.0.0",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "dist": {
+    "shasum": "de9d47c51c7fb6a07a9f979e6c4ad7ae824510b7",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-0.0.0.tgz",
+    "fileCount": 3,
+    "integrity": "sha512-LofDh0K3DWkkPM39pJODrj5yqLABFBFXfKSeJlON+pgV2i6DGU1/GzorpWdc3jpo6dy3AhoLXaZTqOD3y81BFQ==",
+    "signatures": [
+     {
+      "sig": "MEQCIEpxpB1vmdm4Oqga0Q5843LpfGj72xJ9AEheVdg6eh0/AiA5I3vfMVpilJIb39Ib1SvoNTWu/Hf0vLCcWr9EN5N8vQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 3133,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJi8XUmACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmqPyg/+IOim3ETyt1pm3nJ9YxukzK+Nmnj54BPG3UZ4xGqoRLUraGi9\r\nwhn2odke8DJGw0UY8dyDlrvRuP+U9oljCGgT+xZJtz03iOrvKbs+RDHsUZLv\r\nr9sYTB8wGcp0DR9BPYhFkh1k3Crx+V9pozsGx9RU/+5E6UWemX2oEkaoHfoI\r\ncryRpEzl3YPig0URcWNKwpEFRcBlgfepMxiq4qdVaGhnLdh6GxcHn9UR7XPJ\r\nz+ngXzhKpWsXiz0xECiMGp7OS8Kl8EVkiG/dGd7UBYyvjHlr+kPNUtCsRTgk\r\neNJU2XYfLj0h4LdAwXhGROMt4besyH0sms+GaKppOhQdYH4zsFCE+6v5hxhT\r\n/pO9dhX5URzyHPacRisdrApHgOcuDV02inXOm9k3xqcPzv/ZeGmsPLvr0S2h\r\nfW9rMsUD9YKoic8CCq743cTJDTc7DGfG+Vn0V4iizKtkviXHUVo6iCsWi0N5\r\ntxDepmo3fr12fgPEu1FPx23HlpnxCyId+sj0CfA3WhiqH7XzF6l20DEMpYGM\r\nFNZ9Uf43ZkAUqbza5GC0u/IV2CN1jM93woJ09MBiag7e2eWxF+9nxtfzfqdj\r\nwTVyS3uk4u3HbaQumfDOXhKusRkV0HSn9aRRApv9R3ifMhcoqQUJdnWKw1hH\r\nzg03tCzj7E5D2KISPqNlLdHSEk/v/3Nm05c=\r\n=q341\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "./index.js",
+   "gitHead": "72be62dec4fd4f2cde06836ca1aa69fc91d9404d",
+   "_npmUser": {
+    "name": "mylesborins",
+    "email": "myles.borins@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.16.0",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.16.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_0.0.0_1659991334283_0.8420398671558271",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.0.1-alpha.4": {
+   "name": "sigstore",
+   "version": "0.0.1-alpha.4",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@0.0.1-alpha.4",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "0ede24e31ddc3ad6e5f869c045075780c701d68d",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-0.0.1-alpha.4.tgz",
+    "fileCount": 89,
+    "integrity": "sha512-+Bb82LvBfXcDzwCHcKfI4eur602x4+6UnZvzmtPaWFumj6kVGVTXB9BVF11ru5LRGrHzDkk1ldXu2ScHOweqAw==",
+    "signatures": [
+     {
+      "sig": "MEUCIAVGchPQ8G94bqV0NMBR1w77lJhyz5ny0glF0JYJa6OSAiEAkSkXmDkG/vEHeEs7oxyp8jNPmA3IWv7AmV+/m2Ah+Og=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 160853,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJjYUpvACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmqKKg//SzBjhz+4MfVyU7rKIY1jA4QPZ8LJWS7nZxDYKqabqLGYrRyR\r\nPGlA3+sy2zfLyMDZ4HH1jewOIEfALf5hKjGGQlNIL1XgQd3viczlv4x8qPPZ\r\nz2HOJe/KRWXQsM5wjG9z36gygJUtCOT0uktbBBAdjTa9T3OV/6h6AYn6l4HY\r\n7Ft42OOKMOI4F0DR40SEOXPKfvPx/N57JdtF/D9ADpOZocs3YHlwy7oSFcj7\r\nVQQZJerwLv/ziijPgabtMC5/WRoFIH68010GSkjx650in+hSjwIUzVTD+ROU\r\nKgxQumlH6pa1t87JEPE8RraZI/F8JtLKMGjYGQCaBgPV00whzaQLC5OK+SXE\r\nFKbxhUT7uD1ncZ1vzGnnWbTXv8s3a7zrQXEKz3LkOE3WbuSUNl+g4ZAUedv/\r\nc2ar7Kl1p9xhqx6oVY+xCkkyJcjPzZoDdnoDHAp7x87iMQwcjK8M/p5o0/K0\r\nB09TqfOvAoLpq8o5f44+/bu2zKywOTZtlcCHFM/2i3xEt6Zm7Pi9GkceosHa\r\nvgb/5N/IBusFaRCwzgLkPTFxtU8fT+lPu6Wrfmn+aLjzL/jCs84gHJ5g6NEe\r\nZQePOLUFxpaWIXNtf4NNorIj0oUT6f/ybC6jSgIwcdbxU1MxlVBjxjEi2f86\r\nAae2G107mFXwve/2Sj5sBNU1+w6TviInjAM=\r\n=EeOT\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "gitHead": "47472373b5c6c64b0c3873683f382a8b6a6783ae",
+   "scripts": {
+    "lint": "eslint --fix --ext .ts src/**",
+    "test": "jest",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*\"",
+    "test:ci": "jest --maxWorkers=2 --coverage",
+    "lint:check": "eslint --max-warnings 0 --ext .ts src/**",
+    "test:watch": "jest --watch",
+    "codegen:rekor": "./hack/generate-rekor-types",
+    "codegen:bundle": "./hack/generate-bundle-types"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.0.1",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.15.0",
+   "dependencies": {
+    "make-fetch-happen": "^11.0.1"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "jest": "^27.5.1",
+    "nock": "^13.2.4",
+    "eslint": "^8.16.0",
+    "ts-jest": "^27.1.5",
+    "prettier": "^2.6.2",
+    "typescript": "^4.7.2",
+    "@types/jest": "^27.5.1",
+    "@types/node": "^18.6.5",
+    "@tsconfig/node12": "^1.0.9",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "json-schema-to-typescript": "^11.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.26.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_0.0.1-alpha.4_1667320431318_0.32943390398724426",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.1.1": {
+   "name": "sigstore",
+   "version": "0.1.1",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@0.1.1",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "4c1181d676395bfa478a54d0d51f1650b094e23f",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-0.1.1.tgz",
+    "fileCount": 109,
+    "integrity": "sha512-H33B4+E6DQKYdst5MscF6zm/vYvhq2OV1raloghvU+SpJQQ6TW3y9uQWjK1rjouOu0Y8vVrHa6iGuSufRG1Zng==",
+    "signatures": [
+     {
+      "sig": "MEUCIFKxB2dvh0aQX1DPXE2qkVe4InAC49tO+s2qIcVdZKd2AiEAkI7sRAwhoHNKjDEy+FIVbj5fF2PHEhpXqnQ2gt+jTzk=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 195167,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJjiOEqACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2Vmrsbw/+K4ZCjvosNMz80HZR4a8W1FxhV/ZR1ObweTTLn9rKQvc1ooU8\r\n8OfNoX8gFkzzldjJ7+NUOgzYiMbyBIfZtlE1PaNCrlmp7+0mBV8402twhLLq\r\n7C1CwBC8rQZGqnyDwYLqpzNKTFrYuQuVNToHjgc3wOG+kSI5XYsbbORlgB90\r\nnpiaAggVvB7xMHNJFtwTGB5Y9hhQAVCvINI3yfhmlgQ/2vd+VykFhCXP0E63\r\ntGcdNDvjDUvRFTgu/MCgRuKN8DimPgiqRsnGjR9FlyOu+f6zbihNxYKo1mEU\r\nOlOQ2YTXWLT5S8le5ZTrf7IA69FWCgrPIDvpqfPjZTZMK9jtIqQmXRsR3ZBx\r\nV0NRlfVZNqUHHHEBr7gX7nJU3C9cKBdfCBPUsf0q3slBf5OxHEw+/EeizFsV\r\nQQn3KcihLoo5m+ipVTddx1x8/DO5/xAtLdz4YtWYdOG0mhYwQ6kGKhvk/mXO\r\noQvp118V0JC8FBPHA1QYTsl/nYBjZwrFZx9WXK9u2U1k4+L56AsNDVGd3rEx\r\nQipYI7SAO0CyNU0fQSJRde4J6xnD8Fiq7McWrQYaQRLHcTgK7WpKjwdOBxXY\r\nk5P4s51csXNTEj4v6STzz/qv1dqSmypaUcoDCaMmny7iT6NrvqgVcA4s4XOT\r\n7uujuugZga9jvEmqviAWJp5hs/7YP3hI5Jk=\r\n=48jR\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "39c77abc08e29f7a2ca636198a7c6904d8d2a777",
+   "scripts": {
+    "lint": "eslint --fix --ext .ts src/**",
+    "test": "jest",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*\"",
+    "test:ci": "jest --maxWorkers=2 --coverage",
+    "lint:check": "eslint --max-warnings 0 --ext .ts src/**",
+    "test:watch": "jest --watch",
+    "codegen:rekor": "./hack/generate-rekor-types",
+    "codegen:bundle": "./hack/generate-bundle-types"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.19.2",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.18.1",
+   "dependencies": {
+    "make-fetch-happen": "^11.0.1"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "jest": "^27.5.1",
+    "nock": "^13.2.4",
+    "eslint": "^8.16.0",
+    "ts-jest": "^27.1.5",
+    "prettier": "^2.6.2",
+    "typescript": "^4.7.2",
+    "@types/jest": "^27.5.1",
+    "@types/node": "^18.6.5",
+    "@tsconfig/node12": "^1.0.9",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "json-schema-to-typescript": "^11.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.26.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_0.1.1_1669914922430_0.39040781744412834",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "1.0.0-beta.1": {
+   "name": "sigstore",
+   "version": "1.0.0-beta.1",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@1.0.0-beta.1",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "c4ced7a56a1293e4b1f01a57021dc2d718b69a98",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-1.0.0-beta.1.tgz",
+    "fileCount": 144,
+    "integrity": "sha512-f1QDca0rKpIX9aryoqHEWIQWFh3H0KIsVgZoZlqjZbNSketri/xsPY/roC8WsRBDGafAkee7Ngpjl8+yFrW94Q==",
+    "signatures": [
+     {
+      "sig": "MEUCIDAfjERj+JSOeEmpHcVoRyX42XtdaEA7bRwg5BERQYp3AiEAiNmV6uCHJv8U15iKaoUfKZ6/XJ+tCaIrEIjT+b6vqLU=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@1.0.0-beta.1",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v0.2"
+     }
+    },
+    "unpackedSize": 419034,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJj49TTACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmqAjA/8CrHjCYRKM6IdGHbRtEk2WOF4gwYGt0SyDrUcHnr0XLyGLadj\r\noUATkReba/W5Xd4lgRfTjymr0SdLuvzHLeHqFSsyt59tYZfiMbGuTOGlcdwB\r\nuwe4nIzPltIEKukdQdAipSANFTwXrrIHi0aiqv73aMgKdj+BbeSdPFevX4e7\r\nHpQ3Cm1xYWb8ck0bUNhdQc4CU6cDQHmOIpdPhE25ZsYtRhkCtkoP4CnxjyEj\r\n7c2ziHKUhaqfIZKzrcG2/XmbqcF7OA/+vn9/edm5K0vBwMoZ6NoyTEyiX846\r\nklpcBcM+kR9Tbdlc9oME33wSEho7r9JvkzGJhl8qGWv1JMQwIhLC2tqgfilk\r\nIflt1r3+JI+wqgVM7P0mc3R3q07YUsumJXpUr72IbYyrm2rcBebcLlaJPNL6\r\nqIyNyzgOjg9B2BaqUY4sxcxIUCICgF0VwwtjkvSEdZLMA9UwAh3vp7TX6HO6\r\nE0kRXUEWFAZ5PbeRC2aUTwv3iuKn3cggvxJKL1G3nJ3vhY8i6U5WkJBLP9Bl\r\nIZ2W/Vr3gee8LKYE+6wz6wMm35y/yBu4LMrfMgp0X8YTpsZYWvkTFKewLBtZ\r\nNj1+IyokCEuvLDe7l4+Q2KTI9UAyti8ci5nX74LWP0lbX8ct/FY7XEQxk/0K\r\nqu+zfdsB5SVDdIGigZC6DKNVAdjnZqNJMq8=\r\n=PoNP\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "1e3b0bd8c11b1d074e0722e97408b86f162f5416",
+   "scripts": {
+    "lint": "eslint --fix --ext .ts src/**",
+    "test": "jest",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*\"",
+    "test:ci": "jest --maxWorkers=2 --coverage",
+    "lint:check": "eslint --max-warnings 0 --ext .ts src/**",
+    "test:watch": "jest --watch",
+    "codegen:rekor": "./hack/generate-rekor-types",
+    "codegen:sigstore": "./hack/generate-sigstore-types"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.2.0",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.19.0",
+   "dependencies": {
+    "tuf-js": "1.0.0-beta.1",
+    "make-fetch-happen": "^11.0.1"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "jest": "^29.4.1",
+    "nock": "^13.2.4",
+    "eslint": "^8.16.0",
+    "ts-jest": "^29.0.5",
+    "prettier": "^2.6.2",
+    "typescript": "^4.7.2",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.6.5",
+    "@tsconfig/node14": "^1.0.3",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "json-schema-to-typescript": "^11.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.26.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_1.0.0-beta.1_1675875538593_0.8652862406847601",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "1.1.1": {
+   "name": "sigstore",
+   "version": "1.1.1",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@1.1.1",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "751a709a7467ca54dcb2e81e36d67cfdcf5ca546",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-1.1.1.tgz",
+    "fileCount": 127,
+    "integrity": "sha512-4hR3tPP1y59YWlaoAgAWFVZ7srTjNWOrrpkQXWu05qP0BvwFYyt3K3l848+IHo+mKhkOzGcNDf7ktASXLEPC+A==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCOZQzz+udvDeDTJ33fi8KMe8wNDv3xwhVKOnP9ct1g2QIhAIvZGySF9TeuS+5QkhKdqpxNHBvYpD7o2ZokkL8rKdJD",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@1.1.1",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v0.2"
+     }
+    },
+    "unpackedSize": 232110,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJkEMy/ACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2Vmr1cw//QGjnyz8jmWzM8NQP/6CFsCFWq0pYnS4fvZUeHY5g/Fyvwyms\r\nSssJ/oQDImCmxBZjRAU4Z5dXgWNzyadsuAuXYL+gu76E9fEyHnPWNwtVsX0v\r\n82ChnJS3txQdQN9ynHc7gnvXSJbNsWXvPNbMQ9Z2qN3VKaLdGaiSuFSQBkQ2\r\nuXoXulWea67XIMSiJ4q6UVE+oc23gAvHLBEGbs460mrIvc0Qlm+kGEb2xRTV\r\n3/P5X5k67ljj94bk1NM3nqHL/d/Zftx9p8QU/eE+/HZWkCB9G1zTv+lFexqz\r\nLlM4pwAQrXihFteABR9lTsZRHXlyCUHM1Vj2KTzy3g3SmPLEJ1TMmCALbrUC\r\ntB8EfBULRw9vZzHmDS5q3civ4vHjtVMbw2Z/6eBbOYaYXZdyZDojwxNPS/Fr\r\n412yB3M7pC/0CcY2S1zCUeQure/jGQrEBxOpWq0Ou+Y8cw5JKESyVLKuDwQO\r\nupLT0GevxDx0+lE+cQVOKjXIVBi27uE/aMjN9JetyKbbTilceFvpTizzyyXY\r\n8eMaj1Ip9CWk3k3XnID4V/B8GeCr9HgZ7TqZ9DLK4CMwUdf070vQqrWTR7LK\r\nkwJs+vSY15Vt+HZf3tzWsVzYqFCHhRdEbJUD3yjn2ic+pTrniu1KOuosVKUs\r\n+j+IyU2bKr2EWFE5tVxgGR2WPoj4S4kOCCI=\r\n=0BY2\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "dd9790b4a261af4916f34d3359c26dae2628e398",
+   "scripts": {
+    "lint": "eslint --fix --ext .ts src/**",
+    "test": "jest",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*\"",
+    "release": "npm run build && changeset publish",
+    "test:ci": "jest --maxWorkers=2 --coverage",
+    "lint:check": "eslint --max-warnings 0 --ext .ts src/**",
+    "test:watch": "jest --watch",
+    "codegen:rekor": "./hack/generate-rekor-types"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.6.1",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.19.1",
+   "dependencies": {
+    "tuf-js": "^1.0.0",
+    "make-fetch-happen": "^11.0.1",
+    "@sigstore/protobuf-specs": "^0.1.0"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "jest": "^29.4.1",
+    "nock": "^13.2.4",
+    "eslint": "^8.16.0",
+    "ts-jest": "^29.0.5",
+    "prettier": "^2.6.2",
+    "typescript": "^4.7.2",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.6.5",
+    "@changesets/cli": "^2.26.0",
+    "@tsconfig/node14": "^1.0.3",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "json-schema-to-typescript": "^12.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.26.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_1.1.1_1678822591249_0.782500193313894",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "1.3.2": {
+   "name": "sigstore",
+   "version": "1.3.2",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@1.3.2",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "2f70ec3e1192911484d9d148ecd9c98345cd172d",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-1.3.2.tgz",
+    "fileCount": 129,
+    "integrity": "sha512-0KT1DjpVB11FK15ep7BIsZQV6j1jBm4SnXIInbBCRvql6II39IKONOMO+j036sGsArU/+2xqa1NDJwJkic0neA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDJdUH803Y6rbK1R3WzOvFB2yiKWKC5p4N9DVnGfoeTYwIhAOKSlDwC1QiTXmuH83O6NB40pIPSaOvxCcKgKVqpk7C/",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@1.3.2",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v0.2"
+     }
+    },
+    "unpackedSize": 239682,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJkQTHzACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmrDbw//cWBgnuUdwkfq/QZ2XjL5IdLphZjmzNOkvxngFjJMHYF2iRDU\r\npXildfa1RaZOhsoQSZgLLpmSaFlNYGVRyrgR89cBADHs9fvPMBgkRmBwOa69\r\nY1pQ0nQ1rjxA8rclkzbNb1RJFD9nxULuM1N56ryD8pDwlJlvzaFwNhUAaCKz\r\nNVqBVGX82jWVnfgixYqHWqENkmq0F7vcXm3MZQvz16vKADMOSYlE5HFtaCs9\r\nAP0C/6k9bhod3HLyI6FwOZkQBjMv9TUbhmDKT9dMlZt+qrj9g79CeaIy1vU4\r\nwYFDADKxi0d8uSWn/emcqSb5kFoSJHYMcNCKSks76RwMLU8KBpLlSdHM7i4r\r\ng2C9JCvDwX8TuVWa4RmwAxMwKx21U50lUX+EgJA3/ujmgN+/FsxeFRtDrhyS\r\nChk2kCUEM3T6lQW7sRHJR5kMpgbBgaBxk1JIRao+FyFdKtlZWTBqzViZKnf0\r\n0F3FM7oMLjDmkGkNMFzgNeKCNkFaCNjaW5xzxDBTqncetp0/oO7CEisQqgMQ\r\ntSibd2ZfIzw4EsirovxXovEbCqWrZ5IX9ota/lfzptraFAWb/KaAAAHDmJw+\r\ncdlKdRQfgTEVJ7x0xQsXIZ8u3CqWF5r+Q638hjivCxm4Boo+zJrhHBGbUl8p\r\nNU6p5y89CjTq+eeauE9ueeND7EL8X1T0o4c=\r\n=tVzY\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "82f1f65c08faaa29ebc3b0a8186fe87b05772d82",
+   "scripts": {
+    "lint": "eslint --fix --ext .ts src/**",
+    "test": "jest",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*\"",
+    "release": "npm run build && changeset publish",
+    "test:ci": "jest --maxWorkers=2 --coverage",
+    "lint:check": "eslint --max-warnings 0 --ext .ts src/**",
+    "test:watch": "jest --watch",
+    "codegen:rekor": "./hack/generate-rekor-types"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.6.5",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.20.0",
+   "dependencies": {
+    "tuf-js": "^1.1.3",
+    "make-fetch-happen": "^11.0.1",
+    "@sigstore/protobuf-specs": "^0.1.0"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "jest": "^29.4.1",
+    "nock": "^13.2.4",
+    "eslint": "^8.16.0",
+    "ts-jest": "^29.0.5",
+    "prettier": "^2.6.2",
+    "typescript": "^5.0.2",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.6.5",
+    "@changesets/cli": "^2.26.0",
+    "@tsconfig/node14": "^1.0.3",
+    "@tufjs/repo-mock": "^1.1.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "json-schema-to-typescript": "^12.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.26.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_1.3.2_1681994227490_0.672109128121039",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "1.5.1": {
+   "name": "sigstore",
+   "version": "1.5.1",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@1.5.1",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "92b9e371a37d1f53d3baa991a2c63b89bbe3cee5",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-1.5.1.tgz",
+    "fileCount": 135,
+    "integrity": "sha512-FIPThk7S1oeFXn8O8yh7gpyiQb6lYXzMIlOBzXhId/f81VvU587xNCHc4jd2lZ9724UkKUYYTuKSYcjhDSRD/Q==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDkNxRBykaUWwzSD2eO+75AIW1wZsPPRBvUVwLRo3RlSAIhAIoC5iOTN4Knb5hZMx9lm+aUhgOmUt+GqH0ySsF7Zkah",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@1.5.1",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v0.2"
+     }
+    },
+    "unpackedSize": 251310
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "404f16748e9b8d6768576110703b2674d1978797",
+   "scripts": {
+    "test": "jest",
+    "build": "tsc --build"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.6.6",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.20.0",
+   "dependencies": {
+    "tuf-js": "^1.1.3",
+    "make-fetch-happen": "^11.0.1",
+    "@sigstore/protobuf-specs": "^0.1.0"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "nock": "^13.2.4",
+    "typescript": "^5.0.2",
+    "@types/node": "^20.0.0",
+    "@tufjs/repo-mock": "^1.1.0",
+    "@types/make-fetch-happen": "^10.0.0",
+    "json-schema-to-typescript": "^13.0.0",
+    "@total-typescript/shoehorn": "^0.1.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_1.5.1_1684168010265_0.0887894942923606",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "1.8.0": {
+   "name": "sigstore",
+   "version": "1.8.0",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@1.8.0",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "bin": {
+    "sigstore": "bin/sigstore.js"
+   },
+   "dist": {
+    "shasum": "f790120697fa7c89f4418598ce59e638ff680aa5",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-1.8.0.tgz",
+    "fileCount": 118,
+    "integrity": "sha512-ogU8qtQ3VFBawRJ8wjsBEX/vIFeHuGs1fm4jZtjWQwjo8pfAt7T/rh+udlAN4+QUe0IzA8qRSc/YZ7dHP6kh+w==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDiwtSkB2eTprSqtkgm2R/ohKJbbzwWnWgZ2AZ4e36ewAIgO8HrOitRmNn+h+gTDw74Y2ohzswywRuFfGdPiBsyUjY=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@1.8.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 234998
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
+   },
+   "gitHead": "8d69554570934c3f82fad8eda929ec36f5d12262",
+   "scripts": {
+    "test": "jest",
+    "build": "tsc --build",
+    "clean": "shx rm -rf dist *.tsbuildinfo"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.8.0",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.20.1",
+   "dependencies": {
+    "@sigstore/tuf": "^1.0.3",
+    "@sigstore/bundle": "^1.0.0",
+    "make-fetch-happen": "^11.0.1",
+    "@sigstore/protobuf-specs": "^0.2.0"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "@sigstore/jest": "^0.0.0",
+    "@tufjs/repo-mock": "^1.1.0",
+    "@sigstore/rekor-types": "^1.0.0",
+    "@types/make-fetch-happen": "^10.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_1.8.0_1689783034897_0.6219536619029546",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "2.1.0": {
+   "name": "sigstore",
+   "version": "2.1.0",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@2.1.0",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "dist": {
+    "shasum": "c577b596642b3f360dc4135d476466e6edeb2364",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-2.1.0.tgz",
+    "fileCount": 73,
+    "integrity": "sha512-kPIj+ZLkyI3QaM0qX8V/nSsweYND3W448pwkDgS6CQ74MfhEkIR8ToK5Iyx46KJYRjseVcD3Rp9zAmUAj6ZjPw==",
+    "signatures": [
+     {
+      "sig": "MEUCIHxnGcNtJmOs68L+fANGzs1oZzI5B3HT/pEBnU1fWjYEAiEA1C/CIft7s/7Uc79sS6Oh7ducrhp5Jz2+G0ojh+kVgng=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@2.1.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 160555
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^16.14.0 || >=18.0.0"
+   },
+   "gitHead": "26d16513386ffaa790b1c32f927544f1322e4194",
+   "scripts": {
+    "test": "jest",
+    "build": "tsc --build",
+    "clean": "shx rm -rf dist *.tsbuildinfo"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.8.1",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "16.20.2",
+   "dependencies": {
+    "@sigstore/tuf": "^2.1.0",
+    "@sigstore/sign": "^2.1.0",
+    "@sigstore/bundle": "^2.1.0",
+    "@sigstore/protobuf-specs": "^0.2.1"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "@sigstore/jest": "^0.0.0",
+    "@sigstore/mock": "^0.4.0",
+    "@tufjs/repo-mock": "^2.0.0",
+    "@sigstore/rekor-types": "^2.0.0",
+    "@types/make-fetch-happen": "^10.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_2.1.0_1693323624209_0.622695855342287",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "2.3.0": {
+   "name": "sigstore",
+   "version": "2.3.0",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@2.3.0",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "dist": {
+    "shasum": "c56b32818d4dc989f6ea3c0897f4d9bff5d14bed",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-2.3.0.tgz",
+    "fileCount": 9,
+    "integrity": "sha512-q+o8L2ebiWD1AxD17eglf1pFrl9jtW7FHa0ygqY6EKvibK8JHyq9Z26v9MZXeDiw+RbfOJ9j2v70M10Hd6E06A==",
+    "signatures": [
+     {
+      "sig": "MEUCIBZlF7eXgKSVSnf2cNkrkneihdC2Pj6RxjikqjPwlLJUAiEAhMG5Ejxy4eA5ot/2HRIFQQKrLc4IVkbg/WRmFNfLE98=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@2.3.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 36278
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^16.14.0 || >=18.0.0"
+   },
+   "gitHead": "518dfb016e8857990b15edf6dfc364c85fcbd610",
+   "scripts": {
+    "test": "jest",
+    "build": "tsc --build",
+    "clean": "shx rm -rf dist *.tsbuildinfo"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "10.5.1",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "18.17.0",
+   "dependencies": {
+    "@sigstore/tuf": "^2.3.1",
+    "@sigstore/core": "^1.0.0",
+    "@sigstore/sign": "^2.3.0",
+    "@sigstore/bundle": "^2.3.1",
+    "@sigstore/verify": "^1.2.0",
+    "@sigstore/protobuf-specs": "^0.3.1"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "@sigstore/jest": "^0.0.0",
+    "@sigstore/mock": "^0.7.0",
+    "@tufjs/repo-mock": "^2.0.0",
+    "@sigstore/rekor-types": "^2.0.0",
+    "@types/make-fetch-happen": "^10.0.4"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_2.3.0_1712259689853_0.9508144665968301",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.1.0": {
+   "name": "sigstore",
+   "version": "3.1.0",
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "_id": "sigstore@3.1.0",
+   "maintainers": [
+    {
+     "name": "mylesborins",
+     "email": "myles.borins@gmail.com"
+    },
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "dist": {
+    "shasum": "08dc6c0c425263e9fdab85ffdb6477550e2c511d",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-3.1.0.tgz",
+    "fileCount": 9,
+    "integrity": "sha512-ZpzWAFHIFqyFE56dXqgX/DkDRZdz+rRcjoIk/RQU4IX0wiCv1l8S7ZrXDHcCc+uaf+6o7w3h2l3g6GYG5TKN9Q==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCCs7f3ZfBv/GAQbS2bwYKkP7qA+YhEXPVcTlRrP88JHAIgaWJxIIvEupPr1wB3i15BqqC768dquUTCaFcnxxMfK+I=",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@3.1.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 37213
+   },
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "engines": {
+    "node": "^18.17.0 || >=20.5.0"
+   },
+   "gitHead": "06cd267cbdc2eeaa04294995622db9f6ad2fa7cf",
+   "scripts": {
+    "test": "jest",
+    "build": "tsc --build",
+    "clean": "shx rm -rf dist *.tsbuildinfo"
+   },
+   "_npmUser": {
+    "name": "bdehamer",
+    "email": "brian@dehamer.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/sigstore/sigstore-js.git",
+    "type": "git"
+   },
+   "_npmVersion": "10.9.2",
+   "description": "code-signing for npm packages",
+   "directories": {},
+   "_nodeVersion": "18.17.0",
+   "dependencies": {
+    "@sigstore/tuf": "^3.1.0",
+    "@sigstore/core": "^2.0.0",
+    "@sigstore/sign": "^3.1.0",
+    "@sigstore/bundle": "^3.1.0",
+    "@sigstore/verify": "^2.1.0",
+    "@sigstore/protobuf-specs": "^0.4.0"
+   },
+   "publishConfig": {
+    "provenance": true
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "@sigstore/jest": "^0.0.0",
+    "@sigstore/mock": "^0.10.0",
+    "@tufjs/repo-mock": "^3.0.1",
+    "@sigstore/rekor-types": "^3.0.0",
+    "@types/make-fetch-happen": "^10.0.4"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/sigstore_3.1.0_1738701348554_0.34926300164624946",
+    "host": "s3://npm-registry-packages-npm-production"
+   }
+  },
+  "5.0.0": {
+   "name": "sigstore",
+   "version": "5.0.0",
+   "description": "code-signing for npm packages",
+   "main": "dist/index.js",
+   "types": "dist/index.d.ts",
+   "scripts": {
+    "clean": "shx rm -rf dist *.tsbuildinfo",
+    "build": "tsc --build",
+    "test": "jest"
+   },
+   "author": {
+    "name": "bdehamer@github.com"
+   },
+   "license": "Apache-2.0",
+   "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sigstore/sigstore-js.git"
+   },
+   "bugs": {
+    "url": "https://github.com/sigstore/sigstore-js/issues"
+   },
+   "homepage": "https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme",
+   "publishConfig": {
+    "provenance": true
+   },
+   "devDependencies": {
+    "@sigstore/jest": "^0.0.0",
+    "@sigstore/mock": "^0.13.0",
+    "@sigstore/rekor-types": "^5.0.0",
+    "@tufjs/repo-mock": "^5.0.0",
+    "@types/make-fetch-happen": "^10.0.4"
+   },
+   "dependencies": {
+    "@sigstore/bundle": "^5.0.0",
+    "@sigstore/core": "^4.0.0",
+    "@sigstore/protobuf-specs": "^0.5.0",
+    "@sigstore/sign": "^5.0.0",
+    "@sigstore/tuf": "^5.0.0",
+    "@sigstore/verify": "^4.0.0"
+   },
+   "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+   },
+   "gitHead": "7d2900eca1c22b3f87c13987c8d4b7c9a29b733a",
+   "_id": "sigstore@5.0.0",
+   "_nodeVersion": "24.16.0",
+   "_npmVersion": "11.13.0",
+   "dist": {
+    "integrity": "sha512-hJqJfoG/e4qFQaauQL00c6J6FrHLBGKtkFvW3JbTSIEFOhLrSjdSM/gWd/yUOfYo/gsERehTXGC1VZWX+9X4Dg==",
+    "shasum": "c2ed2b740b45b8bf533cfdc4a64dc6aa91f0956c",
+    "tarball": "https://registry.npmjs.org/sigstore/-/sigstore-5.0.0.tgz",
+    "fileCount": 9,
+    "unpackedSize": 37893,
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/sigstore@5.0.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "signatures": [
+     {
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+      "sig": "MEUCIGIJh+4RKmp1wBB1Oh2HPPl+OFV2V3T/51C2IV3Wuaa4AiEA+vjXhMpx2l/O73LLM4XpGwvCgNiBTlNAHzry/lPSAhU="
+     }
+    ]
+   },
+   "_npmUser": {
+    "name": "GitHub Actions",
+    "email": "npm-oidc-no-reply@github.com",
+    "trustedPublisher": {
+     "id": "github",
+     "oidcConfigId": "oidc:a123e7c7-98a7-4464-911d-09fa7c394dd1"
+    }
+   },
+   "directories": {},
+   "maintainers": [
+    {
+     "name": "bdehamer",
+     "email": "brian@dehamer.com"
+    }
+   ],
+   "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages-npm-production",
+    "tmp": "tmp/sigstore_5.0.0_1780347772137_0.8484497290381849"
+   },
+   "_hasShrinkwrap": false
+  }
+ }
+}

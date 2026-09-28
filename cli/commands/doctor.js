@@ -7,8 +7,11 @@ import { npmrcPath } from '../npmrc.js';
 import { readPid, isPortInUse } from '../proxy-control.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
-import { checkSelfWitness, hasAnyChaingateInWitness } from '../self-witness.js';
+import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
+import { resolveActiveBundle, verifyBundleDir, activeBundleId,
+  previousBundleId } from '../seed-bundle.js';
+import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let CLI_VERSION = 'unknown';
@@ -77,6 +80,70 @@ export default async function doctor(args) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
   const checks = [];
+
+  // ── the ACTIVE v3 bundle and the policy in force ────────────────────────
+  // Resolved ONCE, then read through the pinned directory — the same way the proxy does it.
+  let policy = {};
+  let configFault = null;
+  try {
+    const cfg = readConfigStrict(paths.configFile);
+    policy = validateConfig(cfg || {}, paths.configFile).policy;
+  } catch (err) {
+    configFault = err.why || err.message;
+  }
+  if (configFault) {
+    checks.push({ name: 'config', pass: false, severity: 'unverifiable',
+      detail: `${paths.configFile}: ${configFault}` });
+  }
+
+  const active = resolveActiveBundle(paths.base);
+  if (!active) {
+    checks.push({ name: 'seed-v3', pass: true, severity: 'skipped',
+      detail: 'no v3 bundle active (run `chaingate init --seed <bundle>`)' });
+  } else {
+    const verdict = verifyBundleDir(active.dir);
+    if (!verdict.ok) {
+      checks.push({ name: 'seed-v3', pass: false, severity: 'tamper',
+        detail: `active bundle ${active.id} is not usable: ${verdict.why}` });
+    } else {
+      const id = verdict.identity;
+      const writable = (() => {
+        try { accessSync(active.files.db, fsConstants.W_OK); return true; } catch { return false; }
+      })();
+      checks.push({
+        name: 'seed-v3',
+        pass: !writable,
+        detail: `bundle ${id.bundle_id} sha256 ${id.sha256.slice(0, 16)}… `
+          + `schema v${id.schema_version} snapshot ${String(id.corpus_snapshot_digest).slice(0, 12)}… `
+          + `trust ${id.trust}${id.authenticated ? ' (authenticated)' : ''}`
+          + (writable ? ' — WRITABLE, a seed should be read-only' : ' — read-only'),
+      });
+      checks.push({ name: 'seed-v3-separate-from-witness',
+        pass: active.files.db !== paths.witnessDb,
+        detail: active.files.db !== paths.witnessDb
+          ? `immutable bundle and writable witness state are different files (${paths.witnessDb})`
+          : 'the seed and the witness database are the same file' });
+      const prev = previousBundleId(paths.base);
+      checks.push({ name: 'seed-v3-rollback', pass: true,
+        severity: prev ? undefined : 'skipped',
+        detail: prev ? `previous bundle ${prev} retained for rollback`
+          : 'no previous bundle retained (nothing to roll back to yet)' });
+    }
+  }
+
+  const policyComplete = Object.keys(POLICY_VALUES).every((k) => policy[k]);
+  checks.push({
+    name: 'policy',
+    pass: active ? policyComplete : true,
+    severity: active && !policyComplete ? 'unverifiable' : (active ? undefined : 'skipped'),
+    detail: active
+      ? `on_unusable_input=${policy.on_unusable_input || 'UNSET'} `
+        + `on_no_evidence=${policy.on_no_evidence || 'UNSET'}`
+        + (policyComplete ? '' : ' — unresolved policy is not permission; the proxy refuses to start')
+      : 'no bundle active, so no policy is in force',
+  });
+  checks.push({ name: 'domain-version-count', pass: true,
+    detail: 'from-packument (internal: package-scoped, derived per document — not an operator setting)' });
 
   // 1. Chaingate directory exists and is writable
   {
@@ -304,7 +371,7 @@ export default async function doctor(args) {
     }
   } else if (exitCode === EXIT.INTEGRITY_TAMPER) {
     console.log(fmt.red('TAMPER signal — cryptographic checks disagree.'));
-    console.log(fmt.red('  Do not use this installation. Reinstall chaingate from a trusted source.'));
+    console.log(fmt.red(`  Do not use this installation. Reinstall ${OWN_PACKAGE_NAME} from a trusted source.`));
   } else if (exitCode === EXIT.INTEGRITY_UNVERIFIABLE) {
     console.log(fmt.yellow('Unverifiable — integrity checks could not complete.'));
     console.log(fmt.dim('  Expected for pre-publish, dev, or --no-seed installs. See detail above.'));

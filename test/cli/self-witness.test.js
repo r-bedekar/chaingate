@@ -10,21 +10,24 @@ import {
   readLockfileIntegrity,
   hasAnyChaingateInWitness,
   checkSelfWitness,
+  OWN_PACKAGE_NAME,
 } from '../../cli/self-witness.js';
 
 const SRI = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 const SRI_OTHER = 'sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB==';
 
-function makeTree({ version = '0.1.0', writeLock = true, lockIntegrity = SRI } = {}) {
+// The installed tree for a package NAME, laid out as npm lays it out: node_modules/<name>, which is
+// node_modules/@cgsec/chaingate for the scoped package the runtime is published as.
+function makeTree({ version = '0.1.0', writeLock = true, lockIntegrity = SRI, name = OWN_PACKAGE_NAME } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'chaingate-self-'));
   const nm = join(root, 'node_modules');
-  const cgDir = join(nm, 'chaingate');
+  const cgDir = join(nm, ...name.split('/'));
   const cliDir = join(cgDir, 'cli');
   mkdirSync(cliDir, { recursive: true });
 
   writeFileSync(
     join(cgDir, 'package.json'),
-    JSON.stringify({ name: 'chaingate', version }),
+    JSON.stringify({ name, version }),
   );
   // A synthetic entry file; self-witness walks up from this URL.
   const entryFile = join(cliDir, 'index.js');
@@ -34,10 +37,10 @@ function makeTree({ version = '0.1.0', writeLock = true, lockIntegrity = SRI } =
     writeFileSync(
       join(nm, '.package-lock.json'),
       JSON.stringify({
-        name: 'chaingate',
+        name: 'host',
         lockfileVersion: 3,
         packages: {
-          'node_modules/chaingate': { version, integrity: lockIntegrity },
+          [`node_modules/${name}`]: { version, integrity: lockIntegrity },
         },
       }),
     );
@@ -51,14 +54,15 @@ function makeTree({ version = '0.1.0', writeLock = true, lockIntegrity = SRI } =
   };
 }
 
-function makeWitness({ baselineIntegrity, history = null } = {}) {
+function makeWitness({ baselineIntegrity, history = null, recordedAs = OWN_PACKAGE_NAME } = {}) {
   return {
     getBaseline(name, version) {
-      if (name !== 'chaingate') return null;
+      if (name !== recordedAs) return null;
       if (baselineIntegrity === null) return null;
       return { version, integrity_hash: baselineIntegrity };
     },
     getHistory(name) {
+      if (name !== recordedAs) return [];
       if (history != null) return history;
       return baselineIntegrity ? [{ version: '0.0.1' }] : [];
     },
@@ -221,4 +225,44 @@ test('checkSelfWitness: unverifiable when witness read throws', () => {
   } finally {
     t.cleanup();
   }
+});
+
+// ---- U-03: the published name is @cgsec/chaingate; the unscoped `chaingate` is someone else's --------
+test('OWN_PACKAGE_NAME is the package.json name, the scoped @cgsec/chaingate', async () => {
+  const { readFileSync } = await import('node:fs');
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  assert.equal(OWN_PACKAGE_NAME, pkg.name);
+  assert.equal(OWN_PACKAGE_NAME, '@cgsec/chaingate');
+});
+
+test('scoped layout: the lockfile is found two levels up (node_modules/.package-lock.json)', () => {
+  const t = makeTree();
+  try {
+    assert.match(t.installRoot, /node_modules[\\/]@cgsec[\\/]chaingate$/);
+    assert.equal(readLockfileIntegrity(t.installRoot), SRI);
+    assert.equal(findInstallRoot(t.entryFileUrl).root, t.installRoot);
+  } finally { t.cleanup(); }
+});
+
+test('an unscoped layout still works when that is the package name', () => {
+  const t = makeTree({ name: 'chaingate' });
+  try {
+    assert.equal(readLockfileIntegrity(t.installRoot, 'chaingate'), SRI);
+    assert.equal(findInstallRoot(t.entryFileUrl, 'chaingate').root, t.installRoot);
+    assert.equal(findInstallRoot(t.entryFileUrl), null, 'a package named chaingate is NOT our install');
+  } finally { t.cleanup(); }
+});
+
+test('the UNRELATED unscoped `chaingate` in the witness store is never used as our baseline', () => {
+  // The witness knows versions of the other project, published as plain `chaingate`, with a
+  // different integrity. Our install must be neither verified nor flagged as tampered against it.
+  const t = makeTree();
+  try {
+    const foreign = makeWitness({ baselineIntegrity: SRI_OTHER, recordedAs: 'chaingate' });
+    assert.equal(hasAnyChaingateInWitness(foreign), false, 'the other project does not arm the integrity gate');
+    const r = checkSelfWitness(foreign, { startFileUrl: t.entryFileUrl });
+    assert.equal(r.status, 'unverifiable');
+    assert.equal(r.reason, 'not_in_witness');
+    assert.match(r.detail, /^@cgsec\/chaingate@0\.1\.0 not yet in witness store/);
+  } finally { t.cleanup(); }
 });

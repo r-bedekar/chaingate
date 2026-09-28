@@ -1,0 +1,1394 @@
+[
+ {
+  "id": "publisher-broke-beside-unevaluated",
+  "explanation": {
+   "text": [
+    "pub@1.3.0: WARN",
+    "  evaluated disposition: WARN under cft-policy-1.0",
+    "  placement: append",
+    "  decided by:",
+    "    seed-v3:dac-trajectory:any: 1/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [ALLOW] seed-v3:channel-a:critical: 1/5 broke, threshold 3 cannot be reached (retained interval [1, 1])",
+    "    [ALLOW] seed-v3:dac-trajectory:surface: 1/4 broke, threshold 2 cannot be reached (retained interval [1, 1])",
+    "    [WARN] seed-v3:dac-trajectory:any: 1/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)",
+    "    [SKIP] seed-v3:coverage: 1 of 12 observations NOT_EVALUATED (unsupported_field)",
+    "  channel-a witness groups:",
+    "    publisher: BROKE",
+    "      constituent identity: BROKE",
+    "      constituent maintainers: NOT EVALUATED (unsupported_field)",
+    "      constituent tool_downgrade: held",
+    "    provenance: held",
+    "    install: held",
+    "    size: held",
+    "    git: held",
+    "  dac trajectory predicates:",
+    "    install_introduced: held",
+    "    size_jump_5x: held",
+    "    prov_dropped: held",
+    "    first_pkg_appearance_new_publisher: BROKE",
+    "  NOT EVALUATED (1) — none of these is a clean result:",
+    "    channel_a.publisher_constituent maintainers: unsupported_field",
+    "  evidence incomplete: the result above is NOT a clean bill of health"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "pub",
+    "version": "1.3.0",
+    "effective": {
+     "action": "WARN",
+     "basis": "evaluation"
+    },
+    "disposition": "WARN",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "append",
+     "reason": null
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "detail": "1/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "result": "ALLOW",
+      "detail": "1/5 broke, threshold 3 cannot be reached (retained interval [1, 1])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "ALLOW",
+      "detail": "1/4 broke, threshold 2 cannot be reached (retained interval [1, 1])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "WARN",
+      "detail": "1/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "SKIP",
+      "detail": "1 of 12 observations NOT_EVALUATED (unsupported_field)"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "BROKE"
+      },
+      {
+       "name": "provenance",
+       "state": "HELD"
+      },
+      {
+       "name": "install",
+       "state": "HELD"
+      },
+      {
+       "name": "size",
+       "state": "HELD"
+      },
+      {
+       "name": "git",
+       "state": "HELD"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "BROKE"
+      },
+      {
+       "name": "maintainers",
+       "state": "NOT_EVALUATED",
+       "reason": "unsupported_field"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "HELD"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "HELD"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "HELD"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "HELD"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "BROKE"
+      }
+     ]
+    },
+    "not_evaluated": [
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "maintainers",
+      "reason": "unsupported_field"
+     }
+    ],
+    "evidence_complete": false,
+    "evaluated_any": true
+   }
+  }
+ },
+ {
+  "id": "uncovered",
+  "explanation": {
+   "text": [
+    "q@1.0.0: WARN",
+    "  evaluated disposition: WARN under cft-policy-1.0",
+    "  placement: uncovered-package — the seed does not cover this package",
+    "  decided by:",
+    "    seed-v3:coverage: nothing in this finding was evaluated",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [SKIP] seed-v3:channel-a: not evaluated — the seed does not cover this package. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used.",
+    "    [SKIP] seed-v3:dac-trajectory:surface: indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 2 — NOT a clean result",
+    "    [SKIP] seed-v3:dac-trajectory:any: indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 1 — NOT a clean result",
+    "    [SKIP] seed-v3:coverage: 12 of 12 observations NOT_EVALUATED (the seed does not cover this package, uncovered_package)",
+    "    [WARN] seed-v3:coverage: nothing in this finding was evaluated",
+    "  channel-a witness groups:",
+    "    publisher: NOT EVALUATED (the seed does not cover this package)",
+    "      constituent identity: NOT EVALUATED (the seed does not cover this package)",
+    "      constituent maintainers: NOT EVALUATED (the seed does not cover this package)",
+    "      constituent tool_downgrade: NOT EVALUATED (the seed does not cover this package)",
+    "    provenance: NOT EVALUATED (the seed does not cover this package)",
+    "    install: NOT EVALUATED (the seed does not cover this package)",
+    "    size: NOT EVALUATED (the seed does not cover this package)",
+    "    git: NOT EVALUATED (the seed does not cover this package)",
+    "  dac trajectory predicates:",
+    "    install_introduced: NOT EVALUATED (uncovered_package)",
+    "    size_jump_5x: NOT EVALUATED (uncovered_package)",
+    "    prov_dropped: NOT EVALUATED (uncovered_package)",
+    "    first_pkg_appearance_new_publisher: NOT EVALUATED (uncovered_package)",
+    "  NOT EVALUATED (12) — none of these is a clean result:",
+    "    channel_a.group publisher: the seed does not cover this package",
+    "    channel_a.group provenance: the seed does not cover this package",
+    "    channel_a.group install: the seed does not cover this package",
+    "    channel_a.group size: the seed does not cover this package",
+    "    channel_a.group git: the seed does not cover this package",
+    "    channel_a.publisher_constituent identity: the seed does not cover this package",
+    "    channel_a.publisher_constituent maintainers: the seed does not cover this package",
+    "    channel_a.publisher_constituent tool_downgrade: the seed does not cover this package",
+    "    dac_trajectory.predicate install_introduced: uncovered_package",
+    "    dac_trajectory.predicate size_jump_5x: uncovered_package",
+    "    dac_trajectory.predicate prov_dropped: uncovered_package",
+    "    dac_trajectory.predicate first_pkg_appearance_new_publisher: uncovered_package",
+    "  nothing in this finding was evaluated: this is NOT a clean result"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "q",
+    "version": "1.0.0",
+    "effective": {
+     "action": "WARN",
+     "basis": "evaluation"
+    },
+    "disposition": "WARN",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "uncovered-package",
+     "reason": "the seed does not cover this package"
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:coverage",
+      "detail": "nothing in this finding was evaluated"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a",
+      "result": "SKIP",
+      "detail": "not evaluated — the seed does not cover this package. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used."
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "SKIP",
+      "detail": "indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 2 — NOT a clean result"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "SKIP",
+      "detail": "indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 1 — NOT a clean result"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "SKIP",
+      "detail": "12 of 12 observations NOT_EVALUATED (the seed does not cover this package, uncovered_package)"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "WARN",
+      "detail": "nothing in this finding was evaluated"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "provenance",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "install",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "size",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "git",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "maintainers",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "NOT_EVALUATED",
+       "reason": "the seed does not cover this package",
+       "stated_by": "placement"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "NOT_EVALUATED",
+       "reason": "uncovered_package"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "NOT_EVALUATED",
+       "reason": "uncovered_package"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "NOT_EVALUATED",
+       "reason": "uncovered_package"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "uncovered_package"
+      }
+     ]
+    },
+    "not_evaluated": [
+     {
+      "where": "channel_a.group",
+      "name": "publisher",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "provenance",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "install",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "size",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "git",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "identity",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "maintainers",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "tool_downgrade",
+      "reason": "the seed does not cover this package"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "install_introduced",
+      "reason": "uncovered_package"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "size_jump_5x",
+      "reason": "uncovered_package"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "prov_dropped",
+      "reason": "uncovered_package"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "first_pkg_appearance_new_publisher",
+      "reason": "uncovered_package"
+     }
+    ],
+    "evidence_complete": false,
+    "evaluated_any": false
+   }
+  }
+ },
+ {
+  "id": "cold-start-new-major",
+  "explanation": {
+   "text": [
+    "p@2.0.0: ALLOW",
+    "  evaluated disposition: ALLOW under cft-policy-1.0",
+    "  placement: new-major-cold-start — no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "  decided by:",
+    "    seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])",
+    "    seed-v3:dac-trajectory:any: 0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [SKIP] seed-v3:channel-a: not evaluated — no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used.",
+    "    [ALLOW] seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])",
+    "    [ALLOW] seed-v3:dac-trajectory:any: 0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])",
+    "    [SKIP] seed-v3:coverage: 8 of 12 observations NOT_EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "  channel-a witness groups:",
+    "    publisher: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "      constituent identity: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "      constituent maintainers: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "      constituent tool_downgrade: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "    provenance: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "    install: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "    size: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "    git: NOT EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)",
+    "  dac trajectory predicates:",
+    "    install_introduced: held",
+    "    size_jump_5x: held",
+    "    prov_dropped: held",
+    "    first_pkg_appearance_new_publisher: held",
+    "  NOT EVALUATED (8) — none of these is a clean result:",
+    "    channel_a.group publisher: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.group provenance: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.group install: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.group size: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.group git: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.publisher_constituent identity: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.publisher_constituent maintainers: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "    channel_a.publisher_constituent tool_downgrade: no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+    "  evidence incomplete: the result above is NOT a clean bill of health"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "p",
+    "version": "2.0.0",
+    "effective": {
+     "action": "ALLOW",
+     "basis": "evaluation"
+    },
+    "disposition": "ALLOW",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "new-major-cold-start",
+     "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "detail": "0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a",
+      "result": "SKIP",
+      "detail": "not evaluated — no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used."
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "ALLOW",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "ALLOW",
+      "detail": "0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "SKIP",
+      "detail": "8 of 12 observations NOT_EVALUATED (no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against)"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "provenance",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "install",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "size",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "git",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "maintainers",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "NOT_EVALUATED",
+       "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against",
+       "stated_by": "placement"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "HELD"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "HELD"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "HELD"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "HELD"
+      }
+     ]
+    },
+    "not_evaluated": [
+     {
+      "where": "channel_a.group",
+      "name": "publisher",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "provenance",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "install",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "size",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "git",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "identity",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "maintainers",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "tool_downgrade",
+      "reason": "no recorded lineage carries major 2: this release is the first of its own lineage and has no predecessor to compare against"
+     }
+    ],
+    "evidence_complete": false,
+    "evaluated_any": true
+   }
+  }
+ },
+ {
+  "id": "refuse-malformed-npmuser",
+  "explanation": {
+   "text": [
+    "p@1.5.0: BLOCK — REFUSED: no finding exists for this input",
+    "  reason: PackumentRejected: _npmUser is string, not an object: the producer cannot read a publisher from this manifest",
+    "  policy cft-policy-1.0: an unusable input is decided by on_unusable_input -> BLOCK",
+    "  nothing was evaluated: this is NOT a clean result"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "refused",
+    "package": "p",
+    "version": "1.5.0",
+    "refusal": "PackumentRejected: _npmUser is string, not an object: the producer cannot read a publisher from this manifest",
+    "disposition": "BLOCK",
+    "effective": {
+     "action": "BLOCK",
+     "basis": "evaluation"
+    },
+    "not_evaluated": [
+     {
+      "where": "policy",
+      "name": "input",
+      "reason": "PackumentRejected: _npmUser is string, not an object: the producer cannot read a publisher from this manifest"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "refuse-missing-manifest",
+  "explanation": {
+   "text": [
+    "p@1.5.0: BLOCK — REFUSED: no finding exists for this input",
+    "  reason: Error: no raw packument manifest supplied for p@1.5.0",
+    "  policy cft-policy-1.0: an unusable input is decided by on_unusable_input -> BLOCK",
+    "  nothing was evaluated: this is NOT a clean result"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "refused",
+    "package": "p",
+    "version": "1.5.0",
+    "refusal": "Error: no raw packument manifest supplied for p@1.5.0",
+    "disposition": "BLOCK",
+    "effective": {
+     "action": "BLOCK",
+     "basis": "evaluation"
+    },
+    "not_evaluated": [
+     {
+      "where": "policy",
+      "name": "input",
+      "reason": "Error: no raw packument manifest supplied for p@1.5.0"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "notime-pin-block-ineligible",
+  "explanation": {
+   "text": [
+    "p@1.4.0: BLOCK",
+    "  evaluated disposition: BLOCK under cft-policy-1.0",
+    "  placement: ineligible-no-publication-time — the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "  decided by:",
+    "    seed-v3:known-malicious-pin: recorded advisory MAL-2026-U01-1.4.0 pins p@1.4.0 (source osv)",
+    "  all results:",
+    "    [BLOCK] seed-v3:known-malicious-pin: recorded advisory MAL-2026-U01-1.4.0 pins p@1.4.0 (source osv)",
+    "    [SKIP] seed-v3:channel-a: not evaluated — the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used.",
+    "    [SKIP] seed-v3:dac-trajectory:surface: indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 2 — NOT a clean result",
+    "    [SKIP] seed-v3:dac-trajectory:any: indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 1 — NOT a clean result",
+    "    [SKIP] seed-v3:coverage: 12 of 12 observations NOT_EVALUATED (missing_publication_time, the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "    [WARN] seed-v3:coverage: nothing in this finding was evaluated",
+    "  channel-a witness groups:",
+    "    publisher: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "      constituent identity: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "      constituent maintainers: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "      constituent tool_downgrade: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "    provenance: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "    install: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "    size: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "    git: NOT EVALUATED (the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)",
+    "  dac trajectory predicates:",
+    "    install_introduced: NOT EVALUATED (missing_publication_time)",
+    "    size_jump_5x: NOT EVALUATED (missing_publication_time)",
+    "    prov_dropped: NOT EVALUATED (missing_publication_time)",
+    "    first_pkg_appearance_new_publisher: NOT EVALUATED (missing_publication_time)",
+    "  NOT EVALUATED (12) — none of these is a clean result:",
+    "    channel_a.group publisher: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.group provenance: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.group install: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.group size: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.group git: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.publisher_constituent identity: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.publisher_constituent maintainers: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    channel_a.publisher_constituent tool_downgrade: the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+    "    dac_trajectory.predicate install_introduced: missing_publication_time",
+    "    dac_trajectory.predicate size_jump_5x: missing_publication_time",
+    "    dac_trajectory.predicate prov_dropped: missing_publication_time",
+    "    dac_trajectory.predicate first_pkg_appearance_new_publisher: missing_publication_time",
+    "  nothing in this finding was evaluated: this is NOT a clean result"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "p",
+    "version": "1.4.0",
+    "effective": {
+     "action": "BLOCK",
+     "basis": "evaluation"
+    },
+    "disposition": "BLOCK",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "ineligible-no-publication-time",
+     "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "detail": "recorded advisory MAL-2026-U01-1.4.0 pins p@1.4.0 (source osv)"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "BLOCK",
+      "detail": "recorded advisory MAL-2026-U01-1.4.0 pins p@1.4.0 (source osv)"
+     },
+     {
+      "gate": "seed-v3:channel-a",
+      "result": "SKIP",
+      "detail": "not evaluated — the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor. Channel-A compares this release against its lineage predecessor, and this release could not be placed; the thresholds in the finding are over an empty comparison and are NOT used."
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "SKIP",
+      "detail": "indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 2 — NOT a clean result"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "SKIP",
+      "detail": "indeterminate: 4 of 4 unevaluable, retained interval [0, 4] spans threshold 1 — NOT a clean result"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "SKIP",
+      "detail": "12 of 12 observations NOT_EVALUATED (missing_publication_time, the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor)"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "WARN",
+      "detail": "nothing in this finding was evaluated"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "provenance",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "install",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "size",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "git",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "maintainers",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "NOT_EVALUATED",
+       "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor",
+       "stated_by": "placement"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "NOT_EVALUATED",
+       "reason": "missing_publication_time"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "NOT_EVALUATED",
+       "reason": "missing_publication_time"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "NOT_EVALUATED",
+       "reason": "missing_publication_time"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "missing_publication_time"
+      }
+     ]
+    },
+    "not_evaluated": [
+     {
+      "where": "channel_a.group",
+      "name": "publisher",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "provenance",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "install",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "size",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "git",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "identity",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "maintainers",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "tool_downgrade",
+      "reason": "the release has no publication time (FU-2 E5): it is excluded from lineage grouping and cannot be ordered against any predecessor"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "install_introduced",
+      "reason": "missing_publication_time"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "size_jump_5x",
+      "reason": "missing_publication_time"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "prov_dropped",
+      "reason": "missing_publication_time"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "first_pkg_appearance_new_publisher",
+      "reason": "missing_publication_time"
+     }
+    ],
+    "evidence_complete": false,
+    "evaluated_any": false
+   }
+  }
+ },
+ {
+  "id": "warn-trajectory",
+  "explanation": {
+   "text": [
+    "p@1.6.0: WARN",
+    "  evaluated disposition: WARN under cft-policy-1.0",
+    "  placement: append",
+    "  decided by:",
+    "    seed-v3:dac-trajectory:surface: 2/4 witnesses broke, threshold 2 (threshold over history: warns, never blocks — D1)",
+    "    seed-v3:dac-trajectory:any: 2/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [ALLOW] seed-v3:channel-a:critical: 2/5 broke, threshold 3 cannot be reached (retained interval [2, 2])",
+    "    [WARN] seed-v3:dac-trajectory:surface: 2/4 witnesses broke, threshold 2 (threshold over history: warns, never blocks — D1)",
+    "    [WARN] seed-v3:dac-trajectory:any: 2/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)",
+    "  channel-a witness groups:",
+    "    publisher: held",
+    "      constituent identity: held",
+    "      constituent maintainers: held",
+    "      constituent tool_downgrade: held",
+    "    provenance: held",
+    "    install: BROKE",
+    "    size: BROKE",
+    "    git: held",
+    "  dac trajectory predicates:",
+    "    install_introduced: BROKE",
+    "    size_jump_5x: BROKE",
+    "    prov_dropped: held",
+    "    first_pkg_appearance_new_publisher: held"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "p",
+    "version": "1.6.0",
+    "effective": {
+     "action": "WARN",
+     "basis": "evaluation"
+    },
+    "disposition": "WARN",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "append",
+     "reason": null
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "detail": "2/4 witnesses broke, threshold 2 (threshold over history: warns, never blocks — D1)"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "detail": "2/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "result": "ALLOW",
+      "detail": "2/5 broke, threshold 3 cannot be reached (retained interval [2, 2])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "WARN",
+      "detail": "2/4 witnesses broke, threshold 2 (threshold over history: warns, never blocks — D1)"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "WARN",
+      "detail": "2/4 witnesses broke, threshold 1 (threshold over history: warns, never blocks — D1)"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "HELD"
+      },
+      {
+       "name": "provenance",
+       "state": "HELD"
+      },
+      {
+       "name": "install",
+       "state": "BROKE"
+      },
+      {
+       "name": "size",
+       "state": "BROKE"
+      },
+      {
+       "name": "git",
+       "state": "HELD"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "HELD"
+      },
+      {
+       "name": "maintainers",
+       "state": "HELD"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "HELD"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "BROKE"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "BROKE"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "HELD"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "HELD"
+      }
+     ]
+    },
+    "not_evaluated": [],
+    "evidence_complete": true,
+    "evaluated_any": true
+   }
+  }
+ },
+ {
+  "id": "recorded-deep-beyond-spine",
+  "explanation": {
+   "text": [
+    "deep@1.5.0: ALLOW",
+    "  evaluated disposition: ALLOW under cft-policy-1.0",
+    "  placement: recorded",
+    "  decided by:",
+    "    seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    seed-v3:channel-a:critical: 0/5 broke, threshold 3 cannot be reached (retained interval [0, 2])",
+    "    seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 1])",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [ALLOW] seed-v3:channel-a:critical: 0/5 broke, threshold 3 cannot be reached (retained interval [0, 2])",
+    "    [ALLOW] seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 1])",
+    "    [SKIP] seed-v3:dac-trajectory:any: indeterminate: 1 of 4 unevaluable, retained interval [0, 1] spans threshold 1 — NOT a clean result",
+    "    [SKIP] seed-v3:coverage: 4 of 12 observations NOT_EVALUATED (beyond_spine)",
+    "  channel-a witness groups:",
+    "    publisher: NOT EVALUATED (beyond_spine)",
+    "      constituent identity: held",
+    "      constituent maintainers: held",
+    "      constituent tool_downgrade: NOT EVALUATED (beyond_spine)",
+    "    provenance: held",
+    "    install: held",
+    "    size: NOT EVALUATED (beyond_spine)",
+    "    git: held",
+    "  dac trajectory predicates:",
+    "    install_introduced: held",
+    "    size_jump_5x: NOT EVALUATED (beyond_spine)",
+    "    prov_dropped: held",
+    "    first_pkg_appearance_new_publisher: held",
+    "  NOT EVALUATED (4) — none of these is a clean result:",
+    "    channel_a.group publisher: beyond_spine",
+    "    channel_a.group size: beyond_spine",
+    "    channel_a.publisher_constituent tool_downgrade: beyond_spine",
+    "    dac_trajectory.predicate size_jump_5x: beyond_spine",
+    "  evidence incomplete: the result above is NOT a clean bill of health"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "deep",
+    "version": "1.5.0",
+    "effective": {
+     "action": "ALLOW",
+     "basis": "evaluation"
+    },
+    "disposition": "ALLOW",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "recorded",
+     "reason": null
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "detail": "0/5 broke, threshold 3 cannot be reached (retained interval [0, 2])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 1])"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "result": "ALLOW",
+      "detail": "0/5 broke, threshold 3 cannot be reached (retained interval [0, 2])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "ALLOW",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 1])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "SKIP",
+      "detail": "indeterminate: 1 of 4 unevaluable, retained interval [0, 1] spans threshold 1 — NOT a clean result"
+     },
+     {
+      "gate": "seed-v3:coverage",
+      "result": "SKIP",
+      "detail": "4 of 12 observations NOT_EVALUATED (beyond_spine)"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "NOT_EVALUATED",
+       "reason": "beyond_spine"
+      },
+      {
+       "name": "provenance",
+       "state": "HELD"
+      },
+      {
+       "name": "install",
+       "state": "HELD"
+      },
+      {
+       "name": "size",
+       "state": "NOT_EVALUATED",
+       "reason": "beyond_spine"
+      },
+      {
+       "name": "git",
+       "state": "HELD"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "HELD"
+      },
+      {
+       "name": "maintainers",
+       "state": "HELD"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "NOT_EVALUATED",
+       "reason": "beyond_spine"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "HELD"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "NOT_EVALUATED",
+       "reason": "beyond_spine"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "HELD"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "HELD"
+      }
+     ]
+    },
+    "not_evaluated": [
+     {
+      "where": "channel_a.group",
+      "name": "publisher",
+      "reason": "beyond_spine"
+     },
+     {
+      "where": "channel_a.group",
+      "name": "size",
+      "reason": "beyond_spine"
+     },
+     {
+      "where": "channel_a.publisher_constituent",
+      "name": "tool_downgrade",
+      "reason": "beyond_spine"
+     },
+     {
+      "where": "dac_trajectory.predicate",
+      "name": "size_jump_5x",
+      "reason": "beyond_spine"
+     }
+    ],
+    "evidence_complete": false,
+    "evaluated_any": true
+   }
+  }
+ },
+ {
+  "id": "allow-append",
+  "explanation": {
+   "text": [
+    "p@1.5.0: ALLOW",
+    "  evaluated disposition: ALLOW under cft-policy-1.0",
+    "  placement: append",
+    "  decided by:",
+    "    seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    seed-v3:channel-a:critical: 0/5 broke, threshold 3 cannot be reached (retained interval [0, 0])",
+    "    seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])",
+    "    seed-v3:dac-trajectory:any: 0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])",
+    "  all results:",
+    "    [ALLOW] seed-v3:known-malicious-pin: no recorded advisory pins this version",
+    "    [ALLOW] seed-v3:channel-a:critical: 0/5 broke, threshold 3 cannot be reached (retained interval [0, 0])",
+    "    [ALLOW] seed-v3:dac-trajectory:surface: 0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])",
+    "    [ALLOW] seed-v3:dac-trajectory:any: 0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])",
+    "  channel-a witness groups:",
+    "    publisher: held",
+    "      constituent identity: held",
+    "      constituent maintainers: held",
+    "      constituent tool_downgrade: held",
+    "    provenance: held",
+    "    install: held",
+    "    size: held",
+    "    git: held",
+    "  dac trajectory predicates:",
+    "    install_introduced: held",
+    "    size_jump_5x: held",
+    "    prov_dropped: held",
+    "    first_pkg_appearance_new_publisher: held"
+   ],
+   "structured": {
+    "explain_version": "chaingate-explain-1",
+    "result": "evaluated",
+    "package": "p",
+    "version": "1.5.0",
+    "effective": {
+     "action": "ALLOW",
+     "basis": "evaluation"
+    },
+    "disposition": "ALLOW",
+    "policy_version": "cft-policy-1.0",
+    "placement": {
+     "kind": "append",
+     "reason": null
+    },
+    "decided_by": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "detail": "0/5 broke, threshold 3 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "detail": "0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])"
+     }
+    ],
+    "results": [
+     {
+      "gate": "seed-v3:known-malicious-pin",
+      "result": "ALLOW",
+      "detail": "no recorded advisory pins this version"
+     },
+     {
+      "gate": "seed-v3:channel-a:critical",
+      "result": "ALLOW",
+      "detail": "0/5 broke, threshold 3 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:surface",
+      "result": "ALLOW",
+      "detail": "0/4 broke, threshold 2 cannot be reached (retained interval [0, 0])"
+     },
+     {
+      "gate": "seed-v3:dac-trajectory:any",
+      "result": "ALLOW",
+      "detail": "0/4 broke, threshold 1 cannot be reached (retained interval [0, 0])"
+     }
+    ],
+    "channel_a": {
+     "groups": [
+      {
+       "name": "publisher",
+       "state": "HELD"
+      },
+      {
+       "name": "provenance",
+       "state": "HELD"
+      },
+      {
+       "name": "install",
+       "state": "HELD"
+      },
+      {
+       "name": "size",
+       "state": "HELD"
+      },
+      {
+       "name": "git",
+       "state": "HELD"
+      }
+     ],
+     "publisher_constituents": [
+      {
+       "name": "identity",
+       "state": "HELD"
+      },
+      {
+       "name": "maintainers",
+       "state": "HELD"
+      },
+      {
+       "name": "tool_downgrade",
+       "state": "HELD"
+      }
+     ]
+    },
+    "dac_trajectory": {
+     "predicates": [
+      {
+       "name": "install_introduced",
+       "state": "HELD"
+      },
+      {
+       "name": "size_jump_5x",
+       "state": "HELD"
+      },
+      {
+       "name": "prov_dropped",
+       "state": "HELD"
+      },
+      {
+       "name": "first_pkg_appearance_new_publisher",
+       "state": "HELD"
+      }
+     ]
+    },
+    "not_evaluated": [],
+    "evidence_complete": true,
+    "evaluated_any": true
+   }
+  }
+ }
+]

@@ -1,7 +1,7 @@
 {
-  "name": "chaingate",
+  "name": "@cgsec/chaingate",
   "version": "0.1.0",
-  "description": "Supply chain integrity gate — deterministic gating for package registries",
+  "description": "ChainGate by CGSec \u2014 supply chain integrity gate: deterministic gating for package registries",
   "type": "module",
   "main": "proxy/server.js",
   "bin": {
@@ -11,7 +11,9 @@
     "start": "node proxy/server.js",
     "prepare": "git config core.hooksPath .githooks",
     "test": "node --test test/**/*.test.js",
-    "test:witness": "node --test test/witness/*.test.js"
+    "test:witness": "node --test test/witness/*.test.js",
+    "test:seed-v3": "node --test test/seed-v3/*.test.js",
+    "qualify:seed-v3": "node seed/v3/conformance.js --qualify"
   },
   "keywords": [
     "supply-chain",
@@ -21,6 +23,18 @@
     "integrity"
   ],
   "license": "Apache-2.0",
+  "author": "CGSec",
+  "homepage": "https://github.com/r-bedekar/chaingate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/r-bedekar/chaingate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/r-bedekar/chaingate/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.0.0"
   },
@@ -30,6 +44,24 @@
     "undici": "6.25.0"
   },
   "devDependencies": {
+    "ajv": "8.17.1",
     "cheerio": "^1.2.0"
-  }
+  },
+  "exports": {
+    ".": "./cli/index.js",
+    "./seed/v3": "./seed/v3/index.js"
+  },
+  "files": [
+    "cli/",
+    "gates/",
+    "proxy/",
+    "witness/",
+    "patterns/",
+    "seed/",
+    "constants.js",
+    "config-store.js",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ]
 }

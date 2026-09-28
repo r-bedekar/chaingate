@@ -30,10 +30,10 @@ Commands:
   allow <p@v>       Override a WARN/BLOCK for a specific package version
   stop              Stop the proxy and restore .npmrc
   update-seed       Download and verify the latest seed database
-  why <p@v>         Explain the gate decision for a package version
+  why <p@v>         Explain a check result (--packument | --from <file> | --cached)
   history <pkg>     Show the version timeline for a package
   doctor            Check local invariants (6 health checks)
-  check <p@v>       Check a package version (CI-friendly exit codes)
+  check <p@v>       Evaluate a release from --packument <file> (CI exit codes)
   overrides         List or revoke overrides
 
 Options:
@@ -78,10 +78,12 @@ async function main() {
       allow: 'chaingate allow <package>@<version> --reason "..." [--scope user|project]',
       stop: 'chaingate stop [--scope user|project]',
       'update-seed': 'chaingate update-seed [--force] [--scope user|project]',
-      why: 'chaingate why <package>@<version> [--json] [--scope user|project]',
+      why: 'chaingate why <package>@<version> --packument <file> [--json] [--scope user|project]\n'
+        + '  chaingate why --from <check.json> [--json]\n'
+        + '  chaingate why <package>@<version> --cached [--json]   (legacy row, UNBOUND, exit 4)',
       history: 'chaingate history <package> [--limit N] [--json] [--scope user|project]',
       doctor: 'chaingate doctor [--json] [--scope user|project]',
-      check: 'chaingate check <package>@<version> [--json] [--scope user|project]\n  Exit codes: 0=ALLOW, 2=WARN, 3=BLOCK, 4=tool error',
+      check: 'chaingate check <package>@<version> --packument <file> [--json] [--scope user|project]\n  Exit codes (follow the effective action): 0=ALLOW, 2=WARN, 3=BLOCK, 4=tool error',
       overrides: 'chaingate overrides [list|revoke <package>@<version>] [--json] [--scope user|project]',
     };
     console.log(HELP[cmd] ?? `chaingate ${cmd}`);

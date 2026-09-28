@@ -60,17 +60,28 @@ const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK']);
 // NOT in the exempt set short-circuited to SKIP with a poisoning-protection
 // detail.
 //
-// Only content-hash is exempt: it compares against a recorded baseline and
-// does not rely on pattern extraction from history. Any future gate added to
-// the exempt set must be explicitly justified — the default for any new gate
+// Only content-hash and seed-v3 are exempt: neither relies on pattern
+// extraction from LOCALLY observed history. Any future gate added to the
+// exempt set must be explicitly justified — the default for any new gate
 // is "pattern-based, requires depth."
+//
+// seed-v3 justification (CFT-05). The protection exists because a first-seen
+// package's locally recorded baseline can be attacker-supplied, so a gate that
+// learns its expectations from that baseline can be taught anything. The
+// seed-v3 gate reads NO local baseline: its history comes from the seed
+// artifact, and its only BLOCK is a recorded advisory pin naming that exact
+// version. It also handles thin history itself and more honestly than a SKIP
+// does — an unseeded release reports NOT_EVALUATED coverage with the reason,
+// which its policy layer must not read as clean. Skipping it here would have
+// meant a package the proxy happens to be seeing for the first time is
+// installed without the known-malware check ever being consulted.
 //
 // Re-exported here for backward compatibility with existing callers that
 // import it from this module.
 // TODO: migrate callers to import directly from ../constants.js
 // (test/gates/runner.test.js is the remaining importer as of V2 sub-step 2f).
 export { MIN_HISTORY_DEPTH };
-const HISTORY_INDEPENDENT_GATES = new Set(['content-hash']);
+const HISTORY_INDEPENDENT_GATES = new Set(['content-hash', 'seed-v3']);
 
 export const DEFAULT_GATE_MODULES = Object.freeze([
   contentHash,
@@ -81,11 +92,30 @@ export const DEFAULT_GATE_MODULES = Object.freeze([
   scopeBoundary,
 ]);
 
-function normalizeResult(moduleName, raw) {
+// FAIL-OPEN, AND WHERE IT STOPS.
+//
+// D1's fail-open is right for a pattern gate that could not run: one broken module among several
+// that still produced evidence should not block an install. It is NOT right for a gate whose BLOCK
+// rests on a recorded advisory naming this exact version -- there, "the gate threw" silently became
+// ALLOW and the known-malware check was simply lost.
+//
+// So a module may DECLARE what its own failure means, and the runner still invents nothing:
+//
+//   mod.onError(err) -> GateResult   the module's own statement, e.g. routed through its policy
+//   mod.onErrorResult                a plain ALLOW/SKIP/WARN/BLOCK to use when onError is absent or
+//                                    itself throws -- chosen by the operator when the gate is wired
+//
+// A module that declares neither behaves exactly as before: SKIP. Every pilot gate declares neither,
+// so their behaviour is unchanged.
+function declaredErrorResult(mod) {
+  return VALID_RESULTS.has(mod?.onErrorResult) ? mod.onErrorResult : 'SKIP';
+}
+
+function normalizeResult(moduleName, raw, mod = null) {
   if (raw == null || typeof raw !== 'object' || !VALID_RESULTS.has(raw.result)) {
     return {
       gate: moduleName,
-      result: 'SKIP',
+      result: declaredErrorResult(mod),
       detail: 'malformed gate output',
     };
   }
@@ -94,6 +124,23 @@ function normalizeResult(moduleName, raw) {
     result: raw.result,
     detail: typeof raw.detail === 'string' ? raw.detail : '',
   };
+}
+
+/** What one module's failure means, as the module itself declares it. */
+function moduleErrorResult(mod, name, err, log) {
+  if (typeof mod?.onError === 'function') {
+    try {
+      return normalizeResult(name, mod.onError(err), mod);
+    } catch (inner) {
+      log?.error?.(`[gates] ${name}.onError threw: ${inner.message}`);
+      return {
+        gate: name,
+        result: declaredErrorResult(mod),
+        detail: `gate_error: ${err.message}; onError also threw: ${inner.message}`,
+      };
+    }
+  }
+  return { gate: name, result: declaredErrorResult(mod), detail: `gate_error: ${err.message}` };
 }
 
 function aggregate(results) {
@@ -120,7 +167,7 @@ export function createGateRunner({
   const log = logger ?? { info() {}, warn() {}, error() {} };
   const boundServices = services ?? {};
 
-  return function runGates(input) {
+  function runGates(input) {
     // Merge injected services with any caller-provided services (tests).
     const mergedServices = { ...boundServices, ...(input?.services ?? {}) };
     const gateInput = { ...input, services: mergedServices };
@@ -171,16 +218,12 @@ export function createGateRunner({
       }
       try {
         const raw = mod.evaluate(gateInput);
-        results.push(normalizeResult(name, raw));
+        results.push(normalizeResult(name, raw, mod));
       } catch (err) {
         log.warn(
           `[gates] ${name} threw on ${gateInput.packageName}@${gateInput.version}: ${err.message}`,
         );
-        results.push({
-          gate: name,
-          result: 'SKIP',
-          detail: `gate_error: ${err.message}`,
-        });
+        results.push(moduleErrorResult(mod, name, err, log));
       }
     }
 
@@ -190,5 +233,18 @@ export function createGateRunner({
       override: null,
     };
   };
+
+  /**
+   * What a failure of the WHOLE observation means -- the runner threw, the transaction failed, a
+   * version could not be parsed at all. Built from each module's own declaration, so a caller that
+   * previously manufactured `ALLOW` out of an exception can ask instead of assuming. With no module
+   * declaring anything this aggregates to ALLOW, which is exactly the previous behaviour.
+   */
+  runGates.failureDecision = (err) => {
+    const results = modules.map((mod) => moduleErrorResult(mod, mod?.name ?? 'anonymous', err, log));
+    return { disposition: aggregate(results), results, override: null };
+  };
+
+  return runGates;
 }
 

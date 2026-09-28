@@ -1,0 +1,1570 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 289,
+  "full_document_sha256": "4159b831fd98f1e53b0bba5dcbaf0d6b4e3f1f965ad92e82f191054d9126ce1a",
+  "kept": 12
+ },
+ "name": "express",
+ "dist-tags": {
+  "latest": "5.2.1",
+  "latest-4": "4.22.3"
+ },
+ "time": {
+  "created": "2010-12-29T19:38:25.450Z",
+  "modified": "2026-09-18T05:35:08.686Z",
+  "0.14.0": "2010-12-29T19:38:25.450Z",
+  "2.3.9": "2011-05-25T17:18:34.557Z",
+  "3.0.2": "2012-11-08T17:15:53.794Z",
+  "2.0.0-rc": "2013-08-28T17:04:36.588Z",
+  "3.4.1": "2013-10-16T01:34:32.939Z",
+  "3.8.1": "2014-05-28T03:43:39.629Z",
+  "3.15.1": "2014-07-26T21:50:06.966Z",
+  "4.8.8": "2014-09-05T06:25:37.392Z",
+  "4.10.2": "2014-11-10T00:10:27.638Z",
+  "3.21.1": "2015-07-06T04:55:30.351Z",
+  "4.17.1": "2019-05-26T04:25:34.606Z",
+  "4.22.3": "2026-09-14T06:46:38.631Z"
+ },
+ "versions": {
+  "0.14.0": {
+   "name": "express",
+   "version": "0.14.0",
+   "keywords": [
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "express@0.14.0",
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    }
+   ],
+   "dist": {
+    "shasum": "7b33a9fb54c605a3be46c1d3dbbc821acf1d2efb",
+    "tarball": "https://registry.npmjs.org/express/-/express-0.14.0.tgz",
+    "integrity": "sha512-ULazYLF3/YqOU5rzkviWJEd4TNZ0j77Nymuqa1+sQe0dhxcsDzKOQK8GemM9S3i8x2Q55GWXhnhRHwYaJIrM1g==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCGihQqfDiARxIfslKVGe5vzfxCGOh+vhulZER4lO9oBQIhAO2VvApOYRVumT9XVDffvpYimysO/Hm1Qd59+KBublcM",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "engines": {
+    "node": ">= 0.1.98"
+   },
+   "scripts": {
+    "test": "make test"
+   },
+   "deprecated": "express 0.x series is deprecated",
+   "_npmVersion": "0.2.7-2",
+   "description": "Sinatra inspired web development framework",
+   "directories": {
+    "lib": "./lib"
+   },
+   "_nodeVersion": "v0.3.1-pre",
+   "_nodeSupported": true
+  },
+  "2.3.9": {
+   "name": "express",
+   "version": "2.3.9",
+   "keywords": [
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "express@2.3.9",
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    }
+   ],
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "e5b6a5dc5452e9bcaf8936297f9f0e111b71a2a7",
+    "tarball": "https://registry.npmjs.org/express/-/express-2.3.9.tgz",
+    "integrity": "sha512-OXr9LTgIvhBgxjchYsbmHSteZcahnPBk6FM+tFBCerBgU6V2NfD5uuPOhobEyyf9TAfo5KqRs2BWbfFFEpKkBg==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCxb6G+7DDKXcns90MgyP9HejHoRhhUssKM3DXc1vpIJQIgbhDOGRBeEu8YMqsYeSqSmG6fCAED7A6anS+8QcEDlkE=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "engines": {
+    "node": ">= 0.4.1 < 0.5.0"
+   },
+   "scripts": {},
+   "deprecated": "express 2.x series is deprecated",
+   "repository": {
+    "url": "git://github.com/visionmedia/express.git",
+    "type": "git"
+   },
+   "_npmVersion": "1.0.3",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "_nodeVersion": "v0.4.8",
+   "dependencies": {
+    "qs": ">= 0.0.6",
+    "mime": ">= 0.0.1",
+    "connect": ">= 1.4.1 < 2.0.0"
+   },
+   "_defaultsLoaded": true,
+   "devDependencies": {
+    "ejs": "0.4.2",
+    "jade": "0.11.0",
+    "hamljs": "0.5.1",
+    "should": "0.2.1",
+    "stylus": "0.13.0",
+    "expresso": "0.7.2",
+    "connect-form": "0.2.1",
+    "connect-redis": ">= 0.0.1",
+    "node-markdown": ">= 0.0.1",
+    "express-messages": "0.0.2"
+   },
+   "_engineSupported": true
+  },
+  "3.0.2": {
+   "name": "express",
+   "version": "3.0.2",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "express@3.0.2",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    }
+   ],
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "fd93ed32f9a938cf79b7c4df95a2458d412f09b9",
+    "tarball": "https://registry.npmjs.org/express/-/express-3.0.2.tgz",
+    "integrity": "sha512-APaictzMzDSRYRRK4Gg5jrnyNuqsc0lC3RUcVaMBUMZ+svFnjYNj+CNAQ8qDvJtVv7o4k88iuRcy1Xp7sFd8bw==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCvBPY3Ke5j7KcTIjwJz6Ez2EmG27gHsLEQeiUoM8OwhQIhAOtU3ZMEZXPdovo7Q4gbJro+9bKppEshqKXS1dkqbLdI",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "engines": {
+    "node": "*"
+   },
+   "scripts": {
+    "test": "make test",
+    "prepublish": "npm prune"
+   },
+   "_npmUser": {
+    "name": "tjholowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "repository": {
+    "url": "git://github.com/visionmedia/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.1.65",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "dependencies": {
+    "crc": "0.2.0",
+    "send": "0.1.0",
+    "debug": "*",
+    "fresh": "0.1.0",
+    "cookie": "0.0.4",
+    "mkdirp": "0.3.3",
+    "connect": "2.6.2",
+    "methods": "0.0.1",
+    "commander": "0.6.1",
+    "range-parser": "0.0.4",
+    "cookie-signature": "0.0.1"
+   },
+   "devDependencies": {
+    "ejs": "*",
+    "hjs": "*",
+    "jade": "*",
+    "mocha": "*",
+    "should": "*",
+    "stylus": "*",
+    "supertest": "0.0.1",
+    "connect-redis": "*",
+    "github-flavored-markdown": "*"
+   }
+  },
+  "2.0.0-rc": {
+   "name": "express",
+   "version": "2.0.0-rc",
+   "keywords": [
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "express@2.0.0-rc",
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    }
+   ],
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "6d3da0301b6cdce94ee437ae40ae6c8c7f5d7ccf",
+    "tarball": "https://registry.npmjs.org/express/-/express-2.0.0rc.tgz",
+    "integrity": "sha512-fQCbCn5TveLwoBOa54pyhOh8W7siaLL6VqE2XJMRuXbsnb5K2M9rrrpTwnlfBA0OZ8eRV9K4Wbbc5ZEk6mVQCg==",
+    "signatures": [
+     {
+      "sig": "MEUCIE6vhm+XWwDlkDkAZcvVrM9Y3kICKzSpitN04todUE5QAiEAxpxcQzLXafEwLHODx5RIGutqzGtBrUht3V3MSau0tzA=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "files": [
+    ""
+   ],
+   "engines": {
+    "node": ">= 0.4.1 < 0.5.0"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "_npmVersion": "0.3.15",
+   "description": "Sinatra inspired web development framework",
+   "directories": {
+    "bin": "./bin",
+    "lib": "./lib"
+   },
+   "_nodeVersion": "v0.4.2",
+   "dependencies": {
+    "qs": ">= 0.0.6",
+    "mime": ">= 0.0.1",
+    "connect": ">= 1.0.1 < 2.0.0"
+   },
+   "_defaultsLoaded": true,
+   "_engineSupported": true
+  },
+  "3.4.1": {
+   "name": "express",
+   "version": "3.4.1",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "_id": "express@3.4.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    }
+   ],
+   "bugs": {
+    "url": "https://github.com/visionmedia/express/issues"
+   },
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "3b4fb8862b6a1dfce3dc760629833d0cfef9314c",
+    "tarball": "https://registry.npmjs.org/express/-/express-3.4.1.tgz",
+    "integrity": "sha512-SkKTH3OFcgQi6cBc/gR4AGwYX93+iHbrqOEeLqm8qlyrlP3MbOz6W8bXS9fCJ8DAnva2m2TGi8pQ2ZQINNisFA==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDlKLGInfhlw8diyvfn4JsjB5YuA1LLM631ORwQ8WGoNgIgN7FSTxdFQLBAhyI/jUV3Rxyx6xUNQuvpGfsuUXpvPjU=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index",
+   "_from": ".",
+   "engines": {
+    "node": "*"
+   },
+   "scripts": {
+    "test": "make test",
+    "prepublish": "npm prune"
+   },
+   "_npmUser": {
+    "name": "jongleberry",
+    "email": "jonathanrichardong@gmail.com"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "repository": {
+    "url": "git://github.com/visionmedia/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.3.11",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "dependencies": {
+    "send": "0.1.4",
+    "debug": "*",
+    "fresh": "0.2.0",
+    "cookie": "0.1.0",
+    "mkdirp": "0.3.5",
+    "connect": "2.9.1",
+    "methods": "0.0.1",
+    "commander": "2.0.0",
+    "buffer-crc32": "0.2.1",
+    "range-parser": "0.0.4",
+    "cookie-signature": "1.0.1"
+   },
+   "devDependencies": {
+    "ejs": "*",
+    "hjs": "*",
+    "jade": "0.30.0",
+    "mocha": "*",
+    "marked": "*",
+    "should": "2",
+    "stylus": "*",
+    "supertest": "0.6.0",
+    "connect-redis": "*"
+   }
+  },
+  "3.8.1": {
+   "name": "express",
+   "version": "3.8.1",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@3.8.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    },
+    {
+     "name": "shtylman",
+     "email": "shtylman@gmail.com"
+    },
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "TJ Holowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman",
+     "email": "shtylman+expressjs@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/express",
+   "bugs": {
+    "url": "https://github.com/visionmedia/express/issues"
+   },
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "884148c879c5ae88243c635dee4d91956b750143",
+    "tarball": "https://registry.npmjs.org/express/-/express-3.8.1.tgz",
+    "integrity": "sha512-Mcl3hc9KgMpm97n0SRKr+/m4VQtqEy4nrKkc93scr/F6m0rdynh7UGRdaL6ggHPiVprhSUrqCkwaZAOAwott6g==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCtidDnSwFFwxgHgLAhFmxqibdVmvj3DJybmEi91eSVWwIgbQArO29GSvyH0b/E7g4VzQXL4+V3wJmvwYF3IMxmr24=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_from": ".",
+   "_shasum": "884148c879c5ae88243c635dee4d91956b750143",
+   "engines": {
+    "node": ">= 0.8.0"
+   },
+   "scripts": {
+    "test": "mocha --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "prepublish": "npm prune",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "repository": {
+    "url": "git://github.com/visionmedia/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.9",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "dependencies": {
+    "send": "0.3.0",
+    "debug": ">= 0.8.0 < 1",
+    "fresh": "0.2.2",
+    "cookie": "0.1.2",
+    "mkdirp": "0.5.0",
+    "connect": "2.17.3",
+    "methods": "1.0.0",
+    "parseurl": "1.0.1",
+    "commander": "1.3.2",
+    "proxy-addr": "1.0.0",
+    "buffer-crc32": "0.2.1",
+    "range-parser": "1.0.0",
+    "cookie-signature": "1.0.3",
+    "merge-descriptors": "0.0.2"
+   },
+   "devDependencies": {
+    "ejs": "~0.8.4",
+    "hjs": "~0.0.6",
+    "jade": "~0.30.0",
+    "mocha": "~1.19.0",
+    "marked": "0.2.10",
+    "should": "~3.3.1",
+    "stylus": "~0.40.0",
+    "istanbul": "0.2.10",
+    "supertest": "~0.12.1",
+    "connect-redis": "~1.4.5"
+   }
+  },
+  "3.15.1": {
+   "name": "express",
+   "version": "3.15.1",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@3.15.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    },
+    {
+     "name": "shtylman",
+     "email": "shtylman@gmail.com"
+    },
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "aredridel",
+     "email": "aredridel@nbtsc.org"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman"
+    }
+   ],
+   "homepage": "https://github.com/visionmedia/express",
+   "bugs": {
+    "url": "https://github.com/visionmedia/express/issues"
+   },
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "ce6800e0fa51c1c9700f246fc90eb8bcde8172e1",
+    "tarball": "https://registry.npmjs.org/express/-/express-3.15.1.tgz",
+    "integrity": "sha512-tSYb+JG8fjWzBepGdR9TJWK4hjsGcJHJhu30OIFWOKDvsP3Lbjm47Wo6u1iHlb/JzwzvyUOJ/D//YomBilrqlg==",
+    "signatures": [
+     {
+      "sig": "MEUCIGTcHv8zJKRB/+Inq8YJXEK4De8WGHuYofYAiqZcTJiuAiEA/SruxeQBFdjhKH5dCYdp5afSEIVe8RtkVAhfO9Eauao=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_from": ".",
+   "engines": {
+    "node": ">= 0.8.0"
+   },
+   "scripts": {
+    "test": "mocha --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "prepublish": "npm prune",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "repository": {
+    "url": "git://github.com/visionmedia/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.3",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "dependencies": {
+    "depd": "0.4.3",
+    "send": "0.7.1",
+    "vary": "0.1.0",
+    "debug": "1.0.4",
+    "fresh": "0.2.2",
+    "cookie": "0.1.2",
+    "mkdirp": "0.5.0",
+    "connect": "2.24.1",
+    "methods": "1.1.0",
+    "parseurl": "~1.2.0",
+    "commander": "1.3.2",
+    "basic-auth": "1.0.0",
+    "proxy-addr": "1.0.1",
+    "escape-html": "1.0.1",
+    "media-typer": "0.2.0",
+    "buffer-crc32": "0.2.3",
+    "range-parser": "1.0.0",
+    "cookie-signature": "1.0.4",
+    "merge-descriptors": "0.0.2"
+   },
+   "devDependencies": {
+    "ejs": "~1.0.0",
+    "hjs": "~0.0.6",
+    "jade": "~1.3.1",
+    "mocha": "~1.21.0",
+    "marked": "0.3.2",
+    "should": "~4.0.0",
+    "istanbul": "0.3.0",
+    "supertest": "~0.13.0",
+    "connect-redis": "~1.4.5"
+   }
+  },
+  "4.8.8": {
+   "name": "express",
+   "version": "4.8.8",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@4.8.8",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    },
+    {
+     "name": "shtylman",
+     "email": "shtylman@gmail.com"
+    },
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "aredridel",
+     "email": "aredridel@nbtsc.org"
+    },
+    {
+     "name": "strongloop",
+     "email": "callback@strongloop.com"
+    },
+    {
+     "name": "rfeng",
+     "email": "enjoyjava@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman",
+     "email": "shtylman+expressjs@gmail.com"
+    },
+    {
+     "name": "Young Jae Sim",
+     "email": "hanul@hanul.me"
+    }
+   ],
+   "homepage": "http://expressjs.com/",
+   "bugs": {
+    "url": "https://github.com/strongloop/express/issues"
+   },
+   "dist": {
+    "shasum": "6aba348ccdfa87608040b12ca0010107a0aac28e",
+    "tarball": "https://registry.npmjs.org/express/-/express-4.8.8.tgz",
+    "integrity": "sha512-kE2rT0gfYxKC+i2SQObFO9SvN2rTptYnYYPWznCXahXBcFjriwhU0OYCJr7ZcRsJuWl8ZevkCcn8ry8TRkDOoQ==",
+    "signatures": [
+     {
+      "sig": "MEYCIQChVo+DNJ4mcgUZNPDAfARWTrevGuimQsB6TbuB0m3xKQIhAKP7APe9hyIgKc99gnOutTznpQrfASSS5iAeuKE4n8iz",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_from": ".",
+   "_shasum": "6aba348ccdfa87608040b12ca0010107a0aac28e",
+   "engines": {
+    "node": ">= 0.10.0"
+   },
+   "gitHead": "621d074bd87dd7a7064c5607dbed05b97f80fcc0",
+   "scripts": {
+    "test": "mocha --require test/support/env --reporter spec --bail --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "prepublish": "npm prune",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "repository": {
+    "url": "https://github.com/strongloop/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.21",
+   "description": "Fast, unopinionated, minimalist web framework",
+   "directories": {},
+   "dependencies": {
+    "qs": "2.2.2",
+    "depd": "0.4.4",
+    "send": "0.8.5",
+    "vary": "0.1.0",
+    "debug": "1.0.4",
+    "fresh": "0.2.2",
+    "cookie": "0.1.2",
+    "accepts": "~1.0.7",
+    "methods": "1.1.0",
+    "type-is": "~1.3.2",
+    "parseurl": "~1.3.0",
+    "proxy-addr": "1.0.1",
+    "escape-html": "1.0.1",
+    "media-typer": "0.2.0",
+    "utils-merge": "1.0.0",
+    "buffer-crc32": "0.2.3",
+    "finalhandler": "0.1.0",
+    "range-parser": "1.0.0",
+    "serve-static": "~1.5.4",
+    "path-to-regexp": "0.1.3",
+    "cookie-signature": "1.0.4",
+    "merge-descriptors": "0.0.2"
+   },
+   "devDependencies": {
+    "ejs": "~1.0.0",
+    "hjs": "~0.0.6",
+    "jade": "~1.5.0",
+    "after": "0.8.1",
+    "mocha": "~1.21.4",
+    "vhost": "~3.0.0",
+    "marked": "0.3.2",
+    "morgan": "~1.2.3",
+    "should": "~4.0.4",
+    "istanbul": "0.3.2",
+    "supertest": "~0.13.0",
+    "multiparty": "~3.3.2",
+    "body-parser": "~1.7.0",
+    "connect-redis": "~2.0.0",
+    "cookie-parser": "~1.3.2",
+    "express-session": "~1.7.6",
+    "method-override": "~2.1.3"
+   }
+  },
+  "4.10.2": {
+   "name": "express",
+   "version": "4.10.2",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@4.10.2",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    },
+    {
+     "name": "shtylman",
+     "email": "shtylman@gmail.com"
+    },
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "aredridel",
+     "email": "aredridel@nbtsc.org"
+    },
+    {
+     "name": "strongloop",
+     "email": "callback@strongloop.com"
+    },
+    {
+     "name": "rfeng",
+     "email": "enjoyjava@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman",
+     "email": "shtylman+expressjs@gmail.com"
+    },
+    {
+     "name": "Young Jae Sim",
+     "email": "hanul@hanul.me"
+    }
+   ],
+   "homepage": "http://expressjs.com/",
+   "bugs": {
+    "url": "https://github.com/strongloop/express/issues"
+   },
+   "dist": {
+    "shasum": "df06dde94d968932829d440a2004c5efe64495b0",
+    "tarball": "https://registry.npmjs.org/express/-/express-4.10.2.tgz",
+    "integrity": "sha512-RzDZFi0JhDz0/vX3nThylfdnXWaFsxvFNkiwPuCCvRe8SwUby9KzmzZpEJ4ToRYKLdtIFwjlBm+x7nxQsAAhzA==",
+    "signatures": [
+     {
+      "sig": "MEUCIEvX0cHvJkXsYDe+HkhMP0U0Bmz27Uo4n+Nzvvi3+9PWAiEA/LQaYCRomFzyrB7odHEN1qe9lNqgzVOHDBtfWljJE2Y=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_from": ".",
+   "files": [
+    "LICENSE",
+    "History.md",
+    "Readme.md",
+    "index.js",
+    "lib/"
+   ],
+   "_shasum": "df06dde94d968932829d440a2004c5efe64495b0",
+   "engines": {
+    "node": ">= 0.10.0"
+   },
+   "gitHead": "ac56cf46063e461fbaf53c2c869a1a657e8adbe1",
+   "scripts": {
+    "test": "mocha --require test/support/env --reporter spec --bail --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-tap": "mocha --require test/support/env --reporter tap --check-leaks test/ test/acceptance/",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "repository": {
+    "url": "https://github.com/strongloop/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.21",
+   "description": "Fast, unopinionated, minimalist web framework",
+   "directories": {},
+   "dependencies": {
+    "qs": "2.3.2",
+    "depd": "~1.0.0",
+    "etag": "~1.5.0",
+    "send": "0.10.1",
+    "vary": "~1.0.0",
+    "debug": "~2.1.0",
+    "fresh": "0.2.4",
+    "cookie": "0.1.2",
+    "accepts": "~1.1.3",
+    "methods": "1.1.0",
+    "type-is": "~1.5.3",
+    "parseurl": "~1.3.0",
+    "proxy-addr": "~1.0.3",
+    "escape-html": "1.0.1",
+    "media-typer": "0.3.0",
+    "on-finished": "~2.1.1",
+    "utils-merge": "1.0.0",
+    "finalhandler": "0.3.2",
+    "range-parser": "~1.0.2",
+    "serve-static": "~1.7.1",
+    "path-to-regexp": "0.1.3",
+    "cookie-signature": "1.0.5",
+    "merge-descriptors": "0.0.2",
+    "content-disposition": "0.5.0"
+   },
+   "devDependencies": {
+    "ejs": "~1.0.0",
+    "hjs": "~0.0.6",
+    "jade": "~1.7.0",
+    "after": "0.8.1",
+    "mocha": "~2.0.0",
+    "vhost": "~3.0.0",
+    "marked": "0.3.2",
+    "morgan": "~1.4.1",
+    "should": "~4.2.1",
+    "istanbul": "0.3.2",
+    "supertest": "~0.14.0",
+    "multiparty": "~4.0.0",
+    "body-parser": "~1.9.1",
+    "connect-redis": "~2.1.0",
+    "cookie-parser": "~1.3.3",
+    "express-session": "~1.9.1",
+    "method-override": "~2.3.0"
+   }
+  },
+  "3.21.1": {
+   "name": "express",
+   "version": "3.21.1",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@3.21.1",
+   "maintainers": [
+    {
+     "name": "tjholowaychuk",
+     "email": "tj@vision-media.ca"
+    },
+    {
+     "name": "jongleberry",
+     "email": "jonathanrichardong@gmail.com"
+    },
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "rfeng",
+     "email": "enjoyjava@gmail.com"
+    },
+    {
+     "name": "aredridel",
+     "email": "aredridel@dinhe.net"
+    },
+    {
+     "name": "strongloop",
+     "email": "callback@strongloop.com"
+    },
+    {
+     "name": "defunctzombie",
+     "email": "shtylman@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman"
+    }
+   ],
+   "homepage": "http://expressjs.com/",
+   "bugs": {
+    "url": "https://github.com/strongloop/express/issues"
+   },
+   "bin": {
+    "express": "./bin/express"
+   },
+   "dist": {
+    "shasum": "427b1f4e68dcfd5da6809892fe19219d52ce6b55",
+    "tarball": "https://registry.npmjs.org/express/-/express-3.21.1.tgz",
+    "integrity": "sha512-hFg0GiY70dVrBmOjGnbUizWnSMnfdCZ1dit0ARCdIGq67aCz1eJAplFdXiwGUHKa3ThFzOYDxBvmTvtJ460bgg==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDXf6R+ODZPMjZJbUMFShpxDT+AYO+e4v0Kh7y6RnoyhQIgbusjfGUDLa63lon3gQ+HLLlBPznAzVOfL/Qcj+mOc7A=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_from": ".",
+   "files": [
+    "LICENSE",
+    "History.md",
+    "Readme.md",
+    "index.js",
+    "bin/",
+    "lib/"
+   ],
+   "_shasum": "427b1f4e68dcfd5da6809892fe19219d52ce6b55",
+   "engines": {
+    "node": ">= 0.8.0"
+   },
+   "gitHead": "3c0ff8133bace4a0dc1356b8d8e6e83b38d2dd95",
+   "scripts": {
+    "test": "mocha --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-tap": "mocha --require test/support/env --reporter tap --check-leaks test/ test/acceptance/",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "deprecated": "No longer maintained. Please upgrade to a stable version.",
+   "repository": {
+    "url": "https://github.com/strongloop/express",
+    "type": "git"
+   },
+   "_npmVersion": "1.4.28",
+   "description": "Sinatra inspired web development framework",
+   "directories": {},
+   "dependencies": {
+    "depd": "~1.0.1",
+    "etag": "~1.7.0",
+    "send": "0.13.0",
+    "vary": "~1.0.0",
+    "debug": "~2.2.0",
+    "fresh": "0.3.0",
+    "cookie": "0.1.3",
+    "mkdirp": "0.5.1",
+    "connect": "2.30.1",
+    "methods": "~1.1.1",
+    "parseurl": "~1.3.0",
+    "commander": "2.6.0",
+    "basic-auth": "~1.0.3",
+    "proxy-addr": "~1.0.8",
+    "escape-html": "1.0.2",
+    "utils-merge": "1.0.0",
+    "content-type": "~1.0.1",
+    "range-parser": "~1.0.2",
+    "cookie-signature": "1.0.6",
+    "merge-descriptors": "1.0.0",
+    "content-disposition": "0.5.0"
+   },
+   "devDependencies": {
+    "ejs": "2.3.2",
+    "mocha": "2.2.5",
+    "marked": "0.3.3",
+    "should": "7.0.1",
+    "istanbul": "0.3.9",
+    "supertest": "1.0.1",
+    "connect-redis": "~1.5.0"
+   }
+  },
+  "4.17.1": {
+   "name": "express",
+   "version": "4.17.1",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@4.17.1",
+   "maintainers": [
+    {
+     "name": "dougwilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "jasnell",
+     "email": "jasnell@gmail.com"
+    },
+    {
+     "name": "mikeal",
+     "email": "mikeal.rogers@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman",
+     "email": "shtylman+expressjs@gmail.com"
+    },
+    {
+     "name": "Young Jae Sim",
+     "email": "hanul@hanul.me"
+    }
+   ],
+   "homepage": "http://expressjs.com/",
+   "bugs": {
+    "url": "https://github.com/expressjs/express/issues"
+   },
+   "dist": {
+    "shasum": "4491fc38605cf51f8629d39c2b5d026f98a4c134",
+    "tarball": "https://registry.npmjs.org/express/-/express-4.17.1.tgz",
+    "fileCount": 16,
+    "integrity": "sha512-mHJ9O79RqluphRrcw2X/GTh3k9tVv8YcoyY4Kkh4WDMUYKRZUq0h1o0w2rrrxBqM7VoeUVqgb27xlEMXTnYt4g==",
+    "signatures": [
+     {
+      "sig": "MEUCICQgcHZI8QrmBKcFkCxEopG6oFx7tOFQ/5MEphrR6yzDAiEAk/lgG7aANiylDTtQ31NrvELKJ4MmRQ+3u89poClP2Io=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 208133,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJc6hU/CRA9TVsSAnZWagAAFc4QAJzqxI1sgdfreUHk+NIa\n38jYea65Xg8N9JgZVF67j7aXqPT6VXhGu2j54oveGIkr+RL2Xm58RrRWn+Sg\nVWOOSZzotLKtx1qCYS4ozPRYvujKMLYDeiLxePDCSrrLYt48+IJwkHF04Un1\nJ0ZUmtlEqgLL85gvaCrKa9qF8TfwbQhhIzQ914vum11tJ506ePpffN2xFY0M\nsHf0CiuV1OFOD7Wne/RR7DVsxQwZ/FXomkxLJm8+T+T9ZYm3WQxWVD7BRQpA\nN08+zkPd1XMEZiVZkR9Ie4+7ydZomJE8PNCOt5SzvEW6ekDW10QuuF0521Wj\n5lHp4AflVFq1LTJB0WDR6VIPJRp0H5aYTh1tBRxWHUx/EP2LfFS/XEz1bUvm\nBDVj2e1iA4ZWz8aeu9p/2N8Zp05WGINF3/E4YG9smxxs5EDJZGA9k1DAj6US\nzKWTOemaqypRshFWThvfA70a1Rcwdj+0XGboscg/S20XTT0FvG2GLkEY0OO/\niHBy5fKYplUQsths48V8I9P9Gx6U534iaFJlxlzzVEsDleBkH+NBSP8OB7dx\n8N/0ZQDBY6JWL5ZSW9yVY2FzrTEmUOPC1Rts5Uj4m7SBmu8yK154ylnPQ4T6\nMr0jG8XQPYhTLc5pYNTFZNV1Ydu4d01xIrLhGy/3dc7kRlwy3FN5ceNVsB88\njyN+\r\n=QYw2\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "engines": {
+    "node": ">= 0.10.0"
+   },
+   "gitHead": "e1b45ebd050b6f06aa38cda5aaf0c21708b0c71e",
+   "scripts": {
+    "lint": "eslint .",
+    "test": "mocha --require test/support/env --reporter spec --bail --check-leaks test/ test/acceptance/",
+    "test-ci": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --require test/support/env --reporter spec --check-leaks test/ test/acceptance/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --require test/support/env --reporter dot --check-leaks test/ test/acceptance/",
+    "test-tap": "mocha --require test/support/env --reporter tap --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "dougwilson",
+    "email": "doug@somethingdoug.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/expressjs/express.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.4.1",
+   "description": "Fast, unopinionated, minimalist web framework",
+   "directories": {},
+   "_nodeVersion": "8.16.0",
+   "dependencies": {
+    "qs": "6.7.0",
+    "depd": "~1.1.2",
+    "etag": "~1.8.1",
+    "send": "0.17.1",
+    "vary": "~1.1.2",
+    "debug": "2.6.9",
+    "fresh": "0.5.2",
+    "cookie": "0.4.0",
+    "accepts": "~1.3.7",
+    "methods": "~1.1.2",
+    "type-is": "~1.6.18",
+    "parseurl": "~1.3.3",
+    "statuses": "~1.5.0",
+    "encodeurl": "~1.0.2",
+    "proxy-addr": "~2.0.5",
+    "body-parser": "1.19.0",
+    "escape-html": "~1.0.3",
+    "on-finished": "~2.3.0",
+    "safe-buffer": "5.1.2",
+    "utils-merge": "1.0.1",
+    "content-type": "~1.0.4",
+    "finalhandler": "~1.1.2",
+    "range-parser": "~1.2.1",
+    "serve-static": "1.14.1",
+    "array-flatten": "1.1.1",
+    "path-to-regexp": "0.1.7",
+    "setprototypeof": "1.1.1",
+    "cookie-signature": "1.0.6",
+    "merge-descriptors": "1.0.1",
+    "content-disposition": "0.5.3"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "ejs": "2.6.1",
+    "hbs": "4.0.4",
+    "after": "0.8.2",
+    "mocha": "5.2.0",
+    "vhost": "~3.0.2",
+    "eslint": "2.13.1",
+    "marked": "0.6.2",
+    "morgan": "1.9.1",
+    "should": "13.2.3",
+    "istanbul": "0.4.5",
+    "supertest": "3.3.0",
+    "multiparty": "4.2.1",
+    "connect-redis": "3.4.1",
+    "cookie-parser": "~1.4.4",
+    "cookie-session": "1.3.3",
+    "express-session": "1.16.1",
+    "method-override": "3.0.0",
+    "pbkdf2-password": "1.2.1"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/express_4.17.1_1558844734329_0.21547943776855627",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.22.3": {
+   "name": "express",
+   "version": "4.22.3",
+   "keywords": [
+    "express",
+    "framework",
+    "sinatra",
+    "web",
+    "http",
+    "rest",
+    "restful",
+    "router",
+    "app",
+    "api"
+   ],
+   "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca"
+   },
+   "license": "MIT",
+   "_id": "express@4.22.3",
+   "maintainers": [
+    {
+     "name": "wesleytodd",
+     "email": "wes@wesleytodd.com"
+    },
+    {
+     "name": "jonchurch",
+     "email": "npm@jonchurch.com"
+    },
+    {
+     "name": "ctcpip",
+     "email": "c@labsector.com"
+    },
+    {
+     "name": "ulisesgascon",
+     "email": "ulisesgascondev@gmail.com"
+    },
+    {
+     "name": "sheplu",
+     "email": "jean.burellier@gmail.com"
+    }
+   ],
+   "contributors": [
+    {
+     "name": "Aaron Heckmann",
+     "email": "aaron.heckmann+github@gmail.com"
+    },
+    {
+     "name": "Ciaran Jessup",
+     "email": "ciaranj@gmail.com"
+    },
+    {
+     "name": "Douglas Christopher Wilson",
+     "email": "doug@somethingdoug.com"
+    },
+    {
+     "name": "Guillermo Rauch",
+     "email": "rauchg@gmail.com"
+    },
+    {
+     "name": "Jonathan Ong",
+     "email": "me@jongleberry.com"
+    },
+    {
+     "name": "Roman Shtylman",
+     "email": "shtylman+expressjs@gmail.com"
+    },
+    {
+     "name": "Young Jae Sim",
+     "email": "hanul@hanul.me"
+    }
+   ],
+   "homepage": "http://expressjs.com/",
+   "bugs": {
+    "url": "https://github.com/expressjs/express/issues"
+   },
+   "dist": {
+    "shasum": "e8f898d3c17582b1e311dd2c5cd6d8deff84724b",
+    "tarball": "https://registry.npmjs.org/express/-/express-4.22.3.tgz",
+    "fileCount": 16,
+    "integrity": "sha512-Bdcs4+3qlpVlx2NRn6fgX2Ue2/gGRaPeawebgclM0ERSCqDpA+owF1fdPwjJUTAJWMTuAaxjDf+hzb0/4eKvvw==",
+    "signatures": [
+     {
+      "sig": "MEUCIEd1nqXolaHi6bWZ0utapq81VqrCNVTTkuTD4cpXiODYAiEA0r4Vyrpftgj06bI2mLuDEpQVI66mtMmqKg4OoP0lYzk=",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/express@4.22.3",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 215553
+   },
+   "engines": {
+    "node": ">= 0.10.0"
+   },
+   "funding": {
+    "url": "https://opencollective.com/express",
+    "type": "opencollective"
+   },
+   "gitHead": "899b52494e74327905c16164decdc6e51f803af8",
+   "scripts": {
+    "lint": "eslint .",
+    "test": "mocha --require test/support/env --reporter spec --bail --check-leaks test/ test/acceptance/",
+    "test-ci": "nyc --exclude examples --exclude test --exclude benchmarks --reporter=lcovonly --reporter=text npm test",
+    "test-cov": "nyc --exclude examples --exclude test --exclude benchmarks --reporter=html --reporter=text npm test",
+    "test-tap": "mocha --require test/support/env --reporter tap --check-leaks test/ test/acceptance/"
+   },
+   "_npmUser": {
+    "name": "GitHub Actions",
+    "email": "npm-oidc-no-reply@github.com",
+    "approver": {
+     "name": "ulisesgascon",
+     "email": "ulisesgascondev@gmail.com"
+    },
+    "trustedPublisher": {
+     "id": "github",
+     "oidcConfigId": "oidc:99dba195-afaa-4d25-9fac-f714da8caf90"
+    }
+   },
+   "repository": {
+    "url": "git+https://github.com/expressjs/express.git",
+    "type": "git"
+   },
+   "_npmVersion": "12.0.2",
+   "description": "Fast, unopinionated, minimalist web framework",
+   "directories": {},
+   "_nodeVersion": "24.20.0",
+   "dependencies": {
+    "qs": "~6.16.0",
+    "depd": "2.0.0",
+    "etag": "~1.8.1",
+    "send": "~0.19.0",
+    "vary": "~1.1.2",
+    "debug": "2.6.9",
+    "fresh": "~0.5.2",
+    "cookie": "~0.7.1",
+    "accepts": "~1.3.8",
+    "methods": "~1.1.2",
+    "type-is": "~1.6.18",
+    "parseurl": "~1.3.3",
+    "statuses": "~2.0.1",
+    "encodeurl": "~2.0.0",
+    "proxy-addr": "~2.0.7",
+    "body-parser": "~1.20.5",
+    "escape-html": "~1.0.3",
+    "http-errors": "~2.0.0",
+    "on-finished": "~2.4.1",
+    "safe-buffer": "5.2.1",
+    "utils-merge": "1.0.1",
+    "content-type": "~1.0.4",
+    "finalhandler": "~1.3.1",
+    "range-parser": "~1.2.1",
+    "serve-static": "~1.16.2",
+    "array-flatten": "1.1.1",
+    "path-to-regexp": "~0.1.13",
+    "setprototypeof": "1.2.0",
+    "cookie-signature": "~1.0.6",
+    "merge-descriptors": "1.0.3",
+    "content-disposition": "~0.5.4"
+   },
+   "_hasShrinkwrap": false,
+   "readmeFilename": "Readme.md",
+   "devDependencies": {
+    "ejs": "3.1.9",
+    "hbs": "4.2.0",
+    "nyc": "^14.1.1",
+    "after": "0.8.2",
+    "mocha": "^6.2.2",
+    "vhost": "~3.0.2",
+    "eslint": "8.47.0",
+    "marked": "0.7.0",
+    "morgan": "1.10.0",
+    "supertest": "^6.1.6",
+    "connect-redis": "3.4.2",
+    "cookie-parser": "1.4.6",
+    "cookie-session": "2.0.0",
+    "express-session": "1.17.2",
+    "method-override": "3.0.0",
+    "pbkdf2-password": "1.2.1"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/express_4.22.3_1789368398544_0.8828925682277027",
+    "host": "s3://npm-registry-packages-npm-production"
+   }
+  }
+ }
+}

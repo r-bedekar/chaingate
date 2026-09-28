@@ -1,0 +1,934 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 26,
+  "full_document_sha256": "3a771842c785b1e19aa6816a8866d297b9a526651a9ad18f8421c1c79e4db3c4",
+  "kept": 12
+ },
+ "name": "bufferutil",
+ "dist-tags": {
+  "n-api": "3.0.3-napi",
+  "latest": "4.1.0"
+ },
+ "time": {
+  "created": "2015-01-29T10:02:33.540Z",
+  "modified": "2026-07-30T17:57:13.921Z",
+  "1.0.0": "2015-01-29T10:02:33.540Z",
+  "1.1.0": "2015-05-05T19:36:16.679Z",
+  "1.3.0": "2016-11-27T07:17:37.435Z",
+  "2.0.1": "2017-02-07T17:44:36.648Z",
+  "3.0.1": "2017-05-31T07:52:14.521Z",
+  "3.0.3": "2017-11-03T08:26:53.694Z",
+  "3.0.5": "2018-05-06T05:49:55.725Z",
+  "4.0.1": "2018-12-23T08:07:52.401Z",
+  "4.0.3": "2021-01-02T20:08:49.791Z",
+  "4.0.5": "2021-10-13T17:05:48.392Z",
+  "4.0.8": "2023-10-15T16:36:08.534Z",
+  "4.1.0": "2025-12-18T16:24:21.551Z"
+ },
+ "versions": {
+  "1.0.0": {
+   "name": "bufferutil",
+   "version": "1.0.0",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@1.0.0",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "78f783cc2c5a455c6964c8b4d272f4e22bcf083d",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-1.0.0.tgz",
+    "integrity": "sha512-RMawClJB1CnPLl5K2l7jCRcY09gtlPEymr9NMc+N12ny79klNZdSH18xSEpUYKKZqp2tL9vTtqbBi/OiteCEmg==",
+    "signatures": [
+     {
+      "sig": "MEQCIGPDVdb8G3wvad8LlVS6vZA5RQ/LW/sneYXR8bRrlzYsAiAp9OG+UBf8ClgDVyLlt1mO2TIT/HYBVeNtVCIx78HWCw==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "78f783cc2c5a455c6964c8b4d272f4e22bcf083d",
+   "gitHead": "4a87625332d0bbe1a9dd0f041f8897e115c0c74b",
+   "gypfile": true,
+   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "3rdeden",
+    "email": "npm@3rd-Eden.com"
+   },
+   "repository": {
+    "url": "https://github.com/websockets/bufferutil",
+    "type": "git"
+   },
+   "_npmVersion": "2.3.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "0.10.35",
+   "dependencies": {
+    "nan": "1.6.1",
+    "bindings": "1.2.1"
+   }
+  },
+  "1.1.0": {
+   "name": "bufferutil",
+   "version": "1.1.0",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@1.1.0",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "3f96be77a7f8652ff69ef29f1cabc8b89f7fd972",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-1.1.0.tgz",
+    "integrity": "sha512-bttEVtkre4VYrZH+ciatjApTuac7jLMQXVXzM/ymw82WFREdOrJO496C4Bkh0/FfYoBUSOFaAYF32a5Q8dyiLw==",
+    "signatures": [
+     {
+      "sig": "MEQCIC+L6qpaiMAvjuwm+hmmMLscc7giRw9PRRRuJm1/ztvvAiAQNzO1cHKrxRO/EA7ti+BmdipLpMF1pwZNxQ/8Cx0dNQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "3f96be77a7f8652ff69ef29f1cabc8b89f7fd972",
+   "gitHead": "0ba97de2091708438c98147d9328def70183aa79",
+   "gypfile": true,
+   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "3rdeden",
+    "email": "npm@3rd-Eden.com"
+   },
+   "repository": {
+    "url": "https://github.com/websockets/bufferutil",
+    "type": "git"
+   },
+   "_npmVersion": "2.7.5",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "0.10.35",
+   "dependencies": {
+    "nan": "1.8.x",
+    "bindings": "1.2.x"
+   }
+  },
+  "1.3.0": {
+   "name": "bufferutil",
+   "version": "1.3.0",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@1.3.0",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "69fdf13ad9d91222baee109945faadc431534f86",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-1.3.0.tgz",
+    "integrity": "sha512-SFYBVhwk3e2Z6vaXyXTY0Ev0cKu50ndWvzgvo+2NhXN4AH2H+dn8ZkxzZ4kxrDmJgV8JvfeIjK5jp+tqzdNT5Q==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDbGjdzd40vuE9lrLzxYBKrHe8lXkXcR+mJe6bK968rzAIgdv1kSWjgJ6XUYqH9t9m822TjsNGWRV5q59PGqY6f2U0=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "69fdf13ad9d91222baee109945faadc431534f86",
+   "gitHead": "d471757e8edd0e1e0dfb570b9845a4e180f5f33f",
+   "gypfile": true,
+   "scripts": {
+    "test": "echo \"Only testing builds, tests have to be extraced from ws\"",
+    "install": "node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "3.10.9",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "7.2.0",
+   "dependencies": {
+    "nan": "~2.4.0",
+    "bindings": "~1.2.1"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil-1.3.0.tgz_1480231055554_0.3655267891008407",
+    "host": "packages-12-west.internal.npmjs.com"
+   }
+  },
+  "2.0.1": {
+   "name": "bufferutil",
+   "version": "2.0.1",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@2.0.1",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "8de37f5a300730c305fc3edd9f93348ee8a46288",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-2.0.1.tgz",
+    "integrity": "sha512-zJyJIq02mddcR+yqkDrw9oPQfvl55FUxpWhNca2LiCRfXTWIOOcPKieXAljTa2HuRdkqIv21lOdprakybYuC6A==",
+    "signatures": [
+     {
+      "sig": "MEQCIBsNEB7AkuCCTJormmF6DavqstvEd1EJItM8Miw1StFGAiB9UTP2w+Fx5b+3eNmkx6/jHp3mupWKnHdgIINMURTHrA==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "8de37f5a300730c305fc3edd9f93348ee8a46288",
+   "gitHead": "4ef41fc84d9bf72f2bd965baa207f3addfab6bdc",
+   "scripts": {
+    "test": "echo \"Only testing builds, tests have to be extraced from ws\" && prebuild-ci",
+    "install": "prebuild-install || node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "4.1.2",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "7.5.0",
+   "dependencies": {
+    "nan": "~2.5.0",
+    "bindings": "~1.2.1",
+    "prebuild-install": "~2.1.0"
+   },
+   "devDependencies": {
+    "prebuild": "~6.0.2",
+    "prebuild-ci": "~2.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil-2.0.1.tgz_1486489476054_0.8282803113106638",
+    "host": "packages-18-east.internal.npmjs.com"
+   }
+  },
+  "3.0.1": {
+   "name": "bufferutil",
+   "version": "3.0.1",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@3.0.1",
+   "maintainers": [
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "20b2ef5159ac49f20e44bce38e7c35a6a904ee66",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-3.0.1.tgz",
+    "integrity": "sha512-0W0xufsO39Xq9X8m1BE81j+Ljh/h0Ien8ErXtQYvdTTOPvfpe6daHTow5GSkUwaDphMiyRxGF3NgZczYxhltfw==",
+    "signatures": [
+     {
+      "sig": "MEYCIQC8gII3nGb6Qh5D3a73dAs3wibYPnvMij/dV/zvIoaOjQIhAKE5FFL7twVUn5wuVevWxL0hz3juTswVk3y9USWTJytD",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "_from": ".",
+   "_shasum": "20b2ef5159ac49f20e44bce38e7c35a6a904ee66",
+   "gitHead": "abef931cb5ba41343c7c45a77bfaaef56f225a9a",
+   "scripts": {
+    "test": "mocha && prebuild-ci",
+    "install": "prebuild-install || node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "4.2.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "8.0.0",
+   "dependencies": {
+    "nan": "~2.6.0",
+    "bindings": "~1.2.1",
+    "prebuild-install": "~2.1.0"
+   },
+   "devDependencies": {
+    "mocha": "~3.4.1",
+    "prebuild": "~6.1.0",
+    "prebuild-ci": "~2.2.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil-3.0.1.tgz_1496217133472_0.7095420539844781",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.0.3": {
+   "name": "bufferutil",
+   "version": "3.0.3",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@3.0.3",
+   "maintainers": [
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "ce67caefde2282591e399528467fe623f68f4bd5",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-3.0.3.tgz",
+    "integrity": "sha512-o7zTFxMkM/hujDmJKJEeK4N/NYwO3spQ7sfVjjt6Twpkpmw265WbugtpQBGY2+ZHwfqJkf++7Hfn/eWSMzbx5A==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDplVUPTJicOSDgwLU+f7g2Wamn05UhfL8bwLPiwpTJ4QIhAIzpTrd+imXMxHs9LAHWjIANHUKcNkTBpNOSPI8LoRVY",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "main": "index.js",
+   "gitHead": "f6fae26c677215c80aef55720eeb0446e2fe0efb",
+   "scripts": {
+    "test": "mocha && prebuild-ci",
+    "install": "prebuild-install || node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "5.5.1",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "8.9.0",
+   "dependencies": {
+    "nan": "~2.7.0",
+    "bindings": "~1.3.0",
+    "prebuild-install": "~2.3.0"
+   },
+   "devDependencies": {
+    "mocha": "~4.0.0",
+    "prebuild": "~6.2.0",
+    "prebuild-ci": "~2.2.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil-3.0.3.tgz_1509697613513_0.7104485637973994",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "3.0.5": {
+   "name": "bufferutil",
+   "version": "3.0.5",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@3.0.5",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "8abfc3b6da7aca6a13268b3f2482f0c7aa05fffb",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-3.0.5.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-0fUEthLqfCkYspEuP0vmiAe+PsXslE+AlILb2rmS9I4tAdm3SmpCI69M66zQL20GQEszdbXyVN6q+cpG/yhYlg==",
+    "signatures": [
+     {
+      "sig": "MEUCIQChZsicZnedjrCluLbV3OcmMBICsisb9g6+UYne8eKhJwIgJKK7xLT5OIwhrUHyj8ud3S45lFDnzdEZBJjwNESyE0M=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 7798,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJa7peECRA9TVsSAnZWagAAzYcP/RUjc5RFATHCKHKPGOL7\nXHdjE1NGEIx635yOzKB10nJpEpQy022Qhg2k91vPwLfH7APW+Uf1Gm07NI1X\nsEt0PC9t9RVSWVDGggT3emcvYbgumSJej3vel0IGLSpUUsb663XNaeAcdMk0\nEU6ZrCkihEbElUvyqUczNEGjyJQ9sjGE8eN8MaDttjZk8w7UYDeNioWctkn1\nqqw/FLcknRlmyiyJt15hXdrnepDNFDDAp7M+WU7sVQ+g1g3ojlInoOb72n6J\np3FFf0Th2cZRY7LSUPEq7IyElYQmVYEqF75T0nXPcd4BPgdrJcs7c6sqzRn7\nHndKdC/joTi3ZXSg7wC6zoU3nnBoFHLUmnXGwbmRR2H3HY0XrHhvwZV2MTFC\n94I6ZpKr5dRsoisV/wZGDowUtaR3OjnO82UXsFzdN7XA5A1IdQSbBCLzy3O1\ndVH4Ar8su/TzVK/ZZ+YKhjCKO7Awx+FtaARiaSuNPWkBpBFphCQ708tp6jNO\ng9PdK/n1n3nIGBoJNn1D1YJC4Tx6Vw7sWb+xN1Vd3Sj8iY2CYWqkbAPtrE++\nBZ7Qj+xcBb9FavjVnfAbQe8zkLiRbvWzLB1llB/rHFhBi1x9BJ786VkCB8xf\ncqEyatWEfqODeXXzgGoNuQQPf4bh38dC9spMtQxKKEpcyAUUtEyI8stC126U\noMTG\r\n=wTUL\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "gitHead": "765fbe58a9a2a03ac49119966455510c419f0b35",
+   "scripts": {
+    "test": "mocha && prebuild-ci",
+    "install": "prebuild-install || node-gyp rebuild"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "5.6.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "10.0.0",
+   "dependencies": {
+    "nan": "~2.10.0",
+    "bindings": "~1.3.0",
+    "prebuild-install": "~4.0.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "~5.1.0",
+    "prebuild": "~7.6.0",
+    "prebuild-ci": "~2.2.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_3.0.5_1525585795627_0.6340993025004453",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.0.1": {
+   "name": "bufferutil",
+   "version": "4.0.1",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@4.0.1",
+   "maintainers": [
+    {
+     "name": "3rdeden",
+     "email": "npm@3rd-Eden.com"
+    },
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "3a177e8e5819a1243fe16b63a199951a7ad8d4a7",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-4.0.1.tgz",
+    "fileCount": 15,
+    "integrity": "sha512-xowrxvpxojqkagPcWRQVXZl0YXhRhAtBEIq3VoER1NH5Mw1n1o0ojdspp+GS2J//2gCVyrzQDApQ4unGF+QOoA==",
+    "signatures": [
+     {
+      "sig": "MEUCIE5J9cTzSm6LQjsfjH0sji4/2KU/Ww5Xwc8CHUrW3bGWAiEAp/Sjk3HiB0SglkgRlhQdpOOkIxWsOAEJGtbb50tmDTQ=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 524909,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJcH0JYCRA9TVsSAnZWagAAkpMQAJ7WLi58+TZTG15Ngddd\nLhTJEUQxSLW15jhGHzw1SZSbfa8oKpcHRRBj65Idfbp9sNl7yG5Tnwam2zj4\nyH2LPLsINuQ+DO6JxLoRahy/xsnzLXtJTUeY3qXu5avaDMLd+biDyiCEghgF\nFh9zvlj+fje7/3zUsiIIuvOBRtciU34rXYZKXQ8PHBEn6vh6IAz6OGxZ6Xuk\niqu+8SdDjg5PG6/Wdv6VS0whJj3UySR9EOgfBnuYxbybUkNDmFuCYrYSRN5i\nFTXSGSCUj1zZwcUuLfHG4M0EAXN4N/HDEbdLQlapIn5YNQLvwPd03Whfqaiw\n+tSZbc9x5pnbr2OpYD4It91yIRUQIE/dxv2D5rte6RQ96ryJUha6IpK+oHBr\ndA8sibg5Xi3J3jv4llpy7y1Od/PNM0u0nyr5ccNRKKx+kPRXyJHQoAawPQro\nxi5JEVxlkPUYFzFiKCFsIbNGVsqndagvFTyA/FfQdYX5MBykKc04LZQV09Ei\nbw4pFGL0r0SPD+ThcAk8gztyEtw1ZwpBe8Kxyu2uhmZiMWig7+Zvs85rKfNh\nevM2WDH1i4BzjnsH1Db5BaPGjLpFj5VxnPMe5fawLDAftkrx3DcaoQDM6yik\nN+9N9ShUgdG/sgvur+MbKB4rGeg9LEe3M6oxxHsZbxilrLqU7ilhBZZn4+hm\nM24q\r\n=Rp//\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "gitHead": "e367139397179f7f132900025e9b461e714a35bc",
+   "scripts": {
+    "test": "mocha",
+    "install": "node-gyp-build",
+    "prebuild": "prebuildify --napi"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.4.1",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "11.5.0",
+   "dependencies": {
+    "node-gyp-build": "~3.7.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "~5.2.0",
+    "prebuildify": "~2.10.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_4.0.1_1545552472247_0.067683796300124",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.0.3": {
+   "name": "bufferutil",
+   "version": "4.0.3",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@4.0.3",
+   "maintainers": [
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npmjs@3rd-Eden.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "66724b756bed23cd7c28c4d306d7994f9943cc6b",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-4.0.3.tgz",
+    "fileCount": 14,
+    "integrity": "sha512-yEYTwGndELGvfXsImMBLop58eaGW+YdONi1fNjTINSY98tmMmFijBG6WXgdkfuLNt4imzQNtIE+eBp1PVpMCSw==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDplP/OB2wvKo3MdaEj5n6kkcF376hPRTDK6Q3GnrhhrgIgbL2Bmvqmw+qr0uWI55uT4Y9uAuPbw/5xmFEC5kxesI0=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 289573,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJf8NLSCRA9TVsSAnZWagAAKP0P/2k6qW4JiSlYXfGlGRoz\ne/7dktVxEW5pQhPa033Ho+C83vTNwHWc2MTlk9WzKluY4glDSN3VxaFYWi3o\n1B+FrrLaNKDSSFOC4ziZ9N8Z0bHSk4GajwVVF9NSAvf+n8whx1jBZr1VUYp4\nREE+xOws8a1nzSyT8e2ZK8FDlCbaDHzfIsAy4iRiWCGZ/D+AiUCnQMAaNVJ0\ndExu3llbrT+jKrsmAP0lZ+qeHxZwbQTt7JCT1DJkKBw8bcKRN6tzRKL9YA15\nFdUj0WDAtozDTt9Slyl3PpweNuCpy7o0K9YwUcSCXiP9xR02k7mP/9+emVAF\nvlDTNgVOnMZYKWdOT6RlUkjhRFjljlJPez5BWy6Kv5x671FBBFOAgli0qAG0\nQ32o6k5vODv3yKnqeMIlifwUrYKjM/r8F+5gkdg43Sw0rYn06AumP1q1/6pY\n4OMiRvmZmTpyE2Czz14w1aOdFqru5lKIVb3qMqVHYr0w4n8MmflciiKSr/qa\nca8ziismpMIEyi0/qVjSosciXhjYXk1SkLsrhgHRvc0L8xmttvw+7E0kiHhR\nhn7hwMCoD0d70sWKttpeuCJebDD7iO46QAueFNN75Jejo0oU5uGbeCTO6IzY\ngbdHcsuj5C1HnLlALY6qPj+mzYLiIrKnt/YsNz5WP4nEacVn2tbbjm+OBuI9\ni+Qo\r\n=y72D\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "index.js",
+   "gitHead": "a506f9b7473662f9daea3fbd5e08cfb8c9a685a3",
+   "scripts": {
+    "test": "mocha",
+    "install": "node-gyp-build",
+    "prebuild": "prebuildify --napi --strip",
+    "prebuild-linux-arm": "prebuildify-cross -i linux-armv6 -i linux-armv7 --napi --strip"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "7.3.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "15.5.0",
+   "dependencies": {
+    "node-gyp-build": "^4.2.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "^8.0.1",
+    "node-gyp": "^7.1.2",
+    "prebuildify": "^4.0.0",
+    "prebuildify-cross": "^4.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_4.0.3_1609618129628_0.7610264455425453",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.0.5": {
+   "name": "bufferutil",
+   "version": "4.0.5",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@4.0.5",
+   "maintainers": [
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npmjs@3rd-Eden.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "da9ea8166911cc276bf677b8aed2d02d31f59028",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-4.0.5.tgz",
+    "fileCount": 11,
+    "integrity": "sha512-HTm14iMQKK2FjFLRTM5lAVcyaUzOnqbPtesFIvREgXpJHdQm8bWS+GkQgIkfaBYRHuCnea7w8UVNfwiAQhlr9A==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCEVsToT/7HA8U8tGcHsCB7MNQmJP1cKzX9VMo9ZNewQQIgYTqt8I86L4d8Ipz9E2v+/tpWxaaH8acVPc4t3LAC5g8=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 406784
+   },
+   "main": "index.js",
+   "engines": {
+    "node": ">=6.14.2"
+   },
+   "gitHead": "3923cf1534a9def734f2ded9d46fb095c73e8e16",
+   "scripts": {
+    "test": "mocha",
+    "install": "node-gyp-build",
+    "prebuild": "prebuildify --napi --strip",
+    "prebuild-darwin-x64+arm64": "prebuildify --arch x64+arm64 --napi --strip"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.0.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "16.11.1",
+   "dependencies": {
+    "node-gyp-build": "^4.3.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "^9.0.3",
+    "node-gyp": "^7.1.2",
+    "prebuildify": "^4.0.0",
+    "prebuildify-cross": "^4.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_4.0.5_1634144748118_0.48553202225554615",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.0.8": {
+   "name": "bufferutil",
+   "version": "4.0.8",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@4.0.8",
+   "maintainers": [
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npmjs@3rd-Eden.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "1de6a71092d65d7766c4d8a522b261a6e787e8ea",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-4.0.8.tgz",
+    "fileCount": 11,
+    "integrity": "sha512-4T53u4PdgsXqKaIctwF8ifXlRTTmEPJ8iEPWFdGZvcf7sbwYo6FKFEX9eNNAnzFZ7EzJAQ3CJeOtCRA4rDp7Pw==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDM0qTSP5k0qtCwY6u4qQuSNEgf3xofaaisYfwbq+/9WwIgZcn0Wo3Ts1qoVSophVETp77ikVZKWj7cXQqCEeiG5pA=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 414186
+   },
+   "main": "index.js",
+   "engines": {
+    "node": ">=6.14.2"
+   },
+   "gitHead": "9047e45073bf93e495ed100361d270d4062867d8",
+   "scripts": {
+    "test": "mocha",
+    "install": "node-gyp-build",
+    "prebuild": "prebuildify --napi --strip --target=14.0.0",
+    "prebuild-darwin-x64+arm64": "prebuildify --arch x64+arm64 --napi --strip --target=14.0.0"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "10.1.0",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "20.8.0",
+   "dependencies": {
+    "node-gyp-build": "^4.3.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "^10.0.0",
+    "node-gyp": "^9.1.0",
+    "prebuildify": "^5.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_4.0.8_1697387768257_0.7342052856975043",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "4.1.0": {
+   "name": "bufferutil",
+   "version": "4.1.0",
+   "keywords": [
+    "bufferutil"
+   ],
+   "author": {
+    "url": "http://2x.io",
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com"
+   },
+   "license": "MIT",
+   "_id": "bufferutil@4.1.0",
+   "maintainers": [
+    {
+     "name": "einaros",
+     "email": "einaros@gmail.com"
+    },
+    {
+     "name": "lpinca",
+     "email": "luigipinca@gmail.com"
+    },
+    {
+     "name": "3rdeden",
+     "email": "npmjs@3rd-Eden.com"
+    }
+   ],
+   "homepage": "https://github.com/websockets/bufferutil",
+   "bugs": {
+    "url": "https://github.com/websockets/bufferutil/issues"
+   },
+   "dist": {
+    "shasum": "a4623541dd23867626bb08a051ec0d2ec0b70294",
+    "tarball": "https://registry.npmjs.org/bufferutil/-/bufferutil-4.1.0.tgz",
+    "fileCount": 12,
+    "integrity": "sha512-ZMANVnAixE6AWWnPzlW2KpUrxhm9woycYvPOo67jWHyFowASTEd9s+QN1EIMsSDtwhIxN4sWE1jotpuDUIgyIw==",
+    "signatures": [
+     {
+      "sig": "MEYCIQDql6lkSKOOQvihQ/DsSc7+F2aOWzYyOp95n2X4vUV0EgIhAMxutIDmC0qp1BrC8ZjKMlwPtBnhjcqPuESABpM+4zzO",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     }
+    ],
+    "unpackedSize": 350988
+   },
+   "main": "index.js",
+   "engines": {
+    "node": ">=6.14.2"
+   },
+   "gitHead": "580a8a92c91d1b3dea6d4b0d54f89daf42da5e48",
+   "scripts": {
+    "test": "mocha",
+    "install": "node-gyp-build",
+    "prebuild": "prebuildify --napi --strip --target=8.11.2"
+   },
+   "_npmUser": {
+    "name": "lpinca",
+    "email": "luigipinca@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/websockets/bufferutil.git",
+    "type": "git"
+   },
+   "_npmVersion": "11.6.2",
+   "description": "WebSocket buffer utils",
+   "directories": {},
+   "_nodeVersion": "25.2.1",
+   "dependencies": {
+    "node-gyp-build": "^4.3.0"
+   },
+   "_hasShrinkwrap": false,
+   "devDependencies": {
+    "mocha": "^11.0.1",
+    "node-gyp": "^12.1.0",
+    "prebuildify": "^6.0.0"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/bufferutil_4.1.0_1766075061409_0.6905188416245664",
+    "host": "s3://npm-registry-packages-npm-production"
+   }
+  }
+ }
+}

@@ -2,21 +2,30 @@ import { mkdirSync, existsSync, copyFileSync, accessSync, constants as fsConstan
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { npmrcPath, readCurrentRegistry, applyChaingateBlock, findScopedRegistries } from '../npmrc.js';
-import { readPid, spawnProxy, isPortInUse, waitForPort } from '../proxy-control.js';
+import { readPid, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
+  isAlive } from '../proxy-control.js';
 import { fetchSeedBundle } from '../seed-download.js';
 import { verifySeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity } from '../integrity-gate.js';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_UPSTREAM, EXIT } from '../constants.js';
+import { isV3Seed, stageBundle, activateBundle, resolveActiveBundle,
+  verifyBundleDir } from '../seed-bundle.js';
+import { readConfigStrict, writeConfig, validateConfig, DEFAULT_POLICY,
+  POLICY_VALUES } from '../../config-store.js';
 
 function parseArgs(args) {
-  const opts = { scope: 'user', noSeed: false, seedPath: null, force: false, dryRun: false };
+  const opts = { scope: 'user', noSeed: false, seedPath: null, force: false, dryRun: false,
+    unsignedDev: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scope' && args[i + 1]) opts.scope = args[++i];
     else if (args[i] === '--no-seed') opts.noSeed = true;
     else if (args[i] === '--seed' && args[i + 1]) opts.seedPath = args[++i];
     else if (args[i] === '--force') opts.force = true;
     else if (args[i] === '--dry-run') opts.dryRun = true;
+    // A v3 seed with no signature is only usable if the operator asks for it BY NAME, and the
+    // choice is recorded so a later start cannot quietly treat it as authenticated.
+    else if (args[i] === '--unsigned-development') opts.unsignedDev = true;
   }
   return opts;
 }
@@ -24,6 +33,7 @@ function parseArgs(args) {
 export default async function init(args) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
+  let v3Installed = false;
 
   if (opts.dryRun) {
     const rc = npmrcPath(opts.scope);
@@ -90,8 +100,104 @@ export default async function init(args) {
     return EXIT.OK;
   }
 
-  // 3. Seed handling
-  if (!opts.noSeed && !existsSync(paths.witnessDb) || opts.force) {
+  // 3a. A v3 detection seed is installed BESIDE the witness database, never over it: it is
+  //     evidence, it is opened read-only, and the runtime keeps writing its own state elsewhere.
+  //     Everything needed to start later is recorded in config.json, so no environment is required.
+  let intended = null;                  // the identity a started proxy must report back
+  if (opts.seedPath && isV3Seed(opts.seedPath)) {
+    // POLICY FIRST, strictly. A policy the gate cannot act on means the proxy will not start, and
+    // discovering that after a bundle is installed and .npmrc redirected is the wrong order.
+    let policy;
+    try {
+      const existing = readConfigStrict(paths.configFile) || {};
+      policy = { ...DEFAULT_POLICY, ...(existing.policy || {}) };
+      validateConfig({ ...existing, policy }, paths.configFile);
+    } catch (err) {
+      console.error(fmt.fail(err.message));
+      console.error('  Nothing was installed and .npmrc was not touched.');
+      return EXIT.ERROR;
+    }
+
+    // TRUST, decided before anything is staged and recorded in the bundle itself.
+    const sha256Path = `${opts.seedPath}.sha256`;
+    const sigPath = `${opts.seedPath}.sig`;
+    const hasSig = existsSync(sigPath);
+    let trust;
+    if (hasSig) {
+      console.log('Verifying v3 seed signature...');
+      try {
+        await verifySeed(opts.seedPath, sha256Path, sigPath);
+        trust = 'authenticated';
+        console.log(fmt.ok('v3 seed signature verified'));
+      } catch (err) {
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
+        return EXIT.ERROR;
+      }
+    } else if (opts.unsignedDev) {
+      trust = 'unsigned-development';
+      console.log(fmt.warn('v3 seed has no signature; installing as unsigned-development'));
+    } else {
+      console.error(fmt.fail('v3 seed has no .sig and --unsigned-development was not given.'));
+      console.error('  A seed is authenticated by default; asking for the development mode is');
+      console.error('  how you say out loud that this one is not.');
+      return EXIT.ERROR;
+    }
+
+    // STAGE: copied, digest-checked, sidecar written from the staged bytes, and OPENED WITH THE
+    // READER — all before anything in use is touched. A retained bundle with the same identity is
+    // re-verified rather than assumed, and reports its own state.
+    let installed;
+    try {
+      installed = stageBundle({ dbPath: opts.seedPath,
+        sha256Path: existsSync(sha256Path) ? sha256Path : null,
+        sigPath: hasSig ? sigPath : null }, paths.base, { trust });
+    } catch (err) {
+      console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
+      console.error('  Nothing was installed or activated.');
+      return EXIT.ERROR;
+    }
+
+    // The operator's policy is host state and is written before activation; which bundle is active
+    // is recorded ONLY by the link the next step swaps.
+    writeConfig(paths.configFile, { policy });
+    let identity;
+    try {
+      identity = activateBundle(paths.base, installed.dir_name);
+    } catch (err) {
+      console.error(fmt.fail(`activation refused: ${err.message}`));
+      console.error('  The previously active bundle, if any, is still active.');
+      return EXIT.ERROR;
+    }
+
+    console.log(fmt.ok(`v3 seed bundle ${identity.bundle_id} active`
+      + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
+    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}…  `
+      + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}…  `
+      + `trust ${identity.trust}${identity.authenticated ? ' (authenticated)' : ''}`));
+    console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
+      + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
+    if (installed.replaced_damaged) {
+      console.log(fmt.warn(`  replaced a damaged retained bundle: ${installed.replaced_damaged}`));
+    }
+    intended = { bundle_id: identity.bundle_id, sha256: identity.sha256, trust: identity.trust,
+      policy };
+
+    if (!existsSync(paths.witnessDb)) {
+      const db = openWitnessDB(paths.witnessDb);
+      db.applySchema();
+      db.close();
+      console.log(fmt.ok('Witness database created (writable, separate from the seed)'));
+    }
+    opts.seedPath = null;
+    opts.noSeed = true;
+    v3Installed = true;
+  }
+
+  // 3. Seed handling (v1: the seed IS the witness database)
+  //    `--force` must not drag a v3 installation back through this: it downloaded a v1 bundle over
+  //    the witness database that had just been created beside the v3 seed.
+  if (!v3Installed && ((!opts.noSeed && !existsSync(paths.witnessDb)) || opts.force)) {
     if (opts.seedPath) {
       // Local seed
       const sha256Path = opts.seedPath + '.sha256';
@@ -134,6 +240,11 @@ export default async function init(args) {
       copyFileSync(bundle.dbPath, paths.witnessDb);
       copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
       copyFileSync(bundle.sigPath, paths.witnessDbSig);
+      // Say what was, and was not, installed: this is the LEGACY witness seed. The v3 detection seed
+      // is never downloaded automatically; it must be supplied.
+      console.log(fmt.warn('Installed the LEGACY witness seed only. The v3 detection seed is not downloaded '
+        + 'automatically; install it with `chaingate init --seed <bundle>/chaingate-seed.db` '
+        + '(add --unsigned-development for an unsigned bundle).'));
     }
   } else if (existsSync(paths.witnessDb)) {
     console.log(fmt.ok('Existing witness database found'));
@@ -179,31 +290,137 @@ export default async function init(args) {
     return EXIT.ERROR;
   }
 
-  // 6. Patch .npmrc
+  // 6. Start the proxy, and only redirect npm once the RIGHT process is serving.
+  //    A listening port says something bound it. Readiness here means the running process reports
+  //    the bundle digest, trust mode and policy that were just configured — a path proves nothing,
+  //    since the same path spans different bytes across an update.
   const registryUrl = `http://${host}:${port}`;
-  applyChaingateBlock(rc, registryUrl);
-  console.log(fmt.ok(`.npmrc updated (${rc})`));
 
-  // 7. Spawn proxy
-  if (!existingPid) {
-    const env = {};
-    if (upstream !== DEFAULT_UPSTREAM) {
-      env.CHAINGATE_UPSTREAM = upstream;
+  /**
+   * What the running proxy says it loaded, or null.
+   *
+   * The request carries its OWN deadline. Without one it inherits whatever the platform's default
+   * happens to be, so a proxy that accepts the connection and then never answers would hang `init`
+   * indefinitely — after a bounded connection wait, which makes the bound on the connection
+   * pointless. Readiness is "listening AND answering with the right evidence", so the budget has to
+   * cover both halves.
+   */
+  const runningIdentity = async (timeoutMs = 10000) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.max(timeoutMs, 1));
+    try {
+      const resp = await fetch(`${registryUrl}/_chaingate/self`, { signal: ctrl.signal });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch { return null; } finally { clearTimeout(timer); }
+  };
+  /** Does it match what was just configured? Returns a list of disagreements. */
+  const mismatches = (self) => {
+    if (!intended) return [];
+    const got = self?.seed_v3;
+    if (!got) return ['no v3 seed loaded'];
+    const out = [];
+    if (got.sha256 !== intended.sha256) {
+      out.push(`seed digest ${String(got.sha256).slice(0, 16)}… != `
+        + `${intended.sha256.slice(0, 16)}…`);
     }
+    if (got.bundle_id !== intended.bundle_id) {
+      out.push(`bundle ${got.bundle_id} != ${intended.bundle_id}`);
+    }
+    if (got.trust !== intended.trust) out.push(`trust ${got.trust} != ${intended.trust}`);
+    for (const k of Object.keys(POLICY_VALUES)) {
+      if (got.policy?.[k] !== intended.policy[k]) {
+        out.push(`policy ${k} ${got.policy?.[k]} != ${intended.policy[k]}`);
+      }
+    }
+    return out;
+  };
+
+  const childEnv = () => {
+    const env = {};
+    if (upstream !== DEFAULT_UPSTREAM) env.CHAINGATE_UPSTREAM = upstream;
     env.CHAINGATE_WITNESS_DB = paths.witnessDb;
     env.CHAINGATE_PORT = String(port);
     env.CHAINGATE_HOST = host;
+    // The SELECTED base directory, handed to the process this command starts. Internal plumbing
+    // between a command and its child — not something an operator sets.
+    env.CHAINGATE_HOME = paths.base;
+    return env;
+  };
 
-    const pid = spawnProxy({ pidFile: paths.pidFile, logFile: paths.logFile, env });
-    const ready = await waitForPort(port, host, 5000);
-    if (ready) {
-      console.log(fmt.ok(`Proxy running on ${registryUrl} (pid ${pid})`));
+  let running = existingPid && isAlive(existingPid) ? existingPid : null;
+  if (running) {
+    const self = await runningIdentity();
+    const diff = mismatches(self);
+    if (diff.length === 0) {
+      console.log(fmt.ok(`Proxy already running (pid ${running}) with the configured seed`));
+    } else if (opts.force) {
+      // A CONTROLLED restart: stop the old process, start a new one, and re-check identity.
+      console.log(fmt.warn(`Restarting proxy (pid ${running}) to activate the new bundle...`));
+      stopProxy(paths.pidFile);
+      running = null;
     } else {
-      console.log(fmt.warn(`Proxy spawned (pid ${pid}) but port not ready yet. Check ${paths.logFile}`));
+      // Or say so plainly, rather than leaving the operator to assume the new seed is in force.
+      console.log(fmt.warn('Bundle INSTALLED AND ACTIVATED, but NOT YET LOADED by the running proxy.'));
+      for (const d of diff) console.log(fmt.dim(`    ${d}`));
+      console.log(fmt.dim(`  The proxy (pid ${running}) is still serving what it loaded at start-up.`));
+      console.log(fmt.dim('  Activate it with: chaingate stop && chaingate init   (or re-run with --force)'));
+      console.log(fmt.dim('  .npmrc was left as it is.'));
+      return EXIT.OK;
     }
-  } else {
-    console.log(fmt.ok(`Proxy already running (pid ${existingPid})`));
   }
+
+  if (!running) {
+    const pid = spawnProxy({ pidFile: paths.pidFile, logFile: paths.logFile, env: childEnv() });
+    // ONE budget for becoming ready, spanning BOTH the connection wait and the identity answer.
+    // Inside it the bound is the child's liveness, not a stopwatch: a real seed is gigabytes and the
+    // proxy opens it BEFORE it listens, so "slow" and "dead" must be told apart rather than
+    // collapsed into one short deadline.
+    const READY_BUDGET_MS = 180000;
+    const budgetFrom = Date.now();
+    const started = await waitForProxyReady({ port, host, pid, ceilingMs: READY_BUDGET_MS });
+    if (!started.ready) {
+      console.error(fmt.fail(started.why === 'exited'
+        ? `Proxy (pid ${pid}) exited before it began listening. See ${paths.logFile}`
+        : `Proxy (pid ${pid}) did not begin listening within its `
+          + `${Math.round(started.waitedMs / 1000)}s budget. It is still running; it may simply need `
+          + `longer, or it may be stuck. See ${paths.logFile}`));
+      console.error('  .npmrc was NOT redirected: npm keeps using its current registry.');
+      return EXIT.ERROR;
+    }
+    if (started.waitedMs > 5000) {
+      console.log(fmt.dim(`  (seed opened in ${(started.waitedMs / 1000).toFixed(1)}s)`));
+    }
+    // Whatever is left of the budget after the connection wait bounds the identity answer. The
+    // budget is STRICT end to end: no floor, no grace. A start-up that spent the whole budget
+    // becoming reachable has nothing left in which to be asked what it loaded, and is reported as
+    // exactly that — the message below names which half ran out.
+    const self = await runningIdentity(Math.max(READY_BUDGET_MS - (Date.now() - budgetFrom), 1));
+    if (!self) {
+      console.error(fmt.fail('Proxy is listening but did not answer /_chaingate/self in time.'));
+      console.error(`  .npmrc was NOT redirected. See ${paths.logFile}`);
+      return EXIT.ERROR;
+    }
+    const diff = mismatches(self);
+    if (diff.length) {
+      console.error(fmt.fail('Proxy started, but not with what was just configured:'));
+      for (const d of diff) console.error(`    ${d}`);
+      console.error('  .npmrc was NOT redirected.');
+      return EXIT.ERROR;
+    }
+    console.log(fmt.ok(`Proxy running on ${registryUrl} (pid ${pid})`));
+    if (self.seed_v3) {
+      console.log(fmt.dim(`  active bundle ${self.seed_v3.bundle_id} `
+        + `sha256 ${String(self.seed_v3.sha256).slice(0, 16)}…`));
+      console.log(fmt.dim(`  trust ${self.seed_v3.trust}`
+        + `${self.seed_v3.authenticated ? ' (authenticated)' : ''}`
+        + `  policy ${JSON.stringify(self.seed_v3.policy)}`));
+    }
+  }
+
+  // 7. Only now redirect npm at it.
+  applyChaingateBlock(rc, registryUrl);
+  console.log(fmt.ok(`.npmrc updated (${rc})`));
 
   // 8. Summary
   if (upstream !== DEFAULT_UPSTREAM) {

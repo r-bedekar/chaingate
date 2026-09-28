@@ -25,7 +25,7 @@ import { existsSync } from 'node:fs';
 import { fmt } from './format.js';
 import { openWitnessDB } from '../witness/db.js';
 import { verifyPersistedSignature } from '../witness/seed_verify.js';
-import { checkSelfWitness, hasAnyChaingateInWitness } from './self-witness.js';
+import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from './self-witness.js';
 import { EXIT } from './constants.js';
 
 export async function assertIntegrity(paths, { startFileUrl, command } = {}) {
@@ -80,6 +80,6 @@ function printTamperBanner(command, detail) {
   console.error(fmt.red('TAMPER / INTEGRITY CHECK FAILED' + where));
   console.error(fmt.red(`  ${detail}`));
   console.error(fmt.dim('  Run `chaingate doctor` for full diagnostics.'));
-  console.error(fmt.dim('  Reinstall chaingate from a trusted source before continuing.'));
+  console.error(fmt.dim(`  Reinstall ${OWN_PACKAGE_NAME} from a trusted source before continuing.`));
   console.error('');
 }

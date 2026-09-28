@@ -1,0 +1,313 @@
+// Versioned seed bundles, ONE authoritative activation record, and one resolution per startup.
+//
+// A seed is not a file. It is a BUNDLE: a database, the digest sidecar the reader verifies it
+// against, the signature, and the identity those imply. Replacing part of one leaves a host running
+// a combination that never existed — which is how in-place replacement produced a rollback whose
+// restored database sat beside a newer sidecar the reader then refused.
+//
+// Three properties this file exists to hold:
+//
+// 1. RESOLVE ONCE. `seeds/active` is a symlink. Opening `seeds/active/db`, then
+//    `seeds/active/db.sha256`, then `seeds/active/db.sig` is three separate traversals, and an
+//    activation landing between them means those three opens follow DIFFERENT targets — a database
+//    from one bundle checked against another's digest. Atomic replacement of the link does not help,
+//    because the race is across opens, not within one. So the link is resolved ONCE, to a concrete
+//    directory, and every file is then read through that pinned directory.
+//
+// 2. A RETAINED BUNDLE IS VERIFIED BEFORE IT IS REUSED. Content addressing makes re-installing the
+//    same bytes cheap, but "a directory with that name exists" is not "a usable bundle is there":
+//    the retained copy may have been damaged since. And the database bytes alone do not identify a
+//    bundle — the same database signed and unsigned are different things to trust. So the id covers
+//    the signature too, and a retained bundle is validated and reports ITS identity, not the
+//    incoming one's.
+//
+// 3. ONE AUTHORITATIVE ACTIVATION RECORD. Which bundle is active is the symlink, and nothing else.
+//    Identity and trust live inside the bundle it points at. Writing them into config.json as well
+//    would mean two records of the same fact, and an interrupted update leaving them disagreeing —
+//    the split state this design exists to avoid. config.json holds the operator's POLICY, which is
+//    not a property of any bundle.
+
+import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, renameSync, rmSync,
+  chmodSync, symlinkSync, readlinkSync, realpathSync, readdirSync, statSync,
+  lstatSync } from 'node:fs';
+import { join, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import Database from 'better-sqlite3';
+
+import { sha256File, openSeed, TRUST_AUTHENTICATED,
+  TRUST_UNSIGNED_DEV } from '../seed/v3/reader.js';
+import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
+import { SEED_V3_FILENAME } from './constants.js';
+
+export const SEEDS_DIRNAME = 'seeds';
+export const ACTIVE_LINK = 'active';
+export const PREVIOUS_LINK = 'previous';
+export const BUNDLE_MANIFEST = 'bundle.json';
+
+export const seedsDir = (base) => join(base, SEEDS_DIRNAME);
+export const activeLink = (base) => join(seedsDir(base), ACTIVE_LINK);
+export const previousLink = (base) => join(seedsDir(base), PREVIOUS_LINK);
+
+export const bundleFiles = (dir) => ({
+  db: join(dir, SEED_V3_FILENAME),
+  sha256: join(dir, `${SEED_V3_FILENAME}.sha256`),
+  sig: join(dir, `${SEED_V3_FILENAME}.sig`),
+  manifest: join(dir, BUNDLE_MANIFEST),
+});
+
+const trustOf = (name) => (name === 'unsigned-development' ? TRUST_UNSIGNED_DEV : TRUST_AUTHENTICATED);
+
+/** What the seed itself declares, read without trusting a filename. */
+export function inspectSeed(dbPath) {
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    const has = db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='seed_metadata'").get();
+    if (!has) return { schemaVersion: null, corpusSnapshotDigest: null, contractVersion: null };
+    const get = (k) => (db.prepare('SELECT value FROM seed_metadata WHERE key = ?').get(k)
+      || {}).value ?? null;
+    const raw = get('schema_version');
+    const n = raw === null ? null : Number.parseInt(String(raw).trim(), 10);
+    return {
+      schemaVersion: Number.isInteger(n) ? n : null,
+      corpusSnapshotDigest: get('corpus_snapshot_digest'),
+      contractVersion: get('contract_version'),
+    };
+  } catch { return { schemaVersion: null, corpusSnapshotDigest: null, contractVersion: null }; }
+  finally { db.close(); }
+}
+
+export const isV3Seed = (dbPath) => inspectSeed(dbPath).schemaVersion === 3;
+
+/**
+ * A bundle's identity covers the SIGNATURE as well as the database.
+ *
+ * Keying on the database digest alone made the same bytes signed and unsigned collide on one id —
+ * two bundles a host must treat differently, sharing a directory and a manifest.
+ */
+export function bundleIdOf(dbDigest, sigDigest) {
+  return createHash('sha256')
+    .update(`${dbDigest}\n${sigDigest || 'unsigned'}`).digest('hex').slice(0, 16);
+}
+
+/**
+ * Open a bundle directory the way the proxy will and report what it ACTUALLY is.
+ * @returns {{ok: boolean, why: string|null, identity: object|null}}
+ */
+export function verifyBundleDir(dir, { trust } = {}) {
+  const f = bundleFiles(dir);
+  for (const [k, p] of Object.entries(f)) {
+    if (k === 'sig') continue;                       // optional
+    if (!existsSync(p)) return { ok: false, why: `missing ${basename(p)}`, identity: null };
+  }
+  let manifest = null;
+  try { manifest = JSON.parse(readFileSync(f.manifest, 'utf8')); }
+  catch (e) { return { ok: false, why: `unreadable ${BUNDLE_MANIFEST}: ${e.message}`, identity: null }; }
+
+  const dbDigest = sha256File(f.db);
+  if (manifest.sha256 !== dbDigest) {
+    return { ok: false, identity: null,
+      why: `database digest ${dbDigest.slice(0, 16)}… does not match the manifest's `
+        + `${String(manifest.sha256).slice(0, 16)}…` };
+  }
+  const sigDigest = existsSync(f.sig) ? sha256File(f.sig) : null;
+  const id = bundleIdOf(dbDigest, sigDigest);
+  if (basename(dir) !== id && manifest.bundle_id !== id) {
+    return { ok: false, identity: null,
+      why: `bundle contents hash to ${id}, which is neither the directory name nor the manifest id` };
+  }
+
+  // The check that matters: does the READER accept it, under the trust this bundle claims?
+  const claimedTrust = trust || manifest.trust;
+  let authenticated = false;
+  try {
+    const seed = openSeed(f.db, { trust: trustOf(claimedTrust), pubkey: CHAINGATE_SEED_PUBKEY_B64 });
+    try { authenticated = Boolean(seed.report?.authenticated); } finally { seed.close(); }
+  } catch (e) {
+    return { ok: false, why: `the reader refuses it: ${e.message}`, identity: null };
+  }
+  const info = inspectSeed(f.db);
+  return {
+    ok: true,
+    why: null,
+    identity: {
+      ...manifest,
+      bundle_id: id,
+      sha256: dbDigest,
+      signature_sha256: sigDigest,
+      signed: sigDigest !== null,
+      authenticated,
+      trust: claimedTrust,
+      schema_version: info.schemaVersion,
+      contract_version: info.contractVersion,
+      corpus_snapshot_digest: info.corpusSnapshotDigest,
+    },
+  };
+}
+
+/**
+ * Stage a complete bundle, validate it WITH THE READER, and leave it installed but NOT active.
+ * Nothing in use is touched. Returns the identity of the bundle that is now on disk — which, when
+ * an equivalent bundle was already retained, is THAT bundle's verified identity rather than the
+ * incoming copy's assumed one.
+ */
+export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base, { trust } = {}) {
+  const info = inspectSeed(dbPath);
+  if (info.schemaVersion !== 3) {
+    throw new Error(`not a v3 seed: schema_version=${JSON.stringify(info.schemaVersion)}`);
+  }
+  mkdirSync(seedsDir(base), { recursive: true });
+
+  const staging = join(seedsDir(base), `.staging-${process.pid}-${Date.now()}`);
+  rmSync(staging, { recursive: true, force: true });
+  mkdirSync(staging, { recursive: true });
+  const staged = bundleFiles(staging);
+
+  try {
+    copyFileSync(dbPath, staged.db);
+    const dbDigest = sha256File(staged.db);
+    if (sha256Path && existsSync(sha256Path)) {
+      const claimed = String(readFileSync(sha256Path, 'utf8')).trim().split(/\s+/)[0];
+      if (claimed !== dbDigest) {
+        throw new Error(`bundle digest ${claimed.slice(0, 16)}… does not describe the bytes supplied `
+          + `(${dbDigest.slice(0, 16)}…)`);
+      }
+    }
+    writeFileSync(staged.sha256, `${dbDigest}  ${SEED_V3_FILENAME}\n`);
+    if (sigPath && existsSync(sigPath)) copyFileSync(sigPath, staged.sig);
+    const sigDigest = existsSync(staged.sig) ? sha256File(staged.sig) : null;
+    const id = bundleIdOf(dbDigest, sigDigest);
+
+    writeFileSync(staged.manifest, `${JSON.stringify({
+      bundle_id: id, sha256: dbDigest, signature_sha256: sigDigest, signed: sigDigest !== null,
+      trust, schema_version: info.schemaVersion, contract_version: info.contractVersion,
+      corpus_snapshot_digest: info.corpusSnapshotDigest, size_bytes: statSync(staged.db).size,
+      staged_at: new Date().toISOString(),
+    }, null, 2)}\n`);
+
+    const verdict = verifyBundleDir(staging, { trust });
+    if (!verdict.ok) throw new Error(`staged bundle is not usable: ${verdict.why}`);
+
+    // BUNDLE DIRECTORIES ARE IMMUTABLE ONCE PLACED. A running process may have pinned this exact
+    // directory (resolve-once), so repairing a damaged bundle by replacing its directory in place
+    // would pull the ground out from under that process — the very thing pinning exists to prevent.
+    // A repair therefore goes into a FRESH physical directory and is activated normally; the damaged
+    // one is left alone for whoever is still reading it, and `chaingate doctor` reports it.
+    let dest = join(seedsDir(base), id);
+    let replacedDamaged = null;
+    if (existsSync(dest)) {
+      // A bundle with this id is retained. VERIFY IT rather than assume it: the copy on disk may
+      // have been damaged since it was installed, and reusing a damaged bundle because its name
+      // matched would activate something no one checked.
+      const retained = verifyBundleDir(dest, { trust });
+      if (retained.ok) {
+        rmSync(staging, { recursive: true, force: true });
+        return { ...retained.identity, dir: dest, dir_name: basename(dest),
+          path: bundleFiles(dest).db, reused: true };
+      }
+      replacedDamaged = retained.why;
+      let n = 2;
+      while (existsSync(join(seedsDir(base), `${id}.r${n}`))) n += 1;
+      dest = join(seedsDir(base), `${id}.r${n}`);
+    }
+
+    renameSync(staging, dest);
+    for (const f of Object.values(bundleFiles(dest))) if (existsSync(f)) chmodSync(f, 0o444);
+    const placed = verifyBundleDir(dest, { trust });
+    if (!placed.ok) throw new Error(`installed bundle is not usable: ${placed.why}`);
+    return { ...placed.identity, dir: dest, dir_name: basename(dest), path: bundleFiles(dest).db,
+      reused: false, ...(replacedDamaged ? { replaced_damaged: replacedDamaged } : {}) };
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+/**
+ * THE activation record. One symlink swap, and nothing else records which bundle is active — so
+ * there is no second copy of the fact to fall out of step with it.
+ */
+export function activateBundle(base, dirName) {
+  const dir = join(seedsDir(base), dirName);
+  const verdict = verifyBundleDir(dir);
+  if (!verdict.ok) throw new Error(`refusing to activate ${dirName}: ${verdict.why}`);
+
+  const current = activeBundleId(base);
+  if (current && current !== dirName) {
+    // remember what to roll back TO, before the swap rather than after it
+    const tmpPrev = `${previousLink(base)}.switching-${process.pid}`;
+    rmSync(tmpPrev, { force: true });
+    symlinkSync(current, tmpPrev);
+    renameSync(tmpPrev, previousLink(base));
+  }
+  const link = activeLink(base);
+  const tmp = `${link}.switching-${process.pid}`;
+  rmSync(tmp, { force: true });
+  symlinkSync(dirName, tmp);             // relative: the tree can be moved or mounted elsewhere
+  renameSync(tmp, link);                 // ATOMIC replace
+  return { ...verdict.identity, dir_name: dirName };
+}
+
+/** Roll the one activation record back to the bundle it pointed at before. */
+export function rollbackActivation(base) {
+  const prev = previousBundleId(base);
+  if (!prev) return null;
+  const verdict = verifyBundleDir(join(seedsDir(base), prev));
+  if (!verdict.ok) throw new Error(`refusing to roll back to ${prev}: ${verdict.why}`);
+  return activateBundle(base, prev);
+}
+
+const linkTarget = (p) => { try { return basename(readlinkSync(p)); } catch { return null; } };
+export const activeBundleId = (base) => linkTarget(activeLink(base));
+export const previousBundleId = (base) => linkTarget(previousLink(base));
+
+export class ActivationBroken extends Error {
+  constructor(link, why) {
+    super(`chaingate: the activation link ${link} exists but does not resolve: ${why}\n`
+      + '  A host that HAS activated a bundle must not read as "no seed configured": that turns a\n'
+      + '  broken link into silently disabled detection.\n'
+      + '  Fix: re-run `chaingate init --seed <bundle>`, or `chaingate update-seed --rollback`.');
+    this.name = 'ActivationBroken';
+    this.link = link;
+  }
+}
+
+/**
+ * RESOLVE ONCE. The caller pins this directory for the life of the process and reads every file
+ * through it, so a concurrent activation cannot make two opens follow different bundles.
+ *
+ * `null` means NO link — a host that has never activated a bundle, which is a legitimate state.
+ * A link that exists but does not resolve is a different thing entirely and throws: `existsSync`
+ * follows symlinks, so a dangling one answered "false" and the caller read that as "no seed",
+ * silently turning detection off on a host that had activated one. `lstat` asks about the link
+ * itself, which is the question being asked here.
+ */
+export function resolveActiveBundle(base) {
+  const link = activeLink(base);
+  let linkStat = null;
+  try { linkStat = lstatSync(link); } catch { return null; }      // genuinely absent
+  if (!linkStat.isSymbolicLink() && !linkStat.isDirectory()) {
+    throw new ActivationBroken(link, 'it is neither a symlink nor a directory');
+  }
+  let dir;
+  try { dir = realpathSync(link); } catch (err) {
+    throw new ActivationBroken(link, `${err.code || err.name}: ${err.message}`);
+  }
+  if (!existsSync(bundleFiles(dir).db)) {
+    throw new ActivationBroken(link, `it resolves to ${dir}, which holds no ${SEED_V3_FILENAME}`);
+  }
+  return { id: basename(dir), dir, files: bundleFiles(dir) };
+}
+
+/** Every installed bundle, newest first. Previous bundles are KEPT: rollback needs them. */
+export function listBundles(base) {
+  const dir = seedsDir(base);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((n) => ![ACTIVE_LINK, PREVIOUS_LINK].includes(n) && !n.startsWith('.')
+      && !n.includes('.damaged-'))
+    .map((id) => {
+      const v = verifyBundleDir(join(dir, id));
+      return { id, usable: v.ok, why: v.why, ...(v.identity || {}) };
+    })
+    .sort((a, b) => String(b.staged_at).localeCompare(String(a.staged_at)));
+}

@@ -1,0 +1,945 @@
+{
+ "_reduced": {
+  "note": "version objects are VERBATIM; parsing is per-version so this cannot change any expected value",
+  "versions_in_full_document": 482,
+  "full_document_sha256": "1c8e67bfd1640c19f1ea1f4ff1f0a16997ec055678add866edbc15a9710229a5",
+  "kept": 12
+ },
+ "name": "esbuild",
+ "dist-tags": {
+  "latest": "0.28.2"
+ },
+ "time": {
+  "created": "2017-11-26T05:52:58.272Z",
+  "modified": "2026-08-08T20:00:55.803Z",
+  "0.0.0": "2017-11-26T05:52:58.272Z",
+  "0.2.9": "2020-05-08T03:41:11.530Z",
+  "0.5.14": "2020-06-28T08:18:44.246Z",
+  "0.6.31": "2020-09-06T07:27:09.348Z",
+  "0.8.17": "2020-11-29T12:58:13.313Z",
+  "0.9.3": "2021-03-17T08:14:53.676Z",
+  "0.12.11": "2021-06-28T06:00:21.933Z",
+  "0.14.9": "2021-12-29T00:24:46.484Z",
+  "0.14.53": "2022-08-02T21:58:05.490Z",
+  "0.17.5": "2023-01-27T16:38:37.801Z",
+  "0.19.7": "2023-11-21T01:02:22.517Z",
+  "0.28.2": "2026-08-08T20:00:55.454Z"
+ },
+ "versions": {
+  "0.0.0": {
+   "name": "esbuild",
+   "version": "0.0.0",
+   "author": {
+    "name": "Evan Wallace"
+   },
+   "license": "ISC",
+   "_id": "esbuild@0.0.0",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "dist": {
+    "shasum": "9b5ddd4298b85f01eb2707d175cc07a2bcb4189b",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.0.0.tgz",
+    "integrity": "sha512-mFH2NQiWPz0p48pP+Uzy39rTrn+xUYOSFBDGbUhtqnpze4JagLA3DSxryGej/pw8TgckPcE6fjhk+8O9PBX8TA==",
+    "signatures": [
+     {
+      "sig": "MEQCIQDWBwRPpARHJ3yt3LF87LWuAvk6mVLRTocP2Ri2ZHBM/wIfBgacaUf3c7CEzZsrGZx7wDBAYZaOTASVL4MoztHRZw==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ]
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "_npmVersion": "5.5.1",
+   "description": "",
+   "directories": {},
+   "_nodeVersion": "8.9.0",
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild-0.0.0.tgz_1511675578207_0.2229293631389737",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.2.9": {
+   "name": "esbuild",
+   "version": "0.2.9",
+   "license": "MIT",
+   "_id": "esbuild@0.2.9",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "66659b4bcec1f298535838faaca70ae9bbc03114",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.2.9.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-tJt4j1rUE5NYAUaz3MxD/jdmJ0K1G9NQSPriCwP5xMOzGHYLjJyskv+HNHFY7rmvV3VmTKk3K3nb7IG3zx6qEg==",
+    "signatures": [
+     {
+      "sig": "MEQCIFQMVxP2UbC7pMTHIr3QZK5/PEhjDNBhDcVqmoUtWW89AiBhAJZjbmHk6m+Dk8lKezVMUnuliGW+L7fkdFfnviK7RQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 18773,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJetNTYCRA9TVsSAnZWagAAbVMQAKGaD0OlkY2yuW2j1bFQ\niAw2lB18kW5hHYE70TX+9c101bwNtlhTQAmj+OKvIvE9VTlrfUFOVNitgKBy\n/b2BBjyfamQLYwmBol8KWXSEkzMVFQQjEGzCpQn7TOdg5DQWkGxKkaSYz/kP\n5nIVH9iNVctvTL6KRCid5tMM9I/EHgbTTiAeh/p27sx2OqPMaHUaBfpB+qFP\n1VuDcttfQdtGxmqSr4aP++ka2+J+4xyyoB6e5G69AVDpOfAXaY5+Ty/ozf8I\n/Y5NWbjYQlq8BMvLkl9VmF6+ggNfMdgf4RDPLJHMfCfzXFTu/KyJ3Jr99iDO\nXweI2A5ztU8bl+pDcVSTM0px4TMja6C7AgnrT+OV+InnmkKXHvPrrnwjyK8L\nn8FyBTQT2Rs29xTle4wclfgW6Wbkg2LOvfPKWXs+lx5JVBvQYa9u9eMvJ9XF\nTTHS+upLZDjVKvjm3gewWOVAkygw0LwHydhQq2lfY/+4GubOhv7k5/VVOXkJ\nHZEBmXPJCbTgkK7qbpJk+yM9ySbZXWGTyx33YSvAuB3ng/1+xCg4QBPYBQni\nJ8XZc/zalW7UaEhQLuJ5j+me4yLQ6DPfFiw/pjf8kWdvLCIXbmHUZiHpkJq/\neJSycOjzUpNX2lQ+JxCEtzwBQKr5VA1JTgCL58vf7/S89MPI6C5bnysIzIgw\nbMWg\r\n=JL2S\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.14.5",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "12.16.2",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.2.9_1588909271404_0.3291621975731187",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.5.14": {
+   "name": "esbuild",
+   "version": "0.5.14",
+   "license": "MIT",
+   "_id": "esbuild@0.5.14",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "c7c900f728304136556db036840e638318e81cf1",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.5.14.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-0vVlkpR7XOsqzhUA6xgKzZ/vIXCi+sZZI7t/HG4vJ+nUqo77iEyg1KfIKuqk2kBJQ9/Ts7NXuK5/mfL2J0ZVzA==",
+    "signatures": [
+     {
+      "sig": "MEUCIEbx+ae1MKK7fSdqTimnIXDf1/fcBf1TpVQxFpMNt4iEAiEA+qwzB1RSHq6TA9IT4aS1O8NyUU9iAI4KDYg7UEibUFI=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 19983,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJe+FJkCRA9TVsSAnZWagAAQLYP/A9kEPPOIBPi46EvKzVw\nyzNSX6XCHi9tQf0l8Je/yuoA4vsPOz1vnXvYLxDmszjSC5B8oZ8Xkl6sO2PU\njb/0WG3OtQ6y8mpCbQl1MtOmcNuQT/JPd0qwxIo1Ixm+tziQHwDHWqSPgBar\nQPReRMn6/Sh5dVy1vVy6R/TPXs25CO2A/kIyricHfY8ZqMUmcIKysJN5/Ail\nSNMr9NhzptJki0JYOW1bZutLeqByXA5EYe5jcnXqG3r0nST8A07w+xgZIJ8n\n9wDaf3sgph39GYYasgOUn2F2oWWg/Ik38KQ0mHIE4PLVbohWwgNYjJzjP500\nJGe+v9Ry2ctYvMRTTYRXqfN9N05jod3HhhI2VyahO9wMQg2kIY2iemCHXvHr\nwANbDuMoVUkt/RL3hDXcagqazOfkl1b+3wCYEYYdvNpM/IY9Kn/ZN+5sS+9Q\nd2BKSgmo8vwhRQ4ZJGqjsgxv5cS7Hq/B9JnqBV9wEFbw3sg1gVlsxNxi95Oq\nJccz4yf1IsyoxCx+VQUo60S3rPn2FX/xcDKLRPSfNXTakoET0fpCQMelZ5zU\nbRJzUy4knybuo4/aa9KzFygVUEcTfycEsTWVdKx2jVovcK5s0jnjby4ySs95\ncZsrJb4qTOsiCFHzenZsytHHqiHMeMpzAKcCL0/iaVWm7f2VnSk3vYUpZK2a\n4oyE\r\n=w0k1\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.14.5",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "12.16.2",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.5.14_1593332324108_0.10552890905642487",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.6.31": {
+   "name": "esbuild",
+   "version": "0.6.31",
+   "license": "MIT",
+   "_id": "esbuild@0.6.31",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "ea0ae77064b1493db561744a24d68616a5b6a384",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.6.31.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-qZHtPFNAhtsLwh8FEnpA6F0ne4OiKAsHQ4HUrsshJN2LcBATiZXx7WklOWf4/4f0Z0CSL8qA+6TAOBe9szy6JQ==",
+    "signatures": [
+     {
+      "sig": "MEQCIHUnVW9z2k3MYRPBj5KDZlBMqgQ87okxjvYxEFqQPYt+AiBWdsjfVjWJnGhuj1Z+AV6LUAbZigW/5Hi1BoCPDawSOg==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 31226,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJfVI9NCRA9TVsSAnZWagAA43kP/jkoiHzMYK2/uzmHALSP\nW42+YkwCUkCDSkkNaG6de1egS5STIzpnSOKwIXdl1j4omDAAo9TQYqDROpZ0\n9ZA/g4RJi+rSohXhNFp7AI0RbvjuToXVASII7GBOs+vS7xDM/6rdM2aUElsE\n0e7THempUUAYz8irSac+Wt5ssnZWwwqqG5WSU2qNUa/CoKbE8VVJ3Tunw7KR\nagotkJr4F5CWCsFca36IB+vY5ySpnkn5joaOjkjXTjI/1xNNNXj6dqwkQPvi\nwMjjmNntE2bMoktPqE8SimoJMpuCtg1oersf3cVR4RUvakeAcm/1HjAlrdv6\nH8rqAcwQTvSwpjaKukBV/rYL/Ve/JuKIeTQxB/Z1yws1jmChAQz3aB43Tqw0\nC5w9/jII8S6sQAxWhtIatc8RvyBgvepPbhDYg6tz/Aq1rqhBZA4jJNHkfSOq\nNwMWA5GzTiSYKPPYODDFgFDYhNWL4qNP3kTpP0ofBLd06gN0lHwf3zzUrRXP\njxELI1gEMCo7vO6r/GHfrs6AlOjyHiDsvVRse80JsTImreHNXiIUXOoP7d9K\ns7S94pqceX0DxXe/4kV9wLe2g9fVUYJHziPslOxqDEKCrXOGydYChTBezaBH\ns5n7WE7MdYPRxi72HAh1a0ISuOjVMvmkQkjQ5fht8cMDThQU+E/T4H1PUAzt\nde0Z\r\n=tsgX\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.14.8",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "12.16.2",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.6.31_1599377229231_0.18659351459754503",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.8.17": {
+   "name": "esbuild",
+   "version": "0.8.17",
+   "license": "MIT",
+   "_id": "esbuild@0.8.17",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "1c16c6d5988dcfdcf27a7e1612b7fd05e1477c54",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.8.17.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-ReHap+Iyn5BQF0B8F3xrLwu+j57ri5uDUw2ej9XTPAuFDebYiWwRzBY4jhF610bklveXLbCGim/8/2wQKQlu1w==",
+    "signatures": [
+     {
+      "sig": "MEUCIQD4MhK4jdogLig5X+52d6bCRln3osqmn2SRmrc/z5j81QIgQNM79oqDn0akjM4g1bMOSAriMCvU/ju3ZmFF3VQKQJU=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 57252,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJfw5rlCRA9TVsSAnZWagAANKoP/R9N32QMTibR6v++gJS/\neZzgjUaBEH4SDM2c9P/ph+W6phzaYgbMISJPOxwsiFCT+bDBaSVajM4Qqc8O\ngpiJnSVkwsBVPFbuGOtCk+AeLP73WZR4pY9ev903nzqx4tF76VgRjr2wCR7y\nngYhkMhhadU/iJTkGyk/MZp7RNtT/YB+REJf+uKcoVJcoo1hFLNNh4d/CqjD\nUuV8Ra5R4DveuNXYTVSMobpNVPW5xDFEwvpYMq7+o8udrLLcrn5f15fK8EIE\nrv2RZX03LKf5PitIM37dPSxenXtHOa21pezoo+JM3ZHxArqgteZwf3nlSj1f\nMG/IqFOpl0Aw7r2SzRJciZQmWsECOIOZXaWnaUgChraTR0BI/NJupCZ7PNl9\n+kmqAfL26Bf3I3xYBKXblW4d4HbFIh1eEa64jwd2aKcpQDuyj3FnOHsPZ4Q5\nb0RbDxGHWjlPK/jog54lpekTjP+mf8WFSaUHTDZs0Jce7yBy3VmrnPKFrhyv\nJbeV9wQ0ZPW6WkGDihd10WJt8nujI3/HUBuaq9zWw7dQELtkCpTVS/t+BeQj\nuzH501cOyh5lvFu2g2U4vBPGGJ4nIjYQd0QHY6vh1D5enQM1KKb6umX6Y9K+\n4JBW2CR0GPXLJH+qAPX0ony07Q1rku91O+bZsgtbG3qd1j/GJ/2IJoIebk53\ncmdl\r\n=cvP8\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "6.14.8",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "15.2.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.8.17_1606654693160_0.727933930093078",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.9.3": {
+   "name": "esbuild",
+   "version": "0.9.3",
+   "license": "MIT",
+   "_id": "esbuild@0.9.3",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "09293a0b824159c6aa2488d1c6c22f57d8448f74",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.9.3.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-G8k0olucZp3LJ7I/p8y388t+IEyb2Y78nHrLeIxuqZqh6TYqDYP/B/7drAvYKfh83CGwKal9txVP+FTypsPJug==",
+    "signatures": [
+     {
+      "sig": "MEUCIQCokicFoAcGtl9hNN1z5v929Ja6N7P6t8tJS7pEimokdAIgHjSr8t+hBSl2j5DTnv1e5wYflzABpic6Ebm+uIPhils=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 70211,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJgUbp9CRA9TVsSAnZWagAAqMgP/Aj9BQlFWfuDwpSksyM+\nvzt/JlmdZsez/3Ch+r/vKCBqert6TC7mek3BTz/mJ1vvs3bpZQM875JTlrM9\n/X5TQazTPcB+qkPzkD65UnEZNARPf0v2KqF8pQlALez9de6KMEdD4KDQ7uQn\nIkPMFDfrOSxJebURJgOZsQWU0lZ4GforMsIom76Ms2Bj4x7eA+L9AHUcT9Z5\nxYblFdS+IR83y2QpGbJe5OzEAiI0cnzuvY9wJz+AXLWUcLtRfMmIkG+H3x2K\n387V2M7URpqC/m8lhiZyjPwGEBNMW7Nasbl5t+wRevzWz04yMB0hxWCibvYW\ne0ZRD3fVnhiAUtTjfi4S4S7LROX52ih4pFmwe+W47Rb4p6cFMPIGgRM2qfMK\nTWvMs5KJJWequw5uBHN0tSHhmHMEm+0DH2jBUd612UElh9xNmKPeCpov3PnD\nVp1/x3mv4YGvau2T/cVALfijDvu1n4O1VadDZQNVglVEqeLoev0iuoSjvAJz\ncPMmHk9d8l4YCCKwuuG7iVf3T+VQTSSMtw10/S91wPXZk+Cw2M1bidi14nP/\nHo15m15BSUJAhhXvaPEcpi4ywts1CkhYjzRDT871OYqIRBDFQC3LRLxWS7UT\n2fGOmTOt1OCuvBisOsDi754wrMuyQ/2bMkMRNx2JCTmqU2l5DTq+QNzULSFo\nBeDl\r\n=ZjFO\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "7.6.3",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "14.13.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.9.3_1615968893421_0.2704273504764487",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.12.11": {
+   "name": "esbuild",
+   "version": "0.12.11",
+   "license": "MIT",
+   "_id": "esbuild@0.12.11",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "ab24f78cabf481e7dc747e7db15f9c5091beaa14",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.12.11.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-h83GwI6lYOrnSv5hSY2i2XZ191v3haj2IGDzwrkfWHhuO/kVMX3RYjhwRNG9E5VSxVLPaUjTVwrv8HWLvhk2nQ==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCJneWlLzeMCZIUekARq+19pBjIsKJy4vC4yMcGNLGHvwIhAKbXEcuiNoQOMsp6Opv2aaRxR9ke12vBWp6JIun2ng/9",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 88455,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJg2WV2CRA9TVsSAnZWagAAwgEP/jVS8QtB9UeVSwe1r3CO\n+K8A3bQwH2scIwuuerwC2abvB+mkHVa2L23SUfnOw0JQ3PXy6HmvdhbfWFFU\npbv+knbbol52zCwz1oOI5EjicIh1HPtzras8VnWuM/RHrWOgcoeUi4DPujnq\ne3zGw0a1b3YGGB3E/f9pq+CIX9vT+tqC8yPE7rZNNwIUv577ekTPUgKlXX6A\nfgyj59PV65J+UgAlIiNNQkUKL7MjbINsmAlRYfFC7HheLmXomJbSL60+84T5\nc+JDJy+yz+M9EOGMd7YZ68rSq1ohpq1SpJuNN6PBjyJYWSBciQpF7dTIOMA4\nk1/04msCZq8YBaT7fpC2gAaRknxuESJsovm6R+Wm7XiRAUCfAISuThZ/6YU2\nkmvfprQ2AneUAr+Y6r+yXS7L+8w+EVOrIaw+pTFO5DoRUBS+j3NII8CZQ/CG\nPTeBk9BP0V9dZpYQRIu6+uB2xqXMnB0gxhvVkDSbQrYT16f2+MH8EoFZ6unT\nuJcQbWrDONH/lVARta8/bKkuL8TP3jMeyR7XJk//IbDfVRUQNJnZuldJ1zxo\n7WfpMANOwpYs3nt2skl20Pgz+GcpGTGLRdX+UtNsie8GOyeqEALQMOW2RFiO\nV8ISYYIujx39Javul4xpPZCmvP6883kw2gxRpktHgB3R09/ZF6ECsvW+Fl3Y\ntbYU\r\n=TdZl\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "7.13.0",
+   "description": "An extremely fast JavaScript bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "16.4.0",
+   "_hasShrinkwrap": false,
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.12.11_1624860021766_0.6245947780714853",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.14.9": {
+   "name": "esbuild",
+   "version": "0.14.9",
+   "license": "MIT",
+   "_id": "esbuild@0.14.9",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "f48bedfbdb21051b0d47e299bc2eb3110a2301d6",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.14.9.tgz",
+    "fileCount": 6,
+    "integrity": "sha512-uuT3kFsfUvzNW6I2RKKIHuCvutY/U9KFcAP6emUm98WvBhyhEr5vGkZLeN3r3vXfoykl+7xekAH8Ky09LXBd0Q==",
+    "signatures": [
+     {
+      "sig": "MEUCIQDYMtqlx8TETt+KnPoTYC91bu/sf9lWoqLwY63r7GzeJgIgBb7IGBQKnU5ZnLKTIB8THpbF+LPPNWUsIhDr2xB+jtg=",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 108396,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJhy6rOCRA9TVsSAnZWagAARRgP/2kISRMRyN5+OLBGBFt0\nQ+SMyPlQgaTvsRxbhR60W+hCP+Hru2/bLaqqQ0/sl1nFOL7lTALGPQSCeNqX\nS4wah9YQAE83N5DS8Vsy9O/k9ke+jjTlUjRLZu28Ac5LmYHTKSySUNDhBzBa\nywJXDVtRiqQ8S1kgZVf4ozYvaHb6wQS8RiHlhcRgmSgsJZQulpRL6kHAVNDn\nG5hqyd2E44xJiLMrzrTEk1Jvj+vILskjZ7l1GUWYEWypAbplNOHCVurNSrP/\ntRrFuycreDygSzhsi9VO9EVPWWweCszKzvq3AOBSbB5MRtWemLnL127DY3u1\nC9vtgbEiCz1J0qEOUgv9eYDzbIhw9DlPVduBQ6on9TxgtupRm6fjhxt8/BwX\nptJ5UtGZKdUqZy6UqpQBqAUTWxjkqhl9+9RkJ2KamzZCjYCCrrAsqvmaOmvs\nQq4bFQJAlmYM2ojlCYafuRremvP9YogXcv69bRbK6Ml9NDKClDJ6jRJ8SVCg\n4Z5H7eZJGgi0bd0SjdkDaFdMugwcC7kkNQqhhzD7elMXLB9+MhSEhrvvr3Kn\n7cIBZgF61Ufaqq+GYIrWCdMKxzi9VFT2AA6Js0TnXpunrWznqZlEO+UtmtrM\n2N66jzoJCbiyplCEFSMir4Jm5ZVH6qpw2AXNfwTh73OJWsW6paH19MILM94P\nbUPq\r\n=V2bU\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "gitHead": "59e65e0d3bdcc7457a4940787cdbc0abf8117c42",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.1.0",
+   "description": "An extremely fast JavaScript and CSS bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "16.13.0",
+   "dependencies": {
+    "esbuild-linux-32": "0.14.9",
+    "esbuild-linux-64": "0.14.9",
+    "esbuild-sunos-64": "0.14.9",
+    "esbuild-darwin-64": "0.14.9",
+    "esbuild-linux-arm": "0.14.9",
+    "esbuild-netbsd-64": "0.14.9",
+    "esbuild-freebsd-64": "0.14.9",
+    "esbuild-openbsd-64": "0.14.9",
+    "esbuild-windows-32": "0.14.9",
+    "esbuild-windows-64": "0.14.9",
+    "esbuild-linux-arm64": "0.14.9",
+    "esbuild-linux-s390x": "0.14.9",
+    "esbuild-darwin-arm64": "0.14.9",
+    "esbuild-android-arm64": "0.14.9",
+    "esbuild-freebsd-arm64": "0.14.9",
+    "esbuild-linux-ppc64le": "0.14.9",
+    "esbuild-windows-arm64": "0.14.9",
+    "esbuild-linux-mips64le": "0.14.9"
+   },
+   "_hasShrinkwrap": false,
+   "optionalDependencies": {
+    "esbuild-linux-32": "0.14.9",
+    "esbuild-linux-64": "0.14.9",
+    "esbuild-sunos-64": "0.14.9",
+    "esbuild-darwin-64": "0.14.9",
+    "esbuild-linux-arm": "0.14.9",
+    "esbuild-netbsd-64": "0.14.9",
+    "esbuild-freebsd-64": "0.14.9",
+    "esbuild-openbsd-64": "0.14.9",
+    "esbuild-windows-32": "0.14.9",
+    "esbuild-windows-64": "0.14.9",
+    "esbuild-linux-arm64": "0.14.9",
+    "esbuild-linux-s390x": "0.14.9",
+    "esbuild-darwin-arm64": "0.14.9",
+    "esbuild-android-arm64": "0.14.9",
+    "esbuild-freebsd-arm64": "0.14.9",
+    "esbuild-linux-ppc64le": "0.14.9",
+    "esbuild-windows-arm64": "0.14.9",
+    "esbuild-linux-mips64le": "0.14.9"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.14.9_1640737486352_0.3120033885241691",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.14.53": {
+   "name": "esbuild",
+   "version": "0.14.53",
+   "license": "MIT",
+   "_id": "esbuild@0.14.53",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "20b1007f686e8584f2a01a1bec5a37aac9498ce4",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.14.53.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-ohO33pUBQ64q6mmheX1mZ8mIXj8ivQY/L4oVuAshr+aJI+zLl+amrp3EodrUNDNYVrKJXGPfIHFGhO8slGRjuw==",
+    "signatures": [
+     {
+      "sig": "MEQCIA0Bhuikthm/qKxnWPinJNRXcDeRizZvXFkHlfy3hdqSAiBrq27zt8Pgb38SgNNZ4+LO7DyhCpDKu+nDiuFYDkO4ig==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 119589,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJi6Z3tACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmqGEQ//d7rejsfZIFjqp1JEVeGqs9in3mDqSc8ALqJNCdQAIo/VNI3M\r\nl0noX21T/ObfljGbnnfulZCZvlVBtjo4YIE85i2X3tE7tAMGuNpIY9Y0LrlZ\r\nf4b/DWaad6O4yDXqPZl70Q7Ih7U9k+xLYjtNWLp1zhP+Isme2ZR4yLDuhN3m\r\nT4HhNKd6PvxPMECHrkxI0WN3H3fCjIOQfb7LG0q8Mp66+pWfC7XQk4bUhPvH\r\nDYxY82SI7UzLs4DC5dONtP5jqokq0g0/ZHerTRuCM1qxs5RiaVVLhLRFXZJG\r\n2SjdRxmGSXj+U96qheCJq2q2dhL2E+iGHBvy367DGjqoho29YWSqgtG9wwSa\r\nGJpJDRLQvo0K3KVP0FxNhZU0OWm5I6wbfjOoIMBebQFE81FRUxuSSUVu0deJ\r\nufKwsh33jW+duuKfLnnOkiaJPqCM39e1kWESeKmhnVy30iyiEE20W3plkRTa\r\nC3R5imQC30Rp0GjWnMzaHDPdsTiM+zgbEDsm+wNgTSmPyxpd6iY8blwij0R0\r\nmGAIK9Shk27zWEP/oCsu6zv3YUHI+nwKYTWzYHVToF55LTSyl5ayT5OWg5OA\r\n3PdyUW3AeFaT1bA31xtV3BpjaGAzpS5OQOZs9IJX6WbfGaM4SW9VbQrVEGiI\r\nrMJErqa42QJqG+cuK/1EivmHkzKQx7j+oEc=\r\n=PH6p\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "engines": {
+    "node": ">=12"
+   },
+   "gitHead": "4e65c73fcb05846fc5b1f6451849f88d0fb0b6cf",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.1.0",
+   "description": "An extremely fast JavaScript and CSS bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "16.13.0",
+   "dependencies": {
+    "esbuild-linux-32": "0.14.53",
+    "esbuild-linux-64": "0.14.53",
+    "esbuild-sunos-64": "0.14.53",
+    "esbuild-darwin-64": "0.14.53",
+    "esbuild-linux-arm": "0.14.53",
+    "esbuild-netbsd-64": "0.14.53",
+    "esbuild-android-64": "0.14.53",
+    "esbuild-freebsd-64": "0.14.53",
+    "esbuild-openbsd-64": "0.14.53",
+    "esbuild-windows-32": "0.14.53",
+    "esbuild-windows-64": "0.14.53",
+    "esbuild-linux-arm64": "0.14.53",
+    "esbuild-linux-s390x": "0.14.53",
+    "esbuild-darwin-arm64": "0.14.53",
+    "esbuild-android-arm64": "0.14.53",
+    "esbuild-freebsd-arm64": "0.14.53",
+    "esbuild-linux-ppc64le": "0.14.53",
+    "esbuild-linux-riscv64": "0.14.53",
+    "esbuild-windows-arm64": "0.14.53",
+    "@esbuild/linux-loong64": "0.14.53",
+    "esbuild-linux-mips64le": "0.14.53"
+   },
+   "_hasShrinkwrap": false,
+   "optionalDependencies": {
+    "esbuild-linux-32": "0.14.53",
+    "esbuild-linux-64": "0.14.53",
+    "esbuild-sunos-64": "0.14.53",
+    "esbuild-darwin-64": "0.14.53",
+    "esbuild-linux-arm": "0.14.53",
+    "esbuild-netbsd-64": "0.14.53",
+    "esbuild-android-64": "0.14.53",
+    "esbuild-freebsd-64": "0.14.53",
+    "esbuild-openbsd-64": "0.14.53",
+    "esbuild-windows-32": "0.14.53",
+    "esbuild-windows-64": "0.14.53",
+    "esbuild-linux-arm64": "0.14.53",
+    "esbuild-linux-s390x": "0.14.53",
+    "esbuild-darwin-arm64": "0.14.53",
+    "esbuild-android-arm64": "0.14.53",
+    "esbuild-freebsd-arm64": "0.14.53",
+    "esbuild-linux-ppc64le": "0.14.53",
+    "esbuild-linux-riscv64": "0.14.53",
+    "esbuild-windows-arm64": "0.14.53",
+    "@esbuild/linux-loong64": "0.14.53",
+    "esbuild-linux-mips64le": "0.14.53"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.14.53_1659477485314_0.6696262090280689",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.17.5": {
+   "name": "esbuild",
+   "version": "0.17.5",
+   "license": "MIT",
+   "_id": "esbuild@0.17.5",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    },
+    {
+     "name": "esbuild",
+     "email": "evan.exe+esbuild@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "cd76d75700d49ac050ad9eedfbed777bd6a9d930",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.17.5.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-Bu6WLCc9NMsNoMJUjGl3yBzTjVLXdysMltxQWiLAypP+/vQrf+3L1Xe8fCXzxaECus2cEJ9M7pk4yKatEwQMqQ==",
+    "signatures": [
+     {
+      "sig": "MEQCIHc7H065JpO6bE3CoFEUz3bJ3PuS53uqGn/FN5Ksgv2TAiBycL+3jizE5ENK8ngDKIxhnb7SaUK57AeXtbL+Dop0aQ==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 129705,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJj0/4NACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmqhIg//dMUNKgxyn3tnUf7XM3kI4RkUnDX+NftTu29cLyiONagriUi3\r\nrNQqnO4cNMDyfWmQ9Z7nCh1MZnuGKInbpe588zos3Sk1xezLU6+GqW4fz0Uo\r\nbL/MUISNfoW6sOBBnrwAW4HZCD1lcsm8ExUUbZa7UkMe8n07wauDAkCky67l\r\nohQjONwwayrtBgF8bHrUgK5GFVGJn48gmovL5PsDpLSWrU4fjQEeQXey0eUE\r\nw5bWaVLdMXVMag263IC/rpCytyZwM+CLGxIJwLv/nKBaKYUWpKDbqngEOiIN\r\nqcx06trxkZgGPCT5/YYYinIWIltewfPgqsZzOeG3iMrK4OLpz4vvq5+iWzV/\r\nBRI7JK+EMNqXRmUew7YqBVif81VfImkpO+wqaUOHh5GlXJIGA7VZg5ZgUrPk\r\n42Z4YFNnTOhQZfaFzalmWts+tOl0LMY48s9P4HqOdNxNpuSmqlVWyCLj/fL+\r\nuwe9bJK8C0KnyWqaBoWyr66BBwcy5nmTkAUf5w0JEgZb8kg6CSV9Dui5T3KD\r\nwH7cDgKKMhdDKhTo6OfZOhed3/CTnVxlQJu1xQYEJX8E4MyYD6+oUKK2hr0C\r\n14IPRW8HK7IwImMVD5gzwRw9BfX7GPveztCTYlJ4g1azkUNmSHGxFDm/Gg9A\r\nUOUwxc+z7fz/OnWfoGdDM411CqjClRvIDfA=\r\n=z1KR\r\n-----END PGP SIGNATURE-----\r\n"
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "engines": {
+    "node": ">=12"
+   },
+   "gitHead": "a8b660d85a0a57087a0f188857519f194f52b84c",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "8.1.0",
+   "description": "An extremely fast JavaScript and CSS bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "16.13.0",
+   "dependencies": {
+    "@esbuild/linux-arm": "0.17.5",
+    "@esbuild/linux-x64": "0.17.5",
+    "@esbuild/sunos-x64": "0.17.5",
+    "@esbuild/win32-x64": "0.17.5",
+    "@esbuild/darwin-x64": "0.17.5",
+    "@esbuild/linux-ia32": "0.17.5",
+    "@esbuild/netbsd-x64": "0.17.5",
+    "@esbuild/win32-ia32": "0.17.5",
+    "@esbuild/android-arm": "0.17.5",
+    "@esbuild/android-x64": "0.17.5",
+    "@esbuild/freebsd-x64": "0.17.5",
+    "@esbuild/linux-arm64": "0.17.5",
+    "@esbuild/linux-ppc64": "0.17.5",
+    "@esbuild/linux-s390x": "0.17.5",
+    "@esbuild/openbsd-x64": "0.17.5",
+    "@esbuild/win32-arm64": "0.17.5",
+    "@esbuild/darwin-arm64": "0.17.5",
+    "@esbuild/android-arm64": "0.17.5",
+    "@esbuild/freebsd-arm64": "0.17.5",
+    "@esbuild/linux-loong64": "0.17.5",
+    "@esbuild/linux-riscv64": "0.17.5",
+    "@esbuild/linux-mips64el": "0.17.5"
+   },
+   "_hasShrinkwrap": false,
+   "optionalDependencies": {
+    "@esbuild/linux-arm": "0.17.5",
+    "@esbuild/linux-x64": "0.17.5",
+    "@esbuild/sunos-x64": "0.17.5",
+    "@esbuild/win32-x64": "0.17.5",
+    "@esbuild/darwin-x64": "0.17.5",
+    "@esbuild/linux-ia32": "0.17.5",
+    "@esbuild/netbsd-x64": "0.17.5",
+    "@esbuild/win32-ia32": "0.17.5",
+    "@esbuild/android-arm": "0.17.5",
+    "@esbuild/android-x64": "0.17.5",
+    "@esbuild/freebsd-x64": "0.17.5",
+    "@esbuild/linux-arm64": "0.17.5",
+    "@esbuild/linux-ppc64": "0.17.5",
+    "@esbuild/linux-s390x": "0.17.5",
+    "@esbuild/openbsd-x64": "0.17.5",
+    "@esbuild/win32-arm64": "0.17.5",
+    "@esbuild/darwin-arm64": "0.17.5",
+    "@esbuild/android-arm64": "0.17.5",
+    "@esbuild/freebsd-arm64": "0.17.5",
+    "@esbuild/linux-loong64": "0.17.5",
+    "@esbuild/linux-riscv64": "0.17.5",
+    "@esbuild/linux-mips64el": "0.17.5"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.17.5_1674837517570_0.0800578688942919",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.19.7": {
+   "name": "esbuild",
+   "version": "0.19.7",
+   "license": "MIT",
+   "_id": "esbuild@0.19.7",
+   "maintainers": [
+    {
+     "name": "evanw",
+     "email": "evan.exe@gmail.com"
+    },
+    {
+     "name": "esbuild",
+     "email": "evan.exe+esbuild@gmail.com"
+    }
+   ],
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "dist": {
+    "shasum": "b9a7235097b81278dcf090e2532ed13c95a2ee84",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.19.7.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-6brbTZVqxhqgbpqBR5MzErImcpA0SQdoKOkcWK/U30HtQxnokIpG3TX2r0IJqbFUzqLjhU/zC1S5ndgakObVCQ==",
+    "signatures": [
+     {
+      "sig": "MEQCICi3CpNDQE9hTYF6I4p6YcVw+ZVkS6MLn1vCHcv3qIeDAiBSygeWS8lNr/ovlbzi8QmD+K+1yJ9bDbOewP/WbHpIZA==",
+      "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+     }
+    ],
+    "unpackedSize": 132099
+   },
+   "main": "lib/main.js",
+   "types": "lib/main.d.ts",
+   "engines": {
+    "node": ">=12"
+   },
+   "gitHead": "a7773b340bb216d053df91b7479b5aa2a152b0de",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "_npmUser": {
+    "name": "evanw",
+    "email": "evan.exe@gmail.com"
+   },
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "9.5.1",
+   "description": "An extremely fast JavaScript and CSS bundler and minifier.",
+   "directories": {},
+   "_nodeVersion": "18.16.1",
+   "dependencies": {
+    "@esbuild/linux-arm": "0.19.7",
+    "@esbuild/linux-x64": "0.19.7",
+    "@esbuild/sunos-x64": "0.19.7",
+    "@esbuild/win32-x64": "0.19.7",
+    "@esbuild/darwin-x64": "0.19.7",
+    "@esbuild/linux-ia32": "0.19.7",
+    "@esbuild/netbsd-x64": "0.19.7",
+    "@esbuild/win32-ia32": "0.19.7",
+    "@esbuild/android-arm": "0.19.7",
+    "@esbuild/android-x64": "0.19.7",
+    "@esbuild/freebsd-x64": "0.19.7",
+    "@esbuild/linux-arm64": "0.19.7",
+    "@esbuild/linux-ppc64": "0.19.7",
+    "@esbuild/linux-s390x": "0.19.7",
+    "@esbuild/openbsd-x64": "0.19.7",
+    "@esbuild/win32-arm64": "0.19.7",
+    "@esbuild/darwin-arm64": "0.19.7",
+    "@esbuild/android-arm64": "0.19.7",
+    "@esbuild/freebsd-arm64": "0.19.7",
+    "@esbuild/linux-loong64": "0.19.7",
+    "@esbuild/linux-riscv64": "0.19.7",
+    "@esbuild/linux-mips64el": "0.19.7"
+   },
+   "_hasShrinkwrap": false,
+   "optionalDependencies": {
+    "@esbuild/linux-arm": "0.19.7",
+    "@esbuild/linux-x64": "0.19.7",
+    "@esbuild/sunos-x64": "0.19.7",
+    "@esbuild/win32-x64": "0.19.7",
+    "@esbuild/darwin-x64": "0.19.7",
+    "@esbuild/linux-ia32": "0.19.7",
+    "@esbuild/netbsd-x64": "0.19.7",
+    "@esbuild/win32-ia32": "0.19.7",
+    "@esbuild/android-arm": "0.19.7",
+    "@esbuild/android-x64": "0.19.7",
+    "@esbuild/freebsd-x64": "0.19.7",
+    "@esbuild/linux-arm64": "0.19.7",
+    "@esbuild/linux-ppc64": "0.19.7",
+    "@esbuild/linux-s390x": "0.19.7",
+    "@esbuild/openbsd-x64": "0.19.7",
+    "@esbuild/win32-arm64": "0.19.7",
+    "@esbuild/darwin-arm64": "0.19.7",
+    "@esbuild/android-arm64": "0.19.7",
+    "@esbuild/freebsd-arm64": "0.19.7",
+    "@esbuild/linux-loong64": "0.19.7",
+    "@esbuild/linux-riscv64": "0.19.7",
+    "@esbuild/linux-mips64el": "0.19.7"
+   },
+   "_npmOperationalInternal": {
+    "tmp": "tmp/esbuild_0.19.7_1700528542320_0.7431625519982739",
+    "host": "s3://npm-registry-packages"
+   }
+  },
+  "0.28.2": {
+   "_id": "esbuild@0.28.2",
+   "bin": {
+    "esbuild": "bin/esbuild"
+   },
+   "bugs": {
+    "url": "https://github.com/evanw/esbuild/issues"
+   },
+   "dist": {
+    "shasum": "0f43bd1bad955b72d24e2261e3abe5957ccf0816",
+    "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.28.2.tgz",
+    "fileCount": 7,
+    "integrity": "sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==",
+    "signatures": [
+     {
+      "sig": "MEYCIQCUNxdzUXI/rpHaMMcf/skpuDBkNL7aLEXFFc0dex0NCAIhAMDKoRFFyK2uR0qEIAoCe4pdRrJ3ld2ZCoHNyNuX6ju7",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     },
+     {
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+      "sig": "MEUCIQC8VkNobVdJrr03U9huHI7n2VhWQ2shvrTvNYB1Mx8gigIgFkrOTUauuovxR8qg94n81hYvSw6PI2qEQkNiqHkmjcg="
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/esbuild@0.28.2",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 147361
+   },
+   "main": "lib/main.js",
+   "name": "esbuild",
+   "types": "lib/main.d.ts",
+   "engines": {
+    "node": ">=18"
+   },
+   "gitHead": "609683d892977362a0f99026cb74b96263d728a9",
+   "license": "MIT",
+   "scripts": {
+    "postinstall": "node install.js"
+   },
+   "version": "0.28.2",
+   "_npmUser": {
+    "name": "GitHub Actions",
+    "email": "npm-oidc-no-reply@github.com",
+    "trustedPublisher": {
+     "id": "github",
+     "oidcConfigId": "oidc:b0cf120c-134e-4e78-a95a-6cbbb5de631f"
+    }
+   },
+   "homepage": "https://github.com/evanw/esbuild#readme",
+   "repository": {
+    "url": "git+https://github.com/evanw/esbuild.git",
+    "type": "git"
+   },
+   "_npmVersion": "11.5.1",
+   "description": "An extremely fast JavaScript and CSS bundler and minifier.",
+   "directories": {},
+   "maintainers": [
+    {
+     "name": "esbuild",
+     "email": "evan.exe+esbuild@gmail.com"
+    }
+   ],
+   "_nodeVersion": "24.18.0",
+   "_hasShrinkwrap": false,
+   "esbuild.binaryHashes": {
+    "@esbuild/aix-ppc64/bin/esbuild": "6de148b932fc5d3b28a97f9f0bc4de8e2b47db478b8ad679e0eaa6b96e00420d",
+    "@esbuild/linux-arm/bin/esbuild": "d88f751b22095b2f3b42c8c2e8a3f36fabc1705438c5d6e78366b681f8b4e7a5",
+    "@esbuild/linux-x64/bin/esbuild": "e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100",
+    "@esbuild/sunos-x64/bin/esbuild": "01a3bd9183631ca749f34d15601ea21ba6834614184c5c859f99d54bd683203d",
+    "@esbuild/win32-x64/esbuild.exe": "c7bee37877d0aa6a046e52783fa0a2cf1a9ce5579d68bb3083bda99d4bff18ef",
+    "@esbuild/darwin-x64/bin/esbuild": "7fe5c9c905fff0a05d92db98929434ab4d3b6dd92d7a7688922db74380c75df3",
+    "@esbuild/linux-ia32/bin/esbuild": "b1e2d87d79f9a2baa0d3043cdf0dc6716f9f2eea66c58f47588641fd6019f36f",
+    "@esbuild/netbsd-x64/bin/esbuild": "f9d0e59d2b404559e3a0c958164d96960ebf0e04583b878b1d64d8f1c3698fcc",
+    "@esbuild/win32-ia32/esbuild.exe": "b2e62af5c17e00939583be0a0762fdc469f352869a617edc91371b00454c76f0",
+    "@esbuild/freebsd-x64/bin/esbuild": "8a237e222bee0e50556e7b00d83ec2ff43721bf72f19811a5f0ee56f1d40177c",
+    "@esbuild/linux-arm64/bin/esbuild": "90bd269553d258e80b19e3ccab4f98f0831f87442a2f056510ce24fd1b425fc2",
+    "@esbuild/linux-ppc64/bin/esbuild": "c30df60d09bb0ba4853d7b06e244ce966890d61ce60cadd9b22335f6379c316a",
+    "@esbuild/linux-s390x/bin/esbuild": "bbbc1f92a76a5ca6e2976065222e42b02797363a1f119490dda315f74047741f",
+    "@esbuild/openbsd-x64/bin/esbuild": "720bbe607736716f2ecd37962436c5589d801966e868a2ae4e0e7e62d1e4e887",
+    "@esbuild/win32-arm64/esbuild.exe": "530fb3933af14eefe85dfd06502f826e6ef60fdf4e75228ea67c696db312ecb1",
+    "@esbuild/darwin-arm64/bin/esbuild": "10b6243df618d374bb2d5c9cfbe7052e1405f6aa4e53a6164f11a91b9f2e1384",
+    "@esbuild/netbsd-arm64/bin/esbuild": "62548519d7ae875d060aa8c94bfb8ed38ef191671a5173d9f626bdb6b7516970",
+    "@esbuild/android-arm64/bin/esbuild": "84efbbd2cbf21bbfec2aaf304bee79cb2a4a05fe2ea7b861a87f7b8f213ac27d",
+    "@esbuild/freebsd-arm64/bin/esbuild": "6aba108a68b93064e491bfb1ecfa28843b4d4e504dff0627f53f68f6bb015c01",
+    "@esbuild/linux-loong64/bin/esbuild": "55a66f9854d6798f36b2b5471db74f2e552481887ea14d8bda1634a512383a43",
+    "@esbuild/linux-riscv64/bin/esbuild": "36bdcdc8230eef385838cdfeb0d9a1565cbe4b9ace30097a511d77e894de36a1",
+    "@esbuild/openbsd-arm64/bin/esbuild": "e10c45a0b62456632da41df058d7626b2e7cfe710780a2dc7f9f84681753f3aa",
+    "@esbuild/linux-mips64el/bin/esbuild": "6bf7921a3af4a801051e056d85c360fe24bb446f488ef3da25f0b8e5cf973db1"
+   },
+   "optionalDependencies": {
+    "@esbuild/aix-ppc64": "0.28.2",
+    "@esbuild/linux-arm": "0.28.2",
+    "@esbuild/linux-x64": "0.28.2",
+    "@esbuild/sunos-x64": "0.28.2",
+    "@esbuild/win32-x64": "0.28.2",
+    "@esbuild/darwin-x64": "0.28.2",
+    "@esbuild/linux-ia32": "0.28.2",
+    "@esbuild/netbsd-x64": "0.28.2",
+    "@esbuild/win32-ia32": "0.28.2",
+    "@esbuild/android-arm": "0.28.2",
+    "@esbuild/android-x64": "0.28.2",
+    "@esbuild/freebsd-x64": "0.28.2",
+    "@esbuild/linux-arm64": "0.28.2",
+    "@esbuild/linux-ppc64": "0.28.2",
+    "@esbuild/linux-s390x": "0.28.2",
+    "@esbuild/openbsd-x64": "0.28.2",
+    "@esbuild/win32-arm64": "0.28.2",
+    "@esbuild/darwin-arm64": "0.28.2",
+    "@esbuild/netbsd-arm64": "0.28.2",
+    "@esbuild/android-arm64": "0.28.2",
+    "@esbuild/freebsd-arm64": "0.28.2",
+    "@esbuild/linux-loong64": "0.28.2",
+    "@esbuild/linux-riscv64": "0.28.2",
+    "@esbuild/openbsd-arm64": "0.28.2",
+    "@esbuild/linux-mips64el": "0.28.2",
+    "@esbuild/openharmony-arm64": "0.28.2"
+   },
+   "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages-npm-production",
+    "tmp": "tmp/esbuild_0.28.2_1786219255372_0.9596530484521715"
+   }
+  }
+ }
+}

@@ -7,14 +7,124 @@ import { verifySeed as defaultVerifySeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity as defaultAssertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
+import { isV3Seed, stageBundle, activateBundle, rollbackActivation, activeBundleId,
+  previousBundleId, verifyBundleDir, seedsDir } from '../seed-bundle.js';
+import { readConfigStrict } from '../../config-store.js';
 
 function parseArgs(args) {
-  const opts = { scope: 'user', force: false };
+  const opts = { scope: 'user', force: false, seedPath: null, rollback: false,
+    unsignedDev: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scope' && args[i + 1]) opts.scope = args[++i];
     if (args[i] === '--force') opts.force = true;
+    if (args[i] === '--seed' && args[i + 1]) opts.seedPath = args[++i];
+    if (args[i] === '--rollback') opts.rollback = true;
+    // Accepting an unsigned seed is its OWN decision, named. `--force` is a generic "I know what
+    // I am doing" for ordinary obstacles and must not double as "skip authentication".
+    if (args[i] === '--unsigned-development') opts.unsignedDev = true;
   }
   return opts;
+}
+
+/**
+ * Replace the v3 detection seed, or put the previous one back.
+ *
+ * SAFE means three things here, none of which the v1 path needed:
+ *   * the incoming bundle is verified and confirmed to BE a v3 seed before anything is replaced;
+ *   * the swap is a rename, so a proxy starting concurrently sees the old file or the new one and
+ *     never a half-written one, and the previous seed is kept for `--rollback`;
+ *   * the WITNESS DATABASE IS NOT TOUCHED. Runtime state — baselines, decisions, overrides — lives
+ *     in a different file on purpose, and replacing evidence must not discard the record of what was
+ *     decided under the evidence that came before.
+ */
+export async function updateSeedV3(opts, paths, deps) {
+  // Which bundle is active is ONE record — the `seeds/active` link. Nothing here rewrites a second
+  // copy of that fact, so an interrupted update leaves the previously active bundle active and a
+  // rollback is a swap back rather than a restore of files.
+  if (opts.rollback) {
+    const prev = previousBundleId(paths.base);
+    if (!prev) {
+      console.error(fmt.fail('No previous bundle recorded to roll back to.'));
+      return EXIT.ERROR;
+    }
+    let identity;
+    try {
+      identity = rollbackActivation(paths.base);
+    } catch (err) {
+      console.error(fmt.fail(err.message));
+      console.error('  The currently active bundle is unchanged.');
+      return EXIT.ERROR;
+    }
+    console.log(fmt.ok(`Rolled back to bundle ${identity.bundle_id}`));
+    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}… trust ${identity.trust}`));
+    console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
+    console.log(fmt.dim('  Witness state untouched: decisions taken under it are still recorded.'));
+    return EXIT.OK;
+  }
+
+  const sha256Path = `${opts.seedPath}.sha256`;
+  const sigPath = `${opts.seedPath}.sig`;
+  const hasSig = existsSync(sigPath);
+  const activeId = activeBundleId(paths.base);
+  const activeIdentity = activeId
+    ? (verifyBundleDir(join(seedsDir(paths.base), activeId)).identity || {}) : {};
+  const previousTrust = activeIdentity.trust || 'authenticated';
+
+  let trust;
+  if (hasSig) {
+    try {
+      await deps.verifySeed(opts.seedPath, sha256Path, sigPath);
+    } catch (err) {
+      console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+      console.error('  The active bundle is unchanged.');
+      return EXIT.ERROR;
+    }
+    trust = 'authenticated';
+  } else if (opts.unsignedDev) {
+    trust = 'unsigned-development';
+    console.log(fmt.warn('Incoming bundle has no signature; installing as unsigned-development'));
+  } else {
+    console.error(fmt.fail('Incoming v3 seed has no signature.'));
+    if (opts.force) {
+      console.error('  --force does not skip authentication: it is a generic override and this is');
+      console.error('  a trust decision. Pass --unsigned-development to say so explicitly.');
+    } else {
+      console.error(`  The active bundle is ${previousTrust}. Pass --unsigned-development to`);
+      console.error('  accept an unsigned one, which is recorded in the bundle as such.');
+    }
+    console.error('  The active bundle is unchanged.');
+    return EXIT.ERROR;
+  }
+
+  let installed;
+  try {
+    installed = stageBundle({ dbPath: opts.seedPath,
+      sha256Path: existsSync(sha256Path) ? sha256Path : null,
+      sigPath: hasSig ? sigPath : null }, paths.base, { trust });
+  } catch (err) {
+    console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
+    console.error('  Nothing was installed or activated; the active bundle is unchanged.');
+    return EXIT.ERROR;
+  }
+
+  let identity;
+  try {
+    identity = activateBundle(paths.base, installed.dir_name);
+  } catch (err) {
+    console.error(fmt.fail(`activation refused: ${err.message}`));
+    console.error('  The previously active bundle is still active.');
+    return EXIT.ERROR;
+  }
+
+  console.log(fmt.ok(`Bundle ${identity.bundle_id} active`
+    + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
+  console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}… `
+    + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}… trust ${identity.trust}`));
+  console.log(fmt.dim(`  Previous bundle ${activeId || '(none)'} kept for `
+    + '`chaingate update-seed --rollback`.'));
+  console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
+  console.log(fmt.dim('  Witness state untouched.'));
+  return EXIT.OK;
 }
 
 export default async function updateSeed(
@@ -28,6 +138,30 @@ export default async function updateSeed(
 ) {
   const opts = parseArgs(args);
   const paths = deps.resolvePaths(opts.scope);
+
+  // The v3 detection seed has its own lifecycle: it is not the witness database, and replacing it
+  // must not touch runtime state. `--rollback`, or `--seed <bundle>` naming a v3 seed, take it.
+  if (opts.rollback || (opts.seedPath && isV3Seed(opts.seedPath))) {
+    return updateSeedV3(opts, paths, deps);
+  }
+
+  // AUTOMATIC v3 SEED DOWNLOAD IS NOT AVAILABLE. Without --seed this command downloads the LEGACY
+  // witness bundle (seed-v2.x) and swaps it into witness.db; it never touches the active v3 detection
+  // bundle. On a host whose detection runs from a v3 bundle that would report "Seed updated" while
+  // detection stayed exactly as it was. Refuse before downloading anything, and change nothing:
+  // restart (`chaingate init`), a local update (`--seed <bundle>`) and `--rollback` are unaffected.
+  if (!opts.seedPath) {
+    let v3Active = null;
+    try { v3Active = activeBundleId(paths.base); } catch { v3Active = '(a v3 activation record that does not resolve)'; }
+    if (v3Active) {
+      console.error(fmt.fail('Automatic download of v3 detection seeds is not available.'));
+      console.error(`  This host's detection runs from v3 bundle ${v3Active}. Without --seed, update-seed would only`);
+      console.error('  replace the legacy witness database and leave detection unchanged, so it refuses. Nothing was changed.');
+      console.error('  To install a v3 bundle you have:   chaingate update-seed --seed <bundle>/chaingate-seed.db [--unsigned-development]');
+      console.error('  To return to the previous bundle:  chaingate update-seed --rollback');
+      return EXIT.ERROR;
+    }
+  }
 
   if (!existsSync(paths.witnessDb)) {
     console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));

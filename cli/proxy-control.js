@@ -97,6 +97,75 @@ export function waitForPort(port, host = '127.0.0.1', timeoutMs = 5000) {
 }
 
 /**
+ * Wait for a freshly spawned proxy to become reachable.
+ *
+ * A FLAT deadline is wrong here. The proxy opens and validates the seed BEFORE it listens, and a
+ * real seed is gigabytes: the 5 s that was ample for a fixture expires long before a production
+ * bundle is open, so `init` declared a healthy start-up dead, refused to redirect .npmrc and exited
+ * non-zero while the proxy came up seconds later. Waiting longer by itself is no better — it just
+ * trades a false failure for a slow one when the process really is dead.
+ *
+ * So the bound is the CHILD ITSELF: keep waiting while the process is alive, stop the moment it is
+ * not, and report which of the two happened. `ceilingMs` remains only as a backstop against a
+ * process that is alive but permanently wedged.
+ *
+ * @returns {Promise<{ready: boolean, why: 'ready'|'exited'|'timeout', waitedMs: number}>}
+ */
+export function waitForProxyReady({ port, host = '127.0.0.1', pid, ceilingMs = 180000,
+  pollMs = 150, connect = createConnection }) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    let settled = false;
+    let sock = null;
+    let pollTimer = null;
+    let ceiling = null;
+
+    const dropSocket = () => {
+      if (!sock) return;
+      const s = sock; sock = null;
+      s.removeAllListeners(); s.destroy();
+    };
+    const done = (ready, why) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(pollTimer); clearTimeout(ceiling);
+      dropSocket();                                  // never leave a half-open socket behind
+      resolve({ ready, why, waitedMs: Date.now() - started });
+    };
+
+    // ONE deadline over the WHOLE wait, armed once and independent of socket state. Checking the
+    // ceiling inside the error handler was not a deadline at all: a connect that STALLS — SYN sent,
+    // nothing back — never errors, so the check never ran and the wait could outlive its budget
+    // indefinitely.
+    ceiling = setTimeout(() => done(false, 'timeout'), ceilingMs);
+
+    const attempt = () => {
+      if (settled) return;
+      // `connect` is injectable so a test can hand in a socket that NEVER settles. A stalled
+      // connect cannot be produced deterministically from the network side: a reserved address
+      // may be blackholed on one network and rejected at once on another (RFC 5737 §4 reserves
+      // TEST-NET for documentation, nothing more).
+      sock = connect({ port, host }, () => {
+        dropSocket();
+        done(true, 'ready');
+      });
+      // A stalled connect must not wedge the loop either: time the attempt out and retry, which also
+      // keeps the liveness check below running while the port is unresponsive.
+      sock.setTimeout(Math.max(pollMs * 4, 1000), () => { retry(); });
+      sock.on('error', () => { retry(); });
+    };
+    const retry = () => {
+      dropSocket();
+      if (settled) return;
+      if (pid !== undefined && !isAlive(pid)) return done(false, 'exited');
+      pollTimer = setTimeout(attempt, pollMs);
+    };
+
+    attempt();
+  });
+}
+
+/**
  * Check if a port is already in use.
  * @returns {Promise<boolean>}
  */

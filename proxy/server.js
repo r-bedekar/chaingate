@@ -16,6 +16,9 @@ import { openWitnessDB } from '../witness/db.js';
 import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
+import { createSeedV3Gate } from '../seed/v3/gate.js';
+import { openSeed, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV } from '../seed/v3/reader.js';
+import { CHAINGATE_SEED_PUBKEY_B64, CHAINGATE_SEED_PUBKEY_FINGERPRINT } from '../witness/seed_verify.js';
 import { rewritePackument } from '../gates/rewriter.js';
 import { createDepFetcher } from './dep-fetcher.js';
 
@@ -146,7 +149,16 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log)
       );
     } catch (err) {
       log?.warn?.(`[witness] ${packageName}: observe failed: ${err.message}`);
-      observed = null;
+      // Serving the raw document here discarded every decision the packument would have earned --
+      // one exception anywhere in the observe path and a known-malware version went straight
+      // through. Ask the witness what the configured gates say a total failure means instead.
+      try {
+        observed = typeof witness.failureDecisionsFor === 'function'
+          ? witness.failureDecisionsFor(parsed, err) : null;
+      } catch (inner) {
+        log?.error?.(`[witness] ${packageName}: failure decision unavailable: ${inner.message}`);
+        observed = null;
+      }
     }
   }
 
@@ -254,6 +266,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   // observeAndSendPackument try/catch and the handler-level fallback below.
   let witness = null;
   let witnessDb = null;
+  let seedV3 = null;
   let depCache = null;
   let depFetcher = null;
   if (config.witnessDbPath) {
@@ -283,8 +296,73 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       fetchPackument: (name) => fetchPackument(name, { config }),
       logger: log,
     });
+    // The v3 detection gate, wired from CONFIGURATION rather than injected by a test. This is the
+    // path a real startup takes: `CHAINGATE_SEED_V3` names a seed, the reader opens it read-only and
+    // authenticated by default, and the operator's two policy choices come from the environment.
+    //
+    // Fail-LOUD, matching the witness-open precedent above. A configured seed that cannot be opened
+    // or trusted must not leave the proxy running WITHOUT the detection gate: that is the same
+    // silent degradation as serving a packument raw, moved to startup.
+    let seedV3Gate = null;
+    if (config.seedV3Path) {
+      try {
+        if (!['authenticated', 'unsigned-development'].includes(config.seedV3Trust)) {
+          throw new Error(`CHAINGATE_SEED_V3_TRUST must be 'authenticated' or `
+            + `'unsigned-development', got ${JSON.stringify(config.seedV3Trust)}`);
+        }
+        const trust = config.seedV3Trust === 'unsigned-development'
+          ? TRUST_UNSIGNED_DEV : TRUST_AUTHENTICATED;
+        // THE PINNED TRUST ANCHOR, wired through. Opening with a trust mode but no key meant
+        // `authenticated` could never actually authenticate: the reader refuses that combination,
+        // and any signature present went unchecked. The anchor is the same embedded literal the
+        // CLI verifies bundles with, so startup and `chaingate init` agree about what is trusted.
+        seedV3 = openSeed(config.seedV3Path, { trust, pubkey: CHAINGATE_SEED_PUBKEY_B64 });
+        // UNRESOLVED ENFORCEMENT POLICY MUST NOT BECOME PERMISSION. An unset choice makes policy
+        // decline, the gate can only answer SKIP, SKIP does not count, and the package installs --
+        // so silence permitted. A proxy that ENFORCES must be told what these cases mean.
+        const missingPolicy = ['on_unusable_input', 'on_no_evidence']
+          .filter((k) => !(k === 'on_unusable_input'
+            ? config.policyOnUnusableInput : config.policyOnNoEvidence));
+        if (missingPolicy.length) {
+          throw new Error(`policy ${missingPolicy.join(' and ')} is not configured: an unresolved `
+            + 'policy produces no disposition, which enforcement cannot tell apart from '
+            + `permission.\n  Fix: run \`chaingate init\` to record it${config.configSource
+              ? `, or set it in ${config.configSource}` : ''}.`);
+        }
+
+        const policyConfig = {
+          on_unusable_input: config.policyOnUnusableInput,
+          on_no_evidence: config.policyOnNoEvidence,
+        };
+        seedV3Gate = createSeedV3Gate({
+          seed: seedV3, config: policyConfig, domainVersionCount: config.domainVersionCount });
+        log.info?.(`[seed-v3] ${config.seedV3Path} opened (trust=${config.seedV3Trust}`
+          + `${seedV3.report?.authenticated ? ` anchor=${CHAINGATE_SEED_PUBKEY_FINGERPRINT}` : ''}, `
+          + `snapshot=${seedV3.meta.corpus_snapshot_digest?.slice(0, 12)}, `
+          + `policy=${JSON.stringify(policyConfig)}`
+          + `${config.configSource ? `, from ${config.configSource}` : ''})`);
+        if (config.seedV3Trust === 'unsigned-development') {
+          log.warn(`[seed-v3] trust=unsigned-development: this seed is NOT authenticated`);
+        }
+        log.info?.('[seed-v3] provider_class domain_version_count=from-packument (internal: the '
+          + 'package-scoped count is computed from each document, which is CURRENT where the seed '
+          + 'counted as of its history cutoff)');
+      } catch (err) {
+        try { seedV3?.close?.(); } catch { /* already closed */ }
+        const msg =
+          `chaingate-proxy: failed to open v3 seed at ${config.seedV3Path}: ${err.message}\n`
+          + '  The proxy refuses to start WITHOUT the detection gate it was configured with.\n'
+          + `  Fix: re-run \`chaingate init --seed <bundle>\`, or edit ${
+            config.configSource || 'the chaingate config file'} to correct or remove the seed entry.`;
+        const wrapped = new Error(msg);
+        wrapped.cause = err;
+        throw wrapped;
+      }
+    }
+
+    const configured = seedV3Gate ? [...DEFAULT_GATE_MODULES, seedV3Gate] : DEFAULT_GATE_MODULES;
     const modules =
-      Array.isArray(hooks.gateModules) ? hooks.gateModules : DEFAULT_GATE_MODULES;
+      Array.isArray(hooks.gateModules) ? hooks.gateModules : configured;
     const runGates = createGateRunner({
       modules,
       getOverride: (pkg, ver) => witnessDb.getOverride(pkg, ver),
@@ -313,6 +391,28 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         service: 'chaingate-proxy',
         version: PROXY_VERSION,
         pid: process.pid,
+        // WHAT THIS PROCESS ACTUALLY LOADED. A listening port only says something bound it; `init`
+        // and `doctor` need to know it is running the seed and policy that were just configured,
+        // and after a rollback they need to see the RESTORED identity rather than the newer one.
+        seed_v3: seedV3 ? {
+          path: config.seedV3Path,
+          bundle_id: config.seedV3BundleId ?? null,
+          bundle_dir: config.seedV3BundleDir ?? null,
+          // The digest THIS process computed over the bytes it opened. Readiness is checked against
+          // identity, not against a path: a symlink before and after an update has the same path
+          // over different bytes.
+          sha256: seedV3.report?.content_sha256 ?? null,
+          trust: config.seedV3Trust,
+          authenticated: Boolean(seedV3.report?.authenticated),
+          schema_version: seedV3.meta?.schema_version ?? null,
+          corpus_snapshot_digest: seedV3.meta?.corpus_snapshot_digest ?? null,
+          contract_version: seedV3.meta?.contract_version ?? null,
+          policy: {
+            on_unusable_input: config.policyOnUnusableInput,
+            on_no_evidence: config.policyOnNoEvidence,
+          },
+          config_source: config.configSource ?? null,
+        } : null,
       });
       return;
     }
@@ -403,6 +503,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   server.config = config;
   server.witness = witness;
   server.witnessDb = witnessDb;
+  server.seedV3 = seedV3;
   server.depCache = depCache;
   server.depFetcher = depFetcher;
   const origClose = server.close.bind(server);
@@ -413,6 +514,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     const finish = () => {
       origClose(() => {
         try { witness?.close(); } catch { /* already closed */ }
+        try { seedV3?.close(); } catch { /* already closed */ }
         if (cb) cb();
       });
     };

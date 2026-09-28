@@ -1,0 +1,98 @@
+{
+  "body_digest": {
+    "allow_empty": true,
+    "length": 32,
+    "nullable": false,
+    "type": "hex"
+  },
+  "has_scripts": {
+    "nullable": false,
+    "type": "boolean"
+  },
+  "head_present": {
+    "nullable": false,
+    "type": "boolean"
+  },
+  "identity_digest": {
+    "length": 64,
+    "nullable": true,
+    "type": "hex"
+  },
+  "lineage_id": {
+    "min": 1,
+    "nullable": true,
+    "type": "integer"
+  },
+  "maint_digest": {
+    "allow_empty": true,
+    "length": 32,
+    "nullable": false,
+    "type": "hex"
+  },
+  "ord": {
+    "min": 0,
+    "nullable": true,
+    "type": "integer"
+  },
+  "package_name": {
+    "allow_empty": false,
+    "nullable": false,
+    "type": "string"
+  },
+  "provenance_present": {
+    "nullable": false,
+    "type": "boolean"
+  },
+  "provider_class": {
+    "nullable": false,
+    "type": "enum",
+    "values": [
+      "unknown",
+      "privacy",
+      "free-webmail",
+      "verified-corporate",
+      "unverified"
+    ]
+  },
+  "publish_method": {
+    "allow_empty": true,
+    "nullable": false,
+    "type": "string"
+  },
+  "published_s": {
+    "max": 4102444800,
+    "min": 0,
+    "nullable": true,
+    "type": "integer"
+  },
+  "repo_digest": {
+    "length": 64,
+    "nullable": true,
+    "type": "hex"
+  },
+  "size_bytes": {
+    "min": 0,
+    "nullable": true,
+    "type": "integer"
+  },
+  "tool_key": {
+    "min": 0,
+    "nullable": false,
+    "type": "number"
+  },
+  "tool_name": {
+    "allow_empty": true,
+    "nullable": false,
+    "type": "string"
+  },
+  "tuple_digest": {
+    "length": 64,
+    "nullable": true,
+    "type": "hex"
+  },
+  "version": {
+    "allow_empty": false,
+    "nullable": false,
+    "type": "string"
+  }
+}
