@@ -187,9 +187,14 @@ if (activeId) {
   const bi = cg(['init', ...P]);
   const bs = await self();
   record('broken activation (bundle missing): init REFUSES, no proxy runs without its seed', bi.status !== 0 && bs === null, `init exit ${bi.status}: ${bi.out.split('\n').find((l) => /activation|resolve|seed/i.test(l)) ?? ''}`);
+  // doctor must FAIL CLOSED: a non-zero exit that names the broken activation, never "no seed".
+  // (Today it stops at the broken link and prints only that error, with no JSON; see the U-04 notes.)
   const bd = cg(['doctor', ...P, '--json']);
-  let sv = null; try { sv = JSON.parse(bd.stdout).find((c) => c.name === 'seed-v3'); } catch { /* */ }
-  record('broken activation: doctor reports the seed as failed (not "no seed")', sv && !sv.pass, sv ? sv.detail : `doctor exit ${bd.status}`);
+  let sv = null; try { sv = JSON.parse(bd.stdout).find((c) => c.name === 'seed-v3'); } catch { /* no JSON */ }
+  const namesBroken = /activation link .* does not resolve/i.test(bd.out) || (sv && !sv.pass);
+  const saysNoSeed = /no v3 bundle active/i.test(bd.out);
+  record('broken activation: doctor fails closed and names it (never "no seed")', bd.status !== 0 && namesBroken && !saysNoSeed,
+    `exit ${bd.status}; ${sv ? `seed-v3: ${sv.detail}` : (bd.out.split('\n')[0] || '').slice(0, 140)}`);
   fs.renameSync(moved, path.join(activeDir(), activeId));
   await restart('recovered after the bundle is restored', cases.seedA_sha256);
 }
