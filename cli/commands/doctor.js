@@ -12,6 +12,7 @@ import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constan
 import { resolveActiveBundle, verifyBundleDir, activeBundleId,
   previousBundleId } from '../seed-bundle.js';
 import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
+import { probeNativeSqlite, nativeSqliteHelp } from '../native-sqlite.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let CLI_VERSION = 'unknown';
@@ -80,6 +81,14 @@ export default async function doctor(args) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
   const checks = [];
+
+  // ── the SQLite native module: every database below needs it, and npm may have skipped its build ──
+  const sqlite = probeNativeSqlite();
+  checks.push(sqlite.ok
+    ? { name: 'native-sqlite', pass: true, detail: `better-sqlite3 ${sqlite.version} loads` }
+    : { name: 'native-sqlite', pass: false,
+      detail: sqlite.kind === 'abi' ? 'built for a different Node.js version (fix below)' : 'native part not installed (fix below)',
+      help: nativeSqliteHelp(sqlite.kind, sqlite.version) });
 
   // ── the ACTIVE v3 bundle and the policy in force ────────────────────────
   // Resolved ONCE, then read through the pinned directory — the same way the proxy does it.
@@ -378,6 +387,10 @@ export default async function doctor(args) {
   } else {
     const fails = checks.filter((c) => !c.pass).length;
     console.log(fmt.red(`${fails} check(s) failed.`));
+  }
+  if (!sqlite.ok) {
+    console.log('');
+    for (const line of nativeSqliteHelp(sqlite.kind, sqlite.version)) console.log(line);
   }
 
   return exitCode;

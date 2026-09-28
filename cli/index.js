@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { EXIT } from './constants.js';
+import { classifyNativeSqliteError, probeNativeSqlite, nativeSqliteHelp } from './native-sqlite.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -96,7 +97,14 @@ async function main() {
     const code = await mod.default(cmdArgs);
     process.exit(code ?? EXIT.OK);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    const nativeKind = classifyNativeSqliteError(err);
+    // A missing native module reports every path it tried; the first line says what happened.
+    console.error(`Error: ${nativeKind ? String(err.message).split('\n')[0] : err.message}`);
+    if (nativeKind) {
+      const { version } = probeNativeSqlite();
+      console.error('');
+      for (const line of nativeSqliteHelp(nativeKind, version)) console.error(line);
+    }
     process.exit(EXIT.ERROR);
   }
 }

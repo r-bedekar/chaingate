@@ -86,8 +86,8 @@ ChainGate performs cryptographic verification at two distinct
 moments, and it is worth being precise about what each one does
 and does not prove.
 
-For **legacy witness seeds**, at install time — invoked from
-`chaingate init` and `chaingate update-seed` — the CLI does the full
+For **legacy witness seeds**, at install time (invoked from
+`chaingate init` and `chaingate update-seed`), the CLI does the full
 bundle check: it streams the
 freshly-fetched `chaingate-seed.db`, computes its SHA-256, and
 compares the result to the published `.sha256` file. It then
@@ -97,8 +97,8 @@ of the bundle bytes and against registry tampering of any of the
 three artifacts in isolation. A failure at install time aborts
 the install before any state is written.
 
-Post-install — invoked from `chaingate doctor` and the integrity
-gate that runs before mutating commands — the CLI verifies only
+Post-install (invoked from `chaingate doctor` and the integrity
+gate that runs before mutating commands), the CLI verifies only
 the persisted `.sha256/.sig` pair against the pinned key. It does
 not re-hash the live `witness.db`. This is deliberate: `witness.db`
 is a mutable runtime database. Schema migrations apply when the
@@ -106,8 +106,8 @@ runtime version moves ahead of an older bundle; gate decisions
 get appended in normal use; both legitimately change the file's
 bytes. A post-install check that compared the live hash to the
 install-time hash would fire false-positive on every healthy
-installation. What the post-install check does prove — and the
-property that matters at this layer — is that this install was
+installation. What the post-install check does prove, and the
+property that matters at this layer, is that this install was
 seeded from a bundle signed by the project's pinned key.
 Defending the local `witness.db` against an attacker who already has filesystem
 write access is outside the cryptographic threat model; the
@@ -210,6 +210,25 @@ Node's built-in `fetch()`. That uses the undici bundled with Node
 cannot patch it. It follows the Node version installed. Downloaded
 legacy seeds are still checked against their SHA-256 and Ed25519
 signature before use (see above).
+
+## Seed downloads
+
+v3 detection seeds are never downloaded automatically. When one is made available for download, its
+exact identifiers (file SHA-256, logical digest, corpus snapshot) are recorded in
+[SEEDS.md](SEEDS.md) in a signed commit, with a signed git tag carrying the file digest.
+[SEEDS.md](SEEDS.md) explains how to verify both the git signature and the file. That verification
+authenticates the digest through the maintainer's git signing key. It does not make an unsigned
+seed signature-verified at runtime: the tool still reports `authenticated: false`.
+
+## Platform support
+
+Only the combinations in the README's "Tested platforms" table have been tested. Windows and macOS
+are not yet tested.
+
+On Windows, the active seed bundle is recorded as a symbolic link. On a standard Windows account,
+creating symbolic links may require Developer Mode. Whether `init --seed`, `update-seed` and
+`--rollback` work on a standard account has not been tested yet; running ChainGate as Administrator
+is not a supported workaround.
 
 ## Disclosure
 

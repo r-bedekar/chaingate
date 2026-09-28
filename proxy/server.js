@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 
 import { loadConfig } from './config.js';
@@ -537,7 +537,22 @@ export async function startProxyServer(configOverrides = {}) {
   return server;
 }
 
-const isDirectRun = import.meta.url === `file://${process.argv[1]}`;
+/**
+ * True when `entryPath` (process.argv[1]) is the module at `moduleUrl`, i.e. this file was run
+ * directly (`node proxy/server.js`, which is how `chaingate init` starts the proxy).
+ * `file://${path}` matched only POSIX paths with no characters that URL encoding changes: on Windows
+ * (`C:\\...` against `file:///C:/...`) and on any install path with a space or non-ASCII character,
+ * the proxy process loaded and exited without listening. `pathToFileURL` builds the same form as
+ * `import.meta.url` (the idiom seed/v3/parity.js and conformance.js already use). `windows` is for
+ * tests only; normal use passes nothing and needs no launcher variable.
+ */
+export function isDirectEntry(moduleUrl, entryPath, { windows } = {}) {
+  if (!entryPath) return false; // `node -e` / REPL: no entry script
+  const opts = windows === undefined ? undefined : { windows };
+  return moduleUrl === pathToFileURL(entryPath, opts).href;
+}
+
+const isDirectRun = isDirectEntry(import.meta.url, process.argv[1]);
 if (isDirectRun) {
   const server = await startProxyServer();
   const { port, host, upstream, witnessDbPath } = server.config;

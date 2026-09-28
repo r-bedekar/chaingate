@@ -1,0 +1,70 @@
+# Cross-platform install and runtime acceptance for @cgsec/chaingate.
+# PREPARED LOCALLY; pushing it needs separate approval. Runs only on manual dispatch and on pull
+# requests, never on a schedule. It uses only synthetic seeds (test/acceptance/make-fixtures.mjs):
+# no real seed, no secrets, and no network access beyond installing npm dependencies.
+#
+# Limitation: GitHub-hosted Windows runners run as an administrator, so this job cannot show
+# behaviour on a STANDARD Windows account (seed activation creates a symbolic link, which a standard
+# account may not be allowed to do). That is checked separately with test/acceptance/acceptance.mjs
+# on a standard account.
+name: cross-platform acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: ${{ matrix.os }} / node ${{ matrix.node }} / npm ${{ matrix.npm }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14, macos-13]   # macos-14 = arm64, macos-13 = x64
+        node: ['22']
+        npm: [bundled, latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: npm version
+        if: matrix.npm == 'latest'
+        run: npm install -g npm@latest
+      - name: record versions
+        shell: bash
+        run: |
+          echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v)" | tee versions.txt
+      - name: install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: unit and integration tests
+        run: npm test
+      - name: pack the package
+        shell: bash
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz
+      - name: synthetic fixtures
+        shell: bash
+        run: node test/acceptance/make-fixtures.mjs "$RUNNER_TEMP/fixtures"
+      - name: global install (normal launcher)
+        shell: bash
+        run: npm install -g "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --allow-scripts=better-sqlite3 || npm install -g "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
+      - name: acceptance, global install
+        shell: bash
+        run: node test/acceptance/acceptance.mjs --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
+      - name: acceptance, project (local) install
+        shell: bash
+        run: node test/acceptance/acceptance.mjs --launcher local --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local.json"
+      - name: reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
+          path: |
+            versions.txt
+            ${{ runner.temp }}/acceptance-*.json

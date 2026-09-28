@@ -1,7 +1,7 @@
 > **Research prototype. Not production-ready.**
 > Metadata deviations provide explainable warning and gating inputs but do not
 > independently establish malicious intent. The runtime is built and runs
-> end-to-end — local proxy, CLI, witness store, six deterministic gates, seed
+> end-to-end: local proxy, CLI, witness store, six deterministic gates, seed
 > verification (legacy seeds signed; the current v3 seed unsigned and reported as such), and ALLOW / WARN / BLOCK enforcement, with a passing test
 > suite. See [What's built today](#whats-built-today) for what actually runs and
 > [What's next](#whats-next) for what does not exist yet.
@@ -32,14 +32,14 @@ Actions OIDC to a CLI token.
 None of this is exotic. It's all in the registry metadata every tool already
 downloads. It just isn't surfaced to the developer at install time.
 
-ChainGate is the part that does the surfacing — by remembering what every package
+ChainGate is the part that does the surfacing, by remembering what every package
 looked like before, and flagging structural changes at install time, without any
 threat feed. Content analysis answers a different question, and both matter:
 metadata trajectory is complementary to content analysis, not a substitute for it.
 
 ## The Idea
 
-ChainGate keeps a **witness log** — an append-only record of every package version
+ChainGate keeps a **witness log**: an append-only record of every package version
 it has ever observed, with its content hash, dependency tree, publisher identity,
 and provenance status. When a new version shows up, deterministic **gates** compare
 it against the history in the log.
@@ -53,7 +53,7 @@ Six gates, each reading a different axis of the registry metadata:
 | **Publisher Identity** | Did the publisher email or domain change? |
 | **Provenance Continuity** | Did attested publish break? (OIDC → CLI token) |
 | **Release Age** | Is this version less than N hours old? |
-| **Scope Boundary** | Phantom dependency + install scripts — hard limit |
+| **Scope Boundary** | Phantom dependency plus install scripts (hard limit) |
 
 The signals layer. An axios-class attack trips four at once. A routine release trips
 none, or one with a benign explanation. The combination is what makes this work, not
@@ -82,7 +82,7 @@ and the upstream registry, evaluating every version it resolves.
 **CLI.** Ten commands: `init`, `status`, `check`, `why`, `history`, `allow`,
 `overrides`, `update-seed`, `doctor`, `stop`.
 
-**Witness store.** Append-only log backed by SQLite — content hashes, dependency
+**Witness store.** Append-only log backed by SQLite: content hashes, dependency
 trees, publisher metadata, provenance status.
 
 **Six deterministic gates** wired into the proxy request path, each emitting its own
@@ -97,7 +97,7 @@ emits a versioned `chaingate.check/1` record; `examples/ci/` has an offline CI c
 an unsigned v3 seed can be used only with `--unsigned-development`, which the tool reports as
 `authenticated: false`. A present signature that cannot be checked is refused, never ignored.
 
-**Detection engine.** Two pattern layers — publisher identity (tenure blocks, cold
+**Detection engine.** Two pattern layers: publisher identity (tenure blocks, cold
 handoffs, domain classification) and per-major provenance (attestation baselines,
 regression detection, four-escalator logic). Both pure functions over a package's
 observed history.
@@ -109,7 +109,7 @@ the numbers.
 **Tests.** `npm test` runs the full suite; release candidates record their results in the release notes.
 
 **Pilot numbers on the held-out test split.** Small-n results from a 209-package
-research corpus — a pilot measurement, not a population estimate:
+research corpus. This is a pilot measurement, not a population estimate:
 
 | Metric | Value |
 |--------|-------|
@@ -123,12 +123,38 @@ research corpus — a pilot measurement, not a population estimate:
 Five minutes, no account, no feed subscription. The seed bundle is verified locally,
 so this flow works without fetching a bundle over the network.
 
-From npm, once a release is published (none is yet):
+Install from npm (Node.js 22 or later). The command is `chaingate` either way:
 
 ```bash
-npm install -g @cgsec/chaingate
+npm install -g @cgsec/chaingate        # global
 chaingate --help
+
+npm install @cgsec/chaingate           # or inside a project
+npx chaingate --help
 ```
+
+**The SQLite module has a native part.** npm installs it with `better-sqlite3`'s own install
+script. Some npm versions and configurations skip dependency install scripts; the package then
+installs but cannot open a database. `chaingate doctor` reports this as `native-sqlite` and prints
+the fix, which allows only that one package's script:
+
+```bash
+npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3    # when npm blocks install scripts
+# or, with ignore-scripts=true in your npm configuration, rebuild just that package:
+cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scripts=false
+```
+
+For a project install, leave out `-g` and use `node_modules/@cgsec/chaingate`. Do not enable all
+dependency scripts to fix this.
+
+**Tested platforms.** Only the combinations below have been tested. Anything not listed is untested,
+not supported.
+
+| OS | Architecture | Node.js | npm | Status |
+|----|--------------|---------|-----|--------|
+| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | Tested: full qualification, global and project install |
+| Windows | x64 | | | Not yet tested |
+| macOS | | | | Not yet tested |
 
 From source:
 
@@ -141,9 +167,13 @@ npm test
 **You supply the v3 detection seed.** The v3 detection seed is a local file (about 1.9 GB for the full
 corpus). **It is not downloaded automatically and no v3 seed is published yet**: pass it with
 `--seed`. The current release candidate seed is **unsigned**, so it needs `--unsigned-development`,
-which the tool reports as `authenticated: false`. See [SECURITY.md](SECURITY.md).
+which the tool reports as `authenticated: false`. [SEEDS.md](SEEDS.md) lists each v3 seed's exact
+identifiers and how to verify a download. See [SECURITY.md](SECURITY.md) for the trust model.
 
-**1. Initialize** — installs the v3 bundle, starts the proxy, points npm at it:
+A plain `chaingate init` without `--seed` does **not** install v3 detection: it downloads the older
+signed legacy witness seed (about 100 MB) and says so. For v3 detection, always pass `--seed`.
+
+**1. Initialize.** This installs the v3 bundle, starts the proxy and points npm at it:
 
 ```console
 $ chaingate init --seed ./seed-v3/chaingate-seed.db --unsigned-development
@@ -241,8 +271,8 @@ reasons shown. These are corpus and fixture results, not live registry captures.
 | **Ua-parser-js** | New unverified domain after established baseline (fixture-verified) |
 
 **Honest limitation.** If an attacker compromises the CI/CD pipeline and publishes
-through the same workflow with the same publisher and the same structure — only
-changing code — the metadata looks clean. Code-level analysis catches those.
+through the same workflow with the same publisher and the same structure, only
+changing code, the metadata looks clean. Code-level analysis catches those.
 ChainGate is complementary, not a replacement.
 
 ## Architecture
@@ -284,7 +314,7 @@ contributions welcome.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0. See [LICENSE](LICENSE).
 
 ## Contact
 
@@ -295,4 +325,4 @@ GitHub: [@r-bedekar](https://github.com/r-bedekar)
 ---
 
 *ChainGate surfaces structural change at install time, using a package's own history
-instead of a threat feed — as explainable evidence for a human decision, not a verdict.*
+instead of a threat feed, as explainable evidence for a human decision, not a verdict.*
