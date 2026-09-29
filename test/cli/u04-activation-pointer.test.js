@@ -139,7 +139,9 @@ test('malformed, unreadable or out-of-tree records FAIL CLOSED, with no fallback
 test('migration from an existing symlink install: read through the links, then replaced by the record', { skip: !canSymlink && 'symlinks unavailable here' }, () => {
   const h = host();
   try {
-    activateBundle(h.base, h.ids.A, SYM); activateBundle(h.base, h.ids.B, SYM);   // a pre-0.1.2 host: B active, A previous
+    // a pre-0.1.2 host: B active, A previous. Built directly: renaming a link over an existing link is
+    // exactly the operation Windows refuses, so the legacy writer cannot be used here.
+    fs.symlinkSync(h.ids.B, activeLink(h.base), 'dir'); fs.symlinkSync(h.ids.A, previousLink(h.base), 'dir');
     assert.equal(resolveActiveBundle(h.base, PTR).id, h.ids.B, 'no record yet: the legacy link is read');
     assert.equal(previousBundleId(h.base, PTR), h.ids.A);
     activateBundle(h.base, h.ids.C, PTR);

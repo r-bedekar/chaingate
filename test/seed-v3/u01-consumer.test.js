@@ -23,7 +23,10 @@ const CASES = new Map(syntheticCases().map((c) => [c.id, c]));
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'u01-ci-'));
 const NET_LOG = path.join(WORK, 'network-attempts.log');
 test.after(() => fs.rmSync(WORK, { recursive: true, force: true }));
-const env = (home) => ({ PATH: process.env.PATH, HOME: home, NO_COLOR: '1', U01_NET_LOG: NET_LOG });
+// USERPROFILE too: on Windows os.homedir() follows it, and a child that sees the real profile
+// would read (and write) the runner's own ~/.chaingate.
+const env = (home) => ({ PATH: process.env.PATH, HOME: home, USERPROFILE: home, NO_COLOR: '1', U01_NET_LOG: NET_LOG,
+  ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) });
 
 // one host, one override on p@1.3.0 (a pinned BLOCK)
 const HOME = path.join(WORK, 'home');

@@ -214,7 +214,10 @@ async function runInstall({ pinned }) {
 
   const prefix = join(dir, 'install');
   mkdirSync(prefix, { recursive: true });
-  writeFileSync(join(prefix, 'package.json'), '{"name":"host","version":"1.0.0","private":true}\n');
+  // npm 12 blocks dependency install scripts unless the project approves them: approve exactly the
+  // fixture, so the positive control still proves its preinstall runs (older npm ignores the field).
+  writeFileSync(join(prefix, 'package.json'), `${JSON.stringify({ name: 'host', version: '1.0.0', private: true,
+    allowScripts: { [PKG]: true } })}\n`);
   // ASYNC, deliberately. The proxy runs on THIS process's event loop, so a synchronous child
   // (spawnSync) blocks it: npm's request for the packument is accepted by the OS and then never
   // served, and both halves of the test hang rather than proving anything.

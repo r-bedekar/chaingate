@@ -170,7 +170,10 @@ async function runInstall({ pinned }) {
 
   const prefix = join(home, 'install');
   mkdirSync(prefix, { recursive: true });
-  writeFileSync(join(prefix, 'package.json'), '{"name":"host","version":"1.0.0","private":true}\n');
+  // npm 12 blocks dependency install scripts unless the project approves them: approve exactly the
+  // fixture, so the positive control still proves its preinstall runs (older npm ignores the field).
+  writeFileSync(join(prefix, 'package.json'), `${JSON.stringify({ name: 'host', version: '1.0.0', private: true,
+    allowScripts: { [PKG]: true } })}\n`);
   const res = await new Promise((resolve) => {
     const child = spawn('npm', ['install', `${PKG}@${VERSION}`, '--registry', proxyUrl,
       '--cache', join(home, 'npm-cache'), '--no-audit', '--no-fund', '--foreground-scripts',

@@ -53,7 +53,9 @@ function witnessWith(host, { decisions = [], overrides = [] } = {}) {
 }
 
 function cleanEnv(home, extra = {}) {
-  const env = { PATH: process.env.PATH, HOME: home, NO_COLOR: '1', U01_NET_LOG: NET_LOG, ...extra };
+  // USERPROFILE too: on Windows os.homedir() follows it, not HOME.
+  const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, NO_COLOR: '1', U01_NET_LOG: NET_LOG,
+    ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}), ...extra };
   for (const k of Object.keys(env)) if (k.startsWith('CHAINGATE_')) delete env[k];
   return env;
 }

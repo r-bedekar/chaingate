@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import R from '../../seed/v3/reader.js';
@@ -149,6 +150,6 @@ test('A9 (ajv, the approved validator) all shapes valid, findings valid, invalid
   });
 
 test('A9 the CFT-03 finding schema copy is byte-identical to the frozen producer copy', () => {
-  const digest = spawnSync('sha256sum', [FINDING_SCHEMA], { encoding: 'utf8' }).stdout.split(' ')[0];
+  const digest = createHash('sha256').update(fs.readFileSync(FINDING_SCHEMA)).digest('hex');   // not the sha256sum CLI
   assert.equal(digest, '3ce4f8262a8d74def8090bd0aef1339fae07d6a05a3ec7196ca0b5561e8a306f');
 });

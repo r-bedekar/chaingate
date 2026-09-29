@@ -93,6 +93,7 @@ function cli(args, { home, cwd = home }) {
   const env = {};
   for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('CHAINGATE_')) env[k] = v;
   env.HOME = home;                    // user scope resolves under here; not a CHAINGATE_ variable
+  env.USERPROFILE = home;             // ...and on Windows, where os.homedir() follows USERPROFILE
   return spawnSync(process.execPath, [CLI, ...args], { cwd, env, encoding: 'utf8', timeout: 90_000 });
 }
 const userBase = (home) => join(home, '.chaingate');

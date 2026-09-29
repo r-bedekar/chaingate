@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import http from 'node:http';
-import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, readFileSync, existsSync, readdirSync, realpathSync, statSync, mkdirSync,
+  copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,11 +82,20 @@ const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';   // a junc
 function installCopy(base) {
   const inst = join(base, 'node_modules', '@cgsec', 'chaingate');
   const files = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).files;
+  // A plain recursive copy: fs.cpSync on Windows did not place the files under a destination whose
+  // name has a non-ASCII character (CI run 36545649230: entry missing, readdir ENOENT), while node
+  // itself starts from such paths fine (test/acceptance/spawn-diagnostic.mjs).
+  const copy = (src, dst) => {
+    if (statSync(src).isDirectory()) {
+      mkdirSync(dst, { recursive: true });
+      for (const n of readdirSync(src)) copy(join(src, n), join(dst, n));
+    } else { mkdirSync(dirname(dst), { recursive: true }); copyFileSync(src, dst); }
+  };
   for (const f of files) {
     if (/\.md$|^LICENSE$/.test(f)) continue;
-    cpSync(join(ROOT, f), join(inst, f), { recursive: true });
+    copy(join(ROOT, f), join(inst, f));
   }
-  cpSync(join(ROOT, 'package.json'), join(inst, 'package.json'));
+  copy(join(ROOT, 'package.json'), join(inst, 'package.json'));
   symlinkSync(join(ROOT, 'node_modules'), join(inst, 'node_modules'), LINK_TYPE);
   return inst;
 }
