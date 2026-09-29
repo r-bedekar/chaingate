@@ -30,10 +30,10 @@ fingerprint.
 
 The private key that signs **legacy witness seeds** resides on a
 single build host as a file with restricted permissions (mode 0400,
-single-user readable). This host is the operational trust root for
-seed signing. We acknowledge this is a single point of failure and
-intend to migrate seed signing to keyless signing via Sigstore and
-GitHub Actions OIDC before broader adoption. That migration has
+single-user readable). That host is the trust root for seed signing,
+and it is a single point of failure. The plan is to move seed signing
+to keyless signing with Sigstore and GitHub Actions OIDC before wider
+use. That migration has
 **not** happened yet.
 
 **Recorded deferral (2026-09-28).** An earlier version of this
@@ -59,8 +59,8 @@ or with elevated trust requirements may:
 
 ### v3 detection seeds and trust modes
 
-The v3 detection seed is **supplied locally** (`chaingate init --seed …`,
-`chaingate update-seed --seed …`). It is **not downloaded automatically**,
+The v3 detection seed is **supplied locally** (`chaingate init --seed <file>`,
+`chaingate update-seed --seed <file>`). It is **not downloaded automatically**,
 and no v3 seed is published yet. Before use, the runtime checks the
 seed's schema and contract versions, its required bindings and its
 SHA-256 against the `.sha256` sidecar, and opens it read-only.
@@ -82,9 +82,8 @@ unsigned.
 
 ### Verification properties
 
-ChainGate performs cryptographic verification at two distinct
-moments, and it is worth being precise about what each one does
-and does not prove.
+ChainGate verifies legacy seeds at two different points. Each check
+proves something different.
 
 For **legacy witness seeds**, at install time (invoked from
 `chaingate init` and `chaingate update-seed`), the CLI does the full
@@ -110,15 +109,15 @@ installation. What the post-install check does prove, and the
 property that matters at this layer, is that this install was
 seeded from a bundle signed by the project's pinned key.
 Defending the local `witness.db` against an attacker who already has filesystem
-write access is outside the cryptographic threat model; the
-relevant defense at that layer is filesystem permissions on
+write access is outside what the signatures can protect. At that
+level, the protection is the filesystem permissions on
 `~/.chaingate/`.
 
 ## Build and signing
 
-Seed bundles are produced by a private collector infrastructure
-that ingests metadata from public package registries (npm, PyPI)
-and the OSV vulnerability database.
+Seed bundles are built on the maintainer's private collection
+servers from public package registry metadata (npm, PyPI) and the
+OSV vulnerability database.
 
 - **Legacy witness seeds** (`seed-v2.x`) are signed with the
   Ed25519 key described above and published as releases on this
@@ -181,7 +180,7 @@ measures below remove one connection-reuse condition. They do not
 make an untrusted registry trustworthy.
 
 - **Pinned HTTP client.** All upstream requests use an Agent from the
-  pinned `undici` (0.1.1: exactly 6.28.1). These are packuments,
+  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments,
   tarballs, background dependency lookups and the fail-open raw
   fallback. The Agent is set explicitly because on Node 22 importing
   `node:http` installs Node's own bundled undici as the process-wide
@@ -222,8 +221,8 @@ seed signature-verified at runtime: the tool still reports `authenticated: false
 
 ## Platform support
 
-Only the combinations in the README's "Tested platforms" table have been tested. Windows on a
-standard (non-administrator) account is not yet tested.
+Only the combinations in the README's "Tested platforms" table have been tested. On Windows that
+includes a standard (non-administrator) account on Windows 10 with Node 24.
 
 On Windows (from 0.1.2), the active and previous seed bundles are recorded in one file,
 `seeds\activation.json`, which is replaced in a single rename: Windows cannot rename a symbolic link
@@ -235,7 +234,6 @@ supported workaround. Mixing ChainGate versions on one Windows home directory is
 
 ## Disclosure
 
-This document represents the current state. The trust model is
-expected to evolve as ChainGate moves from pre-launch to broader
-adoption. Material changes to this document will be reflected in
-the runtime and announced in release notes.
+This document describes the current state. The trust model will
+change as ChainGate moves beyond a research preview. Significant
+changes will be made in the runtime and announced in release notes.

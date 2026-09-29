@@ -1,4 +1,4 @@
-# chaingate-ci — an offline CI consumer of `chaingate.check/1`
+# chaingate-ci: an offline CI consumer of `chaingate.check/1`
 
 `chaingate-ci.mjs` gates a CI job on the JSON that `chaingate check --json` writes. It uses the Node
 standard library only and makes no network access.

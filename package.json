@@ -1,7 +1,7 @@
 {
   "name": "@cgsec/chaingate",
   "version": "0.1.2",
-  "description": "ChainGate by CGSec: a supply chain integrity gate with deterministic gating for package registries",
+  "description": "Local npm proxy that checks each new package version against that package's own release history",
   "type": "module",
   "main": "proxy/server.js",
   "bin": {

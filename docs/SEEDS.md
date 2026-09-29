@@ -7,8 +7,8 @@ History of signed seed bundles published to GitHub Releases.
 - Release: https://github.com/r-bedekar/chaingate/releases/tag/seed-v2.1
 - SHA256: `db86c7ff90bb71c769735e1f770a52d1655c34cda3ec1b72f7eb8763e99e3515`
 - Schema version: 2
-- Status: post-split pipeline verification rebuild; first seed
-  published from chaingate-ops infrastructure post-Phase-5a
+- Status: rebuilt to verify the new collection pipeline; the first seed
+  published from the current build infrastructure
 - Contents: 105 packages, 50,651 collected versions + 5 reconstructed,
   211 attack labels (206 collected + 5 reconstructed)
 - Notable additions vs seed-v2: `@bitwarden/cli` (ingested 2026-04-23)
@@ -20,12 +20,12 @@ History of signed seed bundles published to GitHub Releases.
 - Seed version: `2026.04.20.1`
 - Schema version: 2
 - Contents: 104 packages, 50,499 versions, 211 attack labels (5 reconstructed)
-- Status: GitHub release deleted in Phase 5a recovery (superseded
-  by seed-v2.1); metadata preserved here for archaeology.
+- Status: GitHub release deleted during an infrastructure recovery
+  (replaced by seed-v2.1); details kept here for reference.
 
-## seed-v1 (2026-04-14) — superseded
+## seed-v1 (2026-04-14), superseded
 
 - Seed version: `2026.04.14.1`
 - Schema version: 1
-- Status: GitHub release deleted in Phase 5a recovery (superseded
-  by seed-v2 then seed-v2.1); metadata preserved here for archaeology.
+- Status: GitHub release deleted during an infrastructure recovery
+  (replaced by seed-v2, then seed-v2.1); details kept here for reference.

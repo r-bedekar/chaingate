@@ -4,14 +4,14 @@
 
 Under the v2 seed corpus (commit `e71e511`), ChainGate detected both
 attack-labeled packages in the held-out test pool. Test recall
-(package-level) is **1.0 (2 / 2)**, 95% Wilson CI **[0.3424, 1.0000]** —
+(package-level) is **1.0 (2 / 2)**, 95% Wilson CI **[0.3424, 1.0000]**;
 the interval is wide because the test pool is small, and the lower
 bound is the honest statement that a 2-of-2 observation does not
 pin down true recall. Test false-positive rate is **0.25 (1 / 4)**,
 CI **[0.0456, 0.6994]**; test precision is **0.6667 (2 / 3)**, CI
 **[0.2077, 0.9385]**. On the training pool (98 packages, 7
-attack-labeled), package-level recall is 0.2857 (2 / 7) — chalk
-and eslint-config-prettier were BLOCKed — and the false-positive
+attack-labeled), package-level recall is 0.2857 (2 / 7), with chalk
+and eslint-config-prettier BLOCKed, and the false-positive
 rate is **0.3407 (31 / 91)**, CI **[0.2515, 0.4427]**. The 0.05
 false-positive target is not met at the publisher layer under v2;
 the calibration sweep confirmed this ceiling rather than dislodging
@@ -43,8 +43,8 @@ recall is **0 / 12 = 0** (`.recall_labels_point`): the BLOCKs that
 trigger on chalk and eslint-config-prettier occur at versions
 outside the labeled advisory ranges, so at the label granularity
 every training advisory counts as a miss even though two packages
-are detected. The table below is at label granularity — one row per
-advisory or attack-label entry — so readers should interpret it
+are detected. The table below is at label granularity (one row per
+advisory or attack-label entry), so readers should interpret it
 against the label denominator, not the package denominator. Test data
 follows the same pattern: package-level recall 2/2, label-level
 recall 3/4 (see table).
@@ -57,10 +57,10 @@ case.
 
 | # | Package | Advisory | Bucket | Detected | Pattern | Shape | Domain stability |
 |---|---|---|---|---|---|---|---|
-| 1 | axios | — | test | Y | provenance_regression (committee) | committee | — |
-| 2 | axios | MAL-2026-2307 | test | N | miss-attribution | committee | — |
-| 3 | event-stream | — | test | Y | cold_handoff (solo) | solo | — |
-| 4 | event-stream | GHSA-mh6f-8j2x-4483 | test | Y | cold_handoff (solo) | solo | — |
+| 1 | axios | n/a | test | Y | provenance_regression (committee) | committee | n/a |
+| 2 | axios | MAL-2026-2307 | test | N | miss-attribution | committee | n/a |
+| 3 | event-stream | n/a | test | Y | cold_handoff (solo) | solo | n/a |
+| 4 | event-stream | GHSA-mh6f-8j2x-4483 | test | Y | cold_handoff (solo) | solo | n/a |
 | 5 | chalk | MAL-2025-46969 | train | N | miss-attribution | solo | stable |
 | 6 | coa | GHSA-73qr-pfmq-6rp8 | train | N | miss-attribution | committee | mixed |
 | 7 | debug | GHSA-4x49-vf9v-38px | train | N | miss-attribution | committee | churning |
@@ -69,9 +69,9 @@ case.
 | 10 | eslint-config-prettier | MAL-2025-6022 | train | N | miss-attribution | solo | stable |
 | 11 | node-ipc | GHSA-97m3-w2cp-4xx6 | train | N | miss-attribution | solo | stable |
 | 12 | rc | GHSA-g2q5-5433-rhrf | train | N | miss-attribution | solo | stable |
-| 13 | ua-parser-js | — | train | N | miss-scope | solo | stable |
-| 14 | ua-parser-js | — | train | N | miss-scope | solo | stable |
-| 15 | ua-parser-js | — | train | N | miss-scope | solo | stable |
+| 13 | ua-parser-js | n/a | train | N | miss-scope | solo | stable |
+| 14 | ua-parser-js | n/a | train | N | miss-scope | solo | stable |
+| 15 | ua-parser-js | n/a | train | N | miss-scope | solo | stable |
 | 16 | ua-parser-js | GHSA-pjwm-rvh2-c87w | train | N | miss-scope | solo | stable |
 
 The four ua-parser-js rows are labeled from a reconstructed-fixture
@@ -94,7 +94,7 @@ on any version they had the attribution for.
 **0.3407 (31 / 91)**, 95% Wilson CI **[0.2515, 0.4427]**
 (`results.json .aggregates.false_positive_rate_point`,
 `.clean_packages_blocked`, `.corpus.clean_packages`). Of the 91
-clean training packages, 31 BLOCK, 44 WARN, and 16 ALLOW — the
+clean training packages, 31 BLOCK, 44 WARN, and 16 ALLOW. The
 BLOCK count is what drives the FP metric.
 
 **Test pool (n=4 clean packages).** False-positive rate
@@ -105,7 +105,7 @@ true positives and this one false positive, is **0.6667 (2 / 3)**,
 CI **[0.2077, 0.9385]**.
 
 Training and test point estimates differ (0.3407 vs. 0.25), but the
-CIs overlap substantially — Wilson bounds for the training rate
+CIs overlap substantially: Wilson bounds for the training rate
 cover [0.2515, 0.4427] and the test rate's CI covers [0.0456,
 0.6994]. The test CI's lower bound (0.0456) falls just below the
 0.05 §2 target, and its upper bound reaches 0.6994; the observation
@@ -130,7 +130,7 @@ contributing to a provenance-layer false-positive rate of
 publisher only (event-stream, cold-handoff on solo tenure) and
 1 via provenance only (axios, committee shape, escalators
 `new_domain` + `privacy` + `machine_to_human` all firing). The
-two layers covered disjoint attacks on this pool — event-stream
+two layers covered disjoint attacks on this pool. Event-stream
 is a classic publisher-takeover shape the publisher layer is
 designed for; axios is a committee-shape package where the
 publisher layer does not fire and the provenance regression
@@ -140,7 +140,7 @@ surface carried the detection. Provenance-layer test FP is
 ## 6. Known limitations
 
 - **Publisher-layer false-positive target unmet.** Training FP
-  0.3407 exceeds the 0.05 target by 6.8×. The calibration sweep
+  0.3407 exceeds the 0.05 target by 6.8 times. The calibration sweep
   characterized this as a corpus-level ceiling under v2, not a
   tuning oversight; full framing in `METHODOLOGY.md §9`.
 - **Small-N test pool.** Test-set denominators are 4 clean and 2
@@ -168,8 +168,8 @@ on the held-out test pool, both locked attack packages were
 detected (publisher-layer on event-stream, provenance-layer on
 axios), and the starter constants already sit at the training-pool
 FP-minimum among recall-preserving grid points. The publisher-layer
-FP ceiling under this corpus is 0.3407, 6.8× above the 0.05 target
-— a ceiling the calibration pass characterized rather than removed.
+FP ceiling under this corpus is 0.3407, 6.8 times above the 0.05 target,
+a ceiling the calibration pass characterized rather than removed.
 See `METHODOLOGY.md §9` for the full framing: under v2, further
 publisher-layer FP reduction is constrained by the same recall pin
 that makes chalk and eslint-config-prettier detectable at all, and

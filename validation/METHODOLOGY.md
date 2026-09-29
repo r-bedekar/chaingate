@@ -12,8 +12,8 @@ reports the findings themselves.
 npm's registry vests publishing authority in accounts rather than in
 source repositories. A tarball carries a maintainer identity at publish
 time; it does not carry build provenance unless the publisher opts in
-via npm's SLSA attestation flow. ChainGate's two detection layers —
-publisher and provenance — are designed around that trust surface, and
+via npm's SLSA attestation flow. ChainGate's two detection layers
+(publisher and provenance) are designed around that trust surface, and
 the rest of this document assumes the four concepts below.
 
 **Publisher identity.** The publisher of an npm version is the account
@@ -24,8 +24,8 @@ account is the unit of risk; a compromised repo contributor whose patch
 lands under an established maintainer is not.
 
 **Tenure block.** A tenure block is a contiguous run of versions
-published under a single publisher-identity signature — same account,
-same email — bounded by any identity change. Tenure blocks are the
+published under a single publisher-identity signature (same account,
+same email), bounded by any identity change. Tenure blocks are the
 building block of the publisher pattern: they let the detector reason
 about "this maintainer has shipped the last N versions, and now a
 different account appears."
@@ -41,7 +41,7 @@ credentials in hand.
 **Provenance layer.** npm's provenance surface (SLSA attestation
 emitted by `npm publish --provenance`) records the build origin of a
 published tarball. ChainGate's provenance layer fires on *regressions*
-in attestation metadata across a publisher's tenure — a known-signed
+in attestation metadata across a publisher's tenure: a known-signed
 lineage suddenly publishing unsigned, or an attested build origin
 changing from a CI runner to a personal machine. It does not fire on
 mere absence of attestation, which is still the default across most of
@@ -50,7 +50,7 @@ the ecosystem.
 ## 2. Threat model and detection goal
 
 ChainGate targets compromised-maintainer and cold-handoff takeovers of
-established packages — the class of attacks where an adversary obtains
+established packages: the class of attacks where an adversary obtains
 an existing publisher's credentials (or a maintainer transfers the
 project to a new account who immediately publishes malware) and ships a
 malicious version that installs under the package's established name.
@@ -77,7 +77,7 @@ for ua-parser-js. Attack labels are sourced from OSV advisories
 (GHSA and MAL identifiers) and, for ua-parser-js specifically, from a
 set of reconstructed-fixture rows that encode the 2021 takeover
 versions. 9 packages carry attack labels (7 in the training pool, 2
-in the held-out test pool — axios and event-stream — where axios and
+in the held-out test pool, axios and event-stream, where axios and
 event-stream are the locked test attacks); the remainder are
 clean-labeled controls.
 
@@ -124,7 +124,7 @@ draw (`held_out_packages`: axios, event-stream) because their
 attack-label provenance is attributable at version level and they
 serve as the locked test attacks. Four packages are hard-locked into
 the training pool (`train_locked_packages`: chalk, coa,
-eslint-config-prettier, rc) — the 2025 publisher-takeover cases
+eslint-config-prettier, rc), the 2025 publisher-takeover cases
 whose characteristics drove the starter constants and whose presence
 in the training pool is the point of the calibration pass.
 
@@ -149,7 +149,7 @@ the starter baseline. Constants outside the publisher layer
 not perturbed in this pass; they are out of scope for v2 calibration
 and revisiting them is future work.
 
-A retention rule — `|Δrecall| ≥ 0.02 OR |ΔFP| ≥ 0.005` — decides
+A retention rule, `|Δrecall| ≥ 0.02 OR |ΔFP| ≥ 0.005`, decides
 which constants carry forward into the calibration grid. The
 threshold is calibrated against the corpus granularity: a recall
 shift of 0.1429 (1 attack package out of 7) is the smallest non-zero
@@ -163,8 +163,8 @@ dropped; MIN_VERIFIED_VERSIONS (ΔFP=0.0219) and SOLO_DOMINANCE
 
 A notable artifact of this pass: the SOLO_DOMINANCE upper
 perturbation (value=0.85) collapses training recall to 0. At that
-threshold, chalk and eslint-config-prettier — the two packages that
-the starter constants *do* catch — stop triggering the cold-handoff
+threshold, chalk and eslint-config-prettier (the two packages that
+the starter constants *do* catch) stop triggering the cold-handoff
 pattern. This result hard-pins the SOLO_DOMINANCE axis of the
 calibration grid from above: values ≥ 0.85 are excluded by
 construction, not by optimization outcome.
@@ -196,8 +196,8 @@ explicit recall floor is needed in the selection rule. The
 selected-parameter branch and the best-achievable-only branch emit
 different output shapes; both are documented in `optimal-params.json`.
 
-Under v2, the filter set is empty — no grid point achieves FP ≤
-0.05 — so the selected field is `null` and the best achievable FP is
+Under v2, the filter set is empty (no grid point achieves FP ≤
+0.05), so the selected field is `null` and the best achievable FP is
 reported: 0.3407 at (MIN_VERIFIED_VERSIONS=1, SOLO_DOMINANCE=0.80),
 tied with (MIN_VERIFIED_VERSIONS=2, SOLO_DOMINANCE=0.80) under the
 FP-first tie-break. Since the starter value is MIN_VERIFIED_VERSIONS=2
@@ -209,9 +209,9 @@ therefore makes no change to the committed constants.
 
 Four aggregates carry 95% confidence intervals in `validation.md`:
 test recall, test false-positive rate, test precision, and training
-false-positive rate. All four use the Wilson score interval — the
+false-positive rate. All four use the Wilson score interval (the
 "score" method, not the normal approximation, not Agresti-Coull,
-not exact binomial — with z = 1.959964, clamped to [0, 1], no
+not exact binomial), with z = 1.959964, clamped to [0, 1], no
 continuity correction.
 
 Formula, for x successes out of n trials with p̂ = x/n:
@@ -222,9 +222,9 @@ half   = (z / (1 + z²/n)) · √( p̂(1-p̂)/n + z²/(4n²) )
 CI     = [center − half, center + half], clamped to [0, 1]
 ```
 
-**Worked example — test recall, x=2, n=2:** p̂ = 1.0, z²/n = 1.92073,
-center = (1 + 0.96037) / 2.92073 ≈ 0.6712, half = (1.959964 /
-2.92073) · √(0 + 3.84146/16) ≈ 0.3288, CI = [0.3424, 1.0000] (upper
+**Worked example, test recall, x=2, n=2:** p̂ = 1.0, z²/n = 1.92073,
+center = (1 + 0.96037) / 2.92073, about 0.6712; half = (1.959964 /
+2.92073) * √(0 + 3.84146/16), about 0.3288; CI = [0.3424, 1.0000] (upper
 clamped from the raw Wilson value 0.99997; lower is 0.34238022
 rounded to 4 decimals). That lower bound reads, plainly: *we cannot
 rule out a true test recall as low as 34% on a 2-of-2 observation.*
@@ -233,8 +233,8 @@ The CI width is the small-N honesty that the point estimate hides.
 **Decomposition metrics reported without CIs.** Publisher-only and
 provenance-only detection counts, per-attack breakdowns, per-package
 dispositions, and per-escalator fire counts appear in `validation.md`
-as point estimates without intervals. At those denominators —
-typically single digits — Wilson CIs would span most of [0, 1] and
+as point estimates without intervals. At those denominators
+(typically single digits), Wilson CIs would span most of [0, 1] and
 communicate less than the raw counts do. CIs are reserved for the
 four aggregates that most directly correspond to detection targets.
 
@@ -248,7 +248,7 @@ confusion between "flagged and correct" and "overall hit rate."
 ## 9. Calibration limitations
 
 Under the v2 corpus, the best achievable publisher-layer training
-false-positive rate is 0.3407 — 6.8× the §2 target of 0.05. No grid
+false-positive rate is 0.3407, 6.8 times the §2 target of 0.05. No grid
 point the sensitivity pass identified as worth searching achieves the
 target; no grid extension under v2 would, because the
 SOLO_DOMINANCE upper edge is pinned by the chalk and
@@ -262,7 +262,7 @@ recall-preserving grid points. That ceiling is itself a finding. It
 either tells us the §2 target needs reformulation against a different
 corpus or a different denominator, or it tells us that
 publisher-layer false-positive reduction has hit a structural limit
-and further progress has to come from provenance-layer signals —
+and further progress has to come from provenance-layer signals,
 which are measured in this report but not yet calibrated. Both
 readings are on the table. What is *not* on the table, under v2, is
 a publisher-layer tuning that both preserves recall and meets the
@@ -281,16 +281,16 @@ where it is, stage 2 is a no-op.
 **Small-N test set.** The held-out test pool is 4 clean packages
 and 2 attack-labeled packages. Point estimates on that pool (recall
 1.0, FP 0.25, precision 0.6667) are each sitting on single-digit
-denominators, and their Wilson CIs — reported in `validation.md §1`
-and §4 — are correspondingly wide. A 2-of-2 recall observation is
+denominators, and their Wilson CIs (reported in `validation.md §1`
+and §4) are correspondingly wide. A 2-of-2 recall observation is
 consistent with a true recall in the mid-30s; a 1-of-4 FP observation
 is consistent with a true FP rate anywhere from 4.6% to 70%. The
 test pool is large enough to surface a qualitative pattern, not
 large enough to tighten to a point.
 
 **Label-quality audit deferred.** A planned manual audit of the
-attack-labeled rows — sampling approximately 30 labels and verifying
-each against upstream advisory records — was not executed under the
+attack-labeled rows (sampling approximately 30 labels and verifying
+each against upstream advisory records) was not executed under the
 initial validation pass. The numbers in this report and in
 `validation.md` assume the committed labels are correct. Systematic
 bias from mislabeled entries (false attack labels inflating recall
@@ -302,7 +302,7 @@ perturbed only publisher-layer constants; provenance-layer thresholds
 (MIN_PROVENANCE_HISTORY, MIN_BASELINE_STREAK, the two tenure
 thresholds) carry the starter values without sensitivity coverage.
 The provenance layer's training FP is 0.011 (1 / 91) and its
-training recall is 0 — numbers reported but not calibrated. A full
+training recall is 0; these numbers are reported but not calibrated. A full
 provenance-layer pass is future work.
 
 ## 10. Reproducibility contract

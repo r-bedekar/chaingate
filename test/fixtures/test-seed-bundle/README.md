@@ -3,11 +3,11 @@
 Minimal signed seed bundle used by `test/integration/update-seed.test.js`.
 
 ## Files committed
-- `chaingate-seed.db` — SQLite DB built from the vendored bundle SCHEMA
+- `chaingate-seed.db`: SQLite DB built from the vendored bundle SCHEMA
   (`test/fixtures/bundle-schema.sql`) with one fixture package, one version,
   and the standard `seed_metadata` rows.
-- `chaingate-seed.db.sha256` — hex-encoded SHA-256 of the `.db`.
-- `chaingate-seed.db.sig` — raw 64-byte Ed25519 signature over the SHA-256
+- `chaingate-seed.db.sha256`: hex-encoded SHA-256 of the `.db`.
+- `chaingate-seed.db.sig`: raw 64-byte Ed25519 signature over the SHA-256
   hex bytes (matches `collector/export_seed.py` signing convention).
 
 ## Identity
@@ -15,7 +15,7 @@ Minimal signed seed bundle used by `test/integration/update-seed.test.js`.
 - `exported_at  = "2026-04-26T00:00:00Z"`
 - Signed by a **throwaway** Ed25519 keypair generated at build time and
   discarded. Not the production signing key. Never store the privkey here
-  or anywhere else — the bundle is regenerable.
+  or anywhere else; the bundle is regenerable.
 
 ## Why the fixture sig isn't actually verified
 The integration test mocks `verifySeed` so it does not check this signature
@@ -38,7 +38,7 @@ prompted regeneration.
 
 A sibling fixture lives at `../test-seed-bundle-drifted/`. It simulates
 a pre-Option-C bundle (e.g., seed-v2.1) that predates the
-`dep_first_publish` table — the bundle SCHEMA exec'd at build time has
+`dep_first_publish` table: the bundle SCHEMA exec'd at build time has
 that CREATE TABLE removed in-memory before the SQLite DB is built.
 
 Used by the schema-gap recovery integration test to prove that

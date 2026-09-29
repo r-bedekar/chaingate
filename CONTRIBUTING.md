@@ -7,7 +7,7 @@ git clone https://github.com/r-bedekar/chaingate.git
 cd chaingate
 npm install
 npm run hooks  # activates the git guard hooks (.githooks/)
-npm test       # 243 tests, should all pass
+npm test       # the full suite; every test should pass
 ```
 
 Requires **Node.js 22 or 24** (the majors that are tested; see the README).
@@ -44,17 +44,20 @@ git config core.hooksPath   # should print .githooks
 ```
 proxy/       HTTP proxy that sits between npm and the upstream registry
 witness/     SQLite-backed witness store (baselines, decisions, overrides)
-gates/       Deterministic gate modules (content-hash, dep-structure, etc.)
-cli/         CLI commands (init, status, allow, stop, why, doctor, etc.)
-collector/   Python data collector (populates the seed database, runs on VPS)
-test/        Node.js test:runner tests, mirrors the source tree
+gates/       gate modules (content-hash, dep-structure, and others)
+patterns/    detection patterns (publisher identity, provenance)
+seed/        v3 seed reader, evaluator and conformance tools
+cli/         CLI commands (init, status, check, why, allow, stop, doctor, and others)
+examples/    the offline CI consumer
+validation/  validation scripts, methodology and reports
+test/        node:test tests, laid out like the source tree
 ```
 
 ## Pull Requests
 
 - One logical change per PR
 - Include tests for new gates or CLI commands
-- Run `npm test` before pushing — all 243 tests must pass
+- Run `npm test` before pushing; every test must pass
 - The pre-commit hook will catch common issues automatically
 
 ## Adding a New Gate

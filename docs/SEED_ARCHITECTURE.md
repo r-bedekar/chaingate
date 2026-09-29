@@ -1,4 +1,4 @@
-# ChainGate — Seed and Collector Architecture
+# ChainGate: Seed and Collector Architecture
 
 _Snapshot: 2026-04-13. Describes the upstream pipeline that produces
 seed bundles consumed by the chaingate runtime. The collector and
@@ -6,7 +6,7 @@ seed production code live on private infrastructure (chaingate-ops);
 this document is preserved here for reader context. See
 [SECURITY.md](../SECURITY.md) for the current trust model._
 
-_Covers the data-collection foundation (Phases P1–P4)._
+_Covers the data-collection foundation (Phases P1 to P4)._
 
 ---
 
@@ -20,15 +20,15 @@ from what's been historically observed.
 
 The project is deliberately staged in two halves:
 
-1. **Witness store** (P1–P4, now landed) — a passive, append-only record
+1. **Witness store** (P1 to P4, now landed): a passive, append-only record
    of every version of every seed package, with hashes, dependencies,
    publishers, attestations, and advisories attached.
-2. **Proxy + gates** (P5, next) — an HTTP shim in front of `registry.npmjs.org`
+2. **Proxy + gates** (P5, next): an HTTP shim in front of `registry.npmjs.org`
    that reads the witness store on install and fires BLOCK/WARN gates
    when the incoming artifact contradicts history.
 
 The order matters: gates only mean something if they have a trustworthy
-baseline to compare against. P1–P4 is that baseline.
+baseline to compare against. P1 to P4 is that baseline.
 
 ---
 
@@ -62,7 +62,7 @@ baseline to compare against. P1–P4 is that baseline.
 
 ### 2.2 Data-flow summary
 
-- Every 15 minutes, the collector walks both seed lists (≈100 npm, ≈100
+- Every 15 minutes, the collector walks both seed lists (about 100 npm, about 100
   PyPI packages), fetches registry metadata, and normalizes it into
   `versions` + `version_files` rows.
 - A single `sources/*.py` module per registry handles the fetch and
@@ -91,9 +91,9 @@ baseline to compare against. P1–P4 is that baseline.
 | `api.osv.dev/v1/querybatch`  | Cheap bulk vuln lookup (sparse result)        | none  | single batch / run   |
 | `api.osv.dev/v1/vulns/{id}`  | Full advisory record (cached by id)           | none  | 10 rps, 10 concurrent |
 
-All are retry-wrapped (`tenacity`, 3 attempts, exponential 1→16 s) and
+All are retry-wrapped (`tenacity`, 3 attempts, exponential 1 to 16 s) and
 distinguish 5xx (retryable) from 4xx (terminal). The collector never
-falls back to fake data on failure — it logs the error, increments the
+falls back to fake data on failure; it logs the error, increments the
 run's error counter, and moves on.
 
 ### 2.4 Runtime topology
@@ -104,7 +104,7 @@ run's error counter, and moves on.
 | `chaingate-collector-pypi.timer`          | `*:07,22,37,52`    | pypi seed walk (7-min stagger)       |
 | `collector.backfill_*` one-shot scripts   | manual / tmux      | historical backfill over existing rows |
 
-The 7-minute stagger is intentional — npm and pypi share the same
+The 7-minute stagger is intentional: npm and pypi share the same
 Postgres instance and the same `collector_runs` table, so serializing
 their writes makes failure attribution obvious (you never have to
 disambiguate which collector owned a failing row).
@@ -251,24 +251,24 @@ The `versions` and `version_files` tables are **append-only** by design.
 Gates only work if what we wrote yesterday is still what we read today.
 There are exactly two sanctioned ways to change an existing row:
 
-1. **Fill-NULL enrichment** — `db.update_version_fill_nulls` and
+1. **Fill-NULL enrichment**: `db.update_version_fill_nulls` and
    `db.update_file_fill_nulls`. Both use `SET col = COALESCE(col, %s)`
    so a non-NULL value can never be overwritten. A second enrichment
    pass with different data is a no-op on any already-populated column.
    The fillable-column set is explicit in `_FILLABLE_COLUMNS` / 
-   `_FILE_FILLABLE_COLUMNS` — adding a new enrichable field is a
+   `_FILE_FILLABLE_COLUMNS`, so adding a new enrichable field is a
    deliberate code change, not an accident.
 
-2. **Write-once lifecycle transitions** — `bulk_mark_seen`,
+2. **Write-once lifecycle transitions**: `bulk_mark_seen`,
    `mark_vanished`, `apply_lifecycle`, `apply_file_yank`. These bump
    monotonic timestamps (`last_seen_at`, `deprecated_at`, `yanked_at`,
-   `vanished_at`). Each first transition additionally appends a
+   `vanished_at`). Each first transition also appends a
    `version_events` row so the history is preserved even if the
    package later reappears.
 
 Everything else (mutating a hash, a dependency list, a publisher email)
 is forbidden at the DB layer. If a mutation like that ever needs to
-happen, it must first become a new row — never an in-place edit.
+happen, it must first become a new row, never an in-place edit.
 
 ### 3.5 Resumable id-cursor backfill pattern
 
@@ -295,16 +295,16 @@ LIMIT %s
 
 Because enrichment is COALESCE-protected, a process crash leaves the
 row it was working on still NULL, so the next run resumes transparently.
-No external state file, no lock table, no cursor snapshot — Postgres
+No external state file, no lock table, no cursor snapshot. Postgres
 is the cursor.
 
 ### 3.6 PEP 740 attestation tri-state
 
 `version_files.attestation_present` is deliberately `NULL`-able:
 
-- `NULL`  — not yet checked
-- `FALSE` — checked, file has no Trusted Publishing attestation
-- `TRUE`  — checked, attestation present; publisher + bundles populated
+- `NULL`: not yet checked
+- `FALSE`: checked, file has no Trusted Publishing attestation
+- `TRUE`: checked, attestation present; publisher + bundles populated
 
 The backfill's `WHERE attestation_present IS NULL` clause self-cursors
 against this: once a file is checked, it drops out of future batches
@@ -319,7 +319,7 @@ Packages project are all federated behind one API. Fetch is two stages
 so we don't pay the per-advisory cost for packages that have no hits:
 
 1. `POST /v1/querybatch` with one query per seed package
-   (209 queries / single POST — well under the 1000 limit). The response
+   (209 queries in a single POST, well under the 1000 limit). The response
    is sparse: `{vulns: [{id, modified}, ...]}` per package. Most
    packages return zero vulns.
 2. `GET /v1/vulns/{id}` per *unique* advisory id. Multi-package
@@ -335,7 +335,7 @@ Malware heuristic (`is_malicious`) triggers on any of:
 
 Ranges are flattened by `_format_ranges` into npm-style semver:
 `>=1.0.0 <1.13.5 || <0.18.1`. We do not try to resolve ranges to
-concrete `version_id`s at ingest — `attack_labels.version_id` stays
+concrete `version_id`s at ingest; `attack_labels.version_id` stays
 NULL and consumers interpret `affected_range` against their own
 version of interest.
 
@@ -354,14 +354,14 @@ async with semaphore:
 
 `CONCURRENCY` and `RPS` are tuned per source (npm: 8/20, pypi: 8/20,
 attestations: 10/10, OSV vulns: 10/10). No source has ever tripped a
-429 — registries are indulgent, but the collector is polite anyway.
+429. Registries are indulgent, but the collector is polite anyway.
 
 ### 3.9 Observability
 
 Every run opens a `collector_runs` row with `status='running'` at start
 and closes it with `success|partial|failed` + counts + notes at end.
 The systemd unit binds the service so a process crash leaves the row in
-`running` — a separate sweeper (or a `started_at < now - interval '1h'
+`running`, and a separate sweeper (or a `started_at < now - interval '1h'
 AND status='running'` query) can flag orphans.
 
 Structured JSON logs go to stdout (captured by systemd-journald):
@@ -398,7 +398,7 @@ npm (50,423 rows):
 PyPI (19,541 rows):
 - `has_install_scripts` 100%  (AST walk of every sdist)
 - `license_text OR license_expression` 91%
-- `publisher_email` 59%  (data-source limit — many authors omit email)
+- `publisher_email` 59%  (data-source limit: many authors omit email)
 - `publisher_maintainer` 6%  (same)
 
 All residual NULLs are data-source limits (upstream didn't publish the
@@ -412,18 +412,18 @@ in the seed set:
 | Package              | Advisory               | Type              | Range               |
 |----------------------|------------------------|-------------------|---------------------|
 | axios                | GHSA-3p68-rc4w-qgx5    | NO_PROXY SSRF     | `<1.15.0` CRITICAL  |
-| axios                | MAL-2026-2307          | Malware           | —                   |
+| axios                | MAL-2026-2307          | Malware           | n/a                 |
 | ua-parser-js         | GHSA-pjwm-rvh2-c87w    | Embedded malware  | `>=0.7.29 <0.7.30`  |
 | event-stream         | GHSA-mh6f-8j2x-4483    | Embedded malware  | CRITICAL            |
 | node-ipc             | GHSA-97m3-w2cp-4xx6    | Protestware       | CRITICAL            |
 | rc                   | GHSA-g2q5-5433-rhrf    | Takeover malware  | CRITICAL            |
 | coa                  | GHSA-73qr-pfmq-6rp8    | Takeover malware  | CRITICAL            |
 | debug                | GHSA-4x49-vf9v-38px    | Account-TO malware| HIGH                |
-| chalk                | MAL-2025-46969         | Malware           | —                   |
+| chalk                | MAL-2025-46969         | Malware           | n/a                 |
 | eslint-config-prettier | GHSA-f29h-pxvx-f335 | Publisher compromise | HIGH           |
 
 Axios also carries 10 non-malicious advisories (SSRF, ReDoS, DoS) with
-correct range slicing — this is the data that drives future gates.
+correct range slicing. This is the data that drives future gates.
 
 ---
 
@@ -435,8 +435,8 @@ correct range slicing — this is the data that drives future gates.
 | P2.1  | versions-table extensions (16 columns)               | done   | 2026-04-13 |
 | P2.2  | version_files + PEP 740 attestations                 | done   | 2026-04-13 |
 | P3    | Advisories / attack_labels (OSV federated)           | done   | 2026-04-13 |
-| P4    | Collector cadence 1h → 15m                           | done   | 2026-04-13 |
-| P5    | Week 2-3: npm proxy + gates                          | pending | —         |
+| P4    | Collector cadence 1h to 15m                          | done   | 2026-04-13 |
+| P5    | Week 2-3: npm proxy + gates                          | pending | n/a       |
 
 ---
 
@@ -469,7 +469,7 @@ store's prior observations. Gate decisions are logged to a new
 `gate_decisions` table (not yet created) and the proxy rewrites the
 response body only when the disposition is BLOCK.
 
-The validation target is the real Axios 1.14.0 → 1.14.1 delta (the
+The validation target is the real Axios 1.14.0 to 1.14.1 delta (the
 2025 incident): 4 gates should fire (content-hash, dep-structure,
 publisher-identity, provenance-continuity).
 
@@ -478,10 +478,10 @@ publisher-identity, provenance-continuity).
 ## 7. Operational notes
 
 - **Secrets**: `DATABASE_URL` is in `.env` (git-ignored). No registry
-  auth tokens needed — everything uses public endpoints.
+  auth tokens needed; everything uses public endpoints.
 - **Postgres**: single local instance, no replication. The collector
   assumes it's the only writer. If that changes, the fill-NULL path
-  would need SERIALIZABLE isolation or a row-lock — today it doesn't.
+  would need SERIALIZABLE isolation or a row-lock. Today it doesn't.
 - **Tmux for backfills**: long-running history passes (attestations,
   tarballs, pypi P2.1) always run inside tmux so an SSH disconnect
   doesn't kill them. See `tracker/tasks.md` Progress Log for run
