@@ -26,11 +26,17 @@
 //    would mean two records of the same fact, and an interrupted update leaving them disagreeing —
 //    the split state this design exists to avoid. config.json holds the operator's POLICY, which is
 //    not a property of any bundle.
+//
+//    ON WINDOWS the record is a FILE, `seeds/activation.json`, holding both the active and the
+//    previous bundle: a symlink cannot be renamed over an existing one there (EPERM, even as an
+//    administrator), and creating one may need Developer Mode. A file IS replaced by one rename,
+//    so the switch stays a single atomic step. See docs: U-04 Windows activation pointer design.
+//    Linux and macOS keep the symlinks.
 
 import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, renameSync, rmSync,
   chmodSync, symlinkSync, readlinkSync, realpathSync, readdirSync, statSync,
-  lstatSync } from 'node:fs';
-import { join, basename } from 'node:path';
+  lstatSync, openSync, writeSync, fsyncSync, closeSync, rmdirSync } from 'node:fs';
+import { join, basename, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 
@@ -43,10 +49,20 @@ export const SEEDS_DIRNAME = 'seeds';
 export const ACTIVE_LINK = 'active';
 export const PREVIOUS_LINK = 'previous';
 export const BUNDLE_MANIFEST = 'bundle.json';
+export const ACTIVATION_FILE = 'activation.json';
+const ACTIVATION_SCHEMA = 'chaingate-activation/1';
+const ACTIVATION_MAX_BYTES = 4096;
+/** A bundle directory name: its 16-hex id, or a repair copy `<id>.r<n>`. Nothing else can be referenced. */
+const BUNDLE_NAME = /^[0-9a-f]{16}(\.r[1-9][0-9]*)?$/;
 
 export const seedsDir = (base) => join(base, SEEDS_DIRNAME);
 export const activeLink = (base) => join(seedsDir(base), ACTIVE_LINK);
 export const previousLink = (base) => join(seedsDir(base), PREVIOUS_LINK);
+export const activationFile = (base) => join(seedsDir(base), ACTIVATION_FILE);
+
+/** 'pointer' (Windows) or 'symlink' (POSIX). Tests select a mode explicitly with `{ mode }`. */
+export const activationMode = (opts = {}) => opts.mode ?? (process.platform === 'win32' ? 'pointer' : 'symlink');
+const isPointer = (opts) => activationMode(opts) === 'pointer';
 
 export const bundleFiles = (dir) => ({
   db: join(dir, SEED_V3_FILENAME),
@@ -223,15 +239,18 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
 }
 
 /**
- * THE activation record. One symlink swap, and nothing else records which bundle is active — so
- * there is no second copy of the fact to fall out of step with it.
+ * THE activation record. One swap, and nothing else records which bundle is active — so there is
+ * no second copy of the fact to fall out of step with it. POSIX: a symlink swap. Windows: one file
+ * replace (see activatePointer).
  */
-export function activateBundle(base, dirName) {
+export function activateBundle(base, dirName, opts = {}) {
   const dir = join(seedsDir(base), dirName);
   const verdict = verifyBundleDir(dir);
   if (!verdict.ok) throw new Error(`refusing to activate ${dirName}: ${verdict.why}`);
+  if (isPointer(opts)) return { ...verdict.identity, dir_name: dirName, ...activatePointer(base, dirName, opts) };
 
-  const current = activeBundleId(base);
+  refuseForeignPointer(base);
+  const current = activeBundleId(base, opts);
   if (current && current !== dirName) {
     // remember what to roll back TO, before the swap rather than after it
     const tmpPrev = `${previousLink(base)}.switching-${process.pid}`;
@@ -247,25 +266,142 @@ export function activateBundle(base, dirName) {
   return { ...verdict.identity, dir_name: dirName };
 }
 
+/**
+ * Windows: write the COMPLETE next state to a temporary file, flush it, then rename it over
+ * activation.json. The working record is never removed first: if the write or the rename fails, the
+ * previous record (or the legacy links) is untouched and still usable. Legacy symlinks from an older
+ * client are removed only AFTER the new record is in place.
+ */
+function activatePointer(base, dirName, opts) {
+  const fsx = { renameSync, ...(opts.fsImpl || {}) };
+  const state = currentPointerState(base);            // activation.json, or the legacy links (migration)
+  const next = {
+    schema: ACTIVATION_SCHEMA,
+    active: dirName,
+    previous: state.active && state.active !== dirName ? state.active : (state.previous ?? null),
+    updated_at: new Date().toISOString(),
+  };
+  const file = activationFile(base);
+  const tmp = `${file}.tmp-${process.pid}`;
+  try {
+    const fd = openSync(tmp, 'w');
+    try { writeSync(fd, `${JSON.stringify(next, null, 2)}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+    fsx.renameSync(tmp, file);                         // ONE step: the old record until it succeeds
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
+  const warnings = [];
+  for (const link of [activeLink(base), previousLink(base)]) {
+    if (!lstatOrNull(link)) continue;
+    try { removeLink(link); } catch (e) {
+      warnings.push(`could not remove the legacy activation link ${link} (${e.code || e.message}); `
+        + `${ACTIVATION_FILE} is authoritative, but older ChainGate versions would still read the link`);
+    }
+  }
+  cleanStaleTemporaries(base, tmp);
+  return { previous: next.previous, record: ACTIVATION_FILE, ...(warnings.length ? { warnings } : {}) };
+}
+
 /** Roll the one activation record back to the bundle it pointed at before. */
-export function rollbackActivation(base) {
-  const prev = previousBundleId(base);
+export function rollbackActivation(base, opts = {}) {
+  const prev = previousBundleId(base, opts);
   if (!prev) return null;
   const verdict = verifyBundleDir(join(seedsDir(base), prev));
   if (!verdict.ok) throw new Error(`refusing to roll back to ${prev}: ${verdict.why}`);
-  return activateBundle(base, prev);
+  return activateBundle(base, prev, opts);
 }
 
+const lstatOrNull = (p) => { try { return lstatSync(p); } catch { return null; } };
 const linkTarget = (p) => { try { return basename(readlinkSync(p)); } catch { return null; } };
-export const activeBundleId = (base) => linkTarget(activeLink(base));
-export const previousBundleId = (base) => linkTarget(previousLink(base));
+function removeLink(p) {
+  try { rmSync(p, { force: true }); } catch (e) {
+    if (e.code === 'EPERM' || e.code === 'EISDIR' || e.code === 'ERR_FS_EISDIR') rmdirSync(p); else throw e;
+  }
+  if (lstatOrNull(p)) rmdirSync(p);                    // a Windows directory link some APIs leave behind
+}
+function cleanStaleTemporaries(base, keep) {
+  let names = [];
+  try { names = readdirSync(seedsDir(base)); } catch { return; }
+  for (const n of names) {
+    const p = join(seedsDir(base), n);
+    if (p === keep) continue;
+    if (n.startsWith(`${ACTIVATION_FILE}.tmp-`)) rmSync(p, { force: true });
+    else if (/^(active|previous)\.switching-\d+$/.test(n)) { try { removeLink(p); } catch { /* left for doctor */ } }
+  }
+}
+
+/**
+ * Read and STRICTLY validate activation.json. null when it does not exist. Anything else that is
+ * wrong with it throws ActivationBroken: a broken pointer never falls back to an older record.
+ */
+export function readActivationPointer(base) {
+  const file = activationFile(base);
+  const st = lstatOrNull(file);
+  if (!st) return null;
+  const broken = (why) => new ActivationBroken(file, why);
+  if (!st.isFile()) throw broken('it is not a regular file');
+  if (st.size > ACTIVATION_MAX_BYTES) throw broken(`it is ${st.size} bytes, more than ${ACTIVATION_MAX_BYTES}`);
+  let rec;
+  try { rec = JSON.parse(readFileSync(file, 'utf8')); } catch (e) { throw broken(`unreadable or not JSON: ${e.message}`); }
+  if (!rec || typeof rec !== 'object' || Array.isArray(rec)) throw broken('not a JSON object');
+  if (rec.schema !== ACTIVATION_SCHEMA) throw broken(`unknown schema ${JSON.stringify(rec.schema)}`);
+  const ref = (role, name, nullable) => {
+    if (name === null && nullable) return null;
+    if (typeof name !== 'string' || !BUNDLE_NAME.test(name)) throw broken(`${role} ${JSON.stringify(name)} is not a bundle name`);
+    const dir = join(seedsDir(base), name);
+    const ds = lstatOrNull(dir);
+    if (!ds || !ds.isDirectory()) throw broken(`${role} bundle ${name} is not a directory in ${seedsDir(base)}`);
+    let real;
+    try { real = realpathSync(dir); } catch (e) { throw broken(`${role} bundle ${name}: ${e.code || e.message}`); }
+    if (dirname(real) !== realpathSync(seedsDir(base))) throw broken(`${role} bundle ${name} resolves outside ${seedsDir(base)}`);
+    return name;
+  };
+  return { active: ref('active', rec.active, false), previous: ref('previous', rec.previous ?? null, true) };
+}
+
+/** The current state for the NEXT pointer write: the pointer if present, else the legacy links. */
+function currentPointerState(base) {
+  const p = readActivationPointer(base);
+  if (p) return p;
+  return { active: linkTarget(activeLink(base)), previous: linkTarget(previousLink(base)) };
+}
+
+/** POSIX: a Windows pointer record here is not something this platform writes; fail closed on it. */
+function refuseForeignPointer(base) {
+  if (lstatOrNull(activationFile(base))) {
+    throw new ActivationBroken(activationFile(base),
+      'a Windows activation record (activation.json) exists on this platform, which records activation as symlinks');
+  }
+}
+
+export const activeBundleId = (base, opts = {}) => {
+  if (isPointer(opts)) { const p = readActivationPointer(base); return p ? p.active : linkTarget(activeLink(base)); }
+  refuseForeignPointer(base);
+  return linkTarget(activeLink(base));
+};
+export const previousBundleId = (base, opts = {}) => {
+  if (isPointer(opts)) { const p = readActivationPointer(base); return p ? p.previous : linkTarget(previousLink(base)); }
+  refuseForeignPointer(base);
+  return linkTarget(previousLink(base));
+};
+
+/** Windows: activation.json and an older client's symlink both present (the link is stale). */
+export function staleLegacyLink(base, opts = {}) {
+  if (!isPointer(opts) || !lstatOrNull(activationFile(base))) return null;
+  const links = [activeLink(base), previousLink(base)].filter((l) => lstatOrNull(l));
+  return links.length ? links : null;
+}
 
 export class ActivationBroken extends Error {
   constructor(link, why) {
     super(`chaingate: the activation link ${link} exists but does not resolve: ${why}\n`
       + '  A host that HAS activated a bundle must not read as "no seed configured": that turns a\n'
       + '  broken link into silently disabled detection.\n'
-      + '  Fix: re-run `chaingate init --seed <bundle>`, or `chaingate update-seed --rollback`.');
+      + (String(link).endsWith(ACTIVATION_FILE)
+        ? `  Fix: remove ${link} (it is not usable and is never guessed around), then run\n`
+          + '  `chaingate init --seed <bundle>` to record a bundle explicitly.'
+        : '  Fix: re-run `chaingate init --seed <bundle>`, or `chaingate update-seed --rollback`.'));
     this.name = 'ActivationBroken';
     this.link = link;
   }
@@ -281,7 +417,20 @@ export class ActivationBroken extends Error {
  * silently turning detection off on a host that had activated one. `lstat` asks about the link
  * itself, which is the question being asked here.
  */
-export function resolveActiveBundle(base) {
+export function resolveActiveBundle(base, opts = {}) {
+  if (isPointer(opts)) {
+    const p = readActivationPointer(base);            // throws ActivationBroken on a bad record
+    if (p) {
+      const dir = realpathSync(join(seedsDir(base), p.active));
+      if (!existsSync(bundleFiles(dir).db)) {
+        throw new ActivationBroken(activationFile(base), `it names ${p.active}, which holds no ${SEED_V3_FILENAME}`);
+      }
+      return { id: basename(dir), dir, files: bundleFiles(dir) };
+    }
+    // no pointer yet: an install made before 0.1.2 is read through its legacy links, as below
+  } else {
+    refuseForeignPointer(base);
+  }
   const link = activeLink(base);
   let linkStat = null;
   try { linkStat = lstatSync(link); } catch { return null; }      // genuinely absent
@@ -303,8 +452,8 @@ export function listBundles(base) {
   const dir = seedsDir(base);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((n) => ![ACTIVE_LINK, PREVIOUS_LINK].includes(n) && !n.startsWith('.')
-      && !n.includes('.damaged-'))
+    .filter((n) => ![ACTIVE_LINK, PREVIOUS_LINK, ACTIVATION_FILE].includes(n) && !n.startsWith('.')
+      && !n.includes('.damaged-') && !n.includes('.switching-') && !n.startsWith(`${ACTIVATION_FILE}.tmp-`))
     .map((id) => {
       const v = verifyBundleDir(join(dir, id));
       return { id, usable: v.ok, why: v.why, ...(v.identity || {}) };

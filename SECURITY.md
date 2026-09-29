@@ -225,10 +225,13 @@ seed signature-verified at runtime: the tool still reports `authenticated: false
 Only the combinations in the README's "Tested platforms" table have been tested. Windows and macOS
 are not yet tested.
 
-On Windows, the active seed bundle is recorded as a symbolic link. On a standard Windows account,
-creating symbolic links may require Developer Mode. Whether `init --seed`, `update-seed` and
-`--rollback` work on a standard account has not been tested yet; running ChainGate as Administrator
-is not a supported workaround.
+On Windows (from 0.1.2), the active and previous seed bundles are recorded in one file,
+`seeds\activation.json`, which is replaced in a single rename: Windows cannot rename a symbolic link
+over an existing one, even for an administrator, and creating one may need Developer Mode. The
+record is validated strictly on every read; if it is malformed or names a bundle that is missing or
+outside the seeds directory, ChainGate refuses to run detection instead of guessing. Linux and macOS
+keep symbolic links. Running ChainGate as Administrator, or enabling Developer Mode, is not a
+supported workaround. Mixing ChainGate versions on one Windows home directory is not supported.
 
 ## Disclosure
 

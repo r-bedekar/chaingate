@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { pipeline } from 'node:stream/promises';
@@ -349,6 +349,9 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           + 'counted as of its history cutoff)');
       } catch (err) {
         try { seedV3?.close?.(); } catch { /* already closed */ }
+        // Refusing to start must not leave the witness database open: on Windows an open handle
+        // keeps the file locked for as long as the calling process lives.
+        try { witnessDb?.close?.(); } catch { /* already closed */ }
         const msg =
           `chaingate-proxy: failed to open v3 seed at ${config.seedV3Path}: ${err.message}\n`
           + '  The proxy refuses to start WITHOUT the detection gate it was configured with.\n'
@@ -549,7 +552,11 @@ export async function startProxyServer(configOverrides = {}) {
 export function isDirectEntry(moduleUrl, entryPath, { windows } = {}) {
   if (!entryPath) return false; // `node -e` / REPL: no entry script
   const opts = windows === undefined ? undefined : { windows };
-  return moduleUrl === pathToFileURL(entryPath, opts).href;
+  if (moduleUrl === pathToFileURL(entryPath, opts).href) return true;
+  // Node loads the entry module by its REAL path, so an entry path through a symlink (macOS's
+  // /var -> /private/var, a symlinked install prefix) must be compared by its real path too.
+  if (windows !== undefined) return false;             // test-only form: no filesystem to consult
+  try { return moduleUrl === pathToFileURL(realpathSync(entryPath)).href; } catch { return false; }
 }
 
 const isDirectRun = isDirectEntry(import.meta.url, process.argv[1]);

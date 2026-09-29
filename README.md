@@ -133,24 +133,29 @@ npm install @cgsec/chaingate           # or inside a project
 npx chaingate --help
 ```
 
-**The SQLite module has a native part.** npm installs it with `better-sqlite3`'s own install
-script. Current npm runs dependency install scripts by default but warns about any not approved in
-`allowScripts`, and npm documents that a future release will block them. An `ignore-scripts=true`
-configuration skips them today. If the script did not run, the package installs but cannot open a
-database; `chaingate doctor` reports this as `native-sqlite` and prints the fix. The fix allows only
-that one package's script:
+**The SQLite module has a native part.** npm builds it with `better-sqlite3`'s own install script.
+npm 12 blocks dependency install scripts unless you approve them; npm 11 runs them but warns about
+any not approved in `allowScripts`; an `ignore-scripts=true` configuration skips them on any version.
+If the script did not run, ChainGate installs but cannot open a database: `chaingate doctor` reports
+this as `native-sqlite` and prints the fix. Approve only that one package's script:
 
 ```bash
-# global install
+# global install (npm 11 and 12)
 npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3
-# project install, in the project directory (npm versions with allowScripts)
-npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3
+
+# project install: approve in package.json before installing ...
+npm pkg set allowScripts.better-sqlite3=true --json && npm install @cgsec/chaingate
+# ... or install first, then approve and build it
+npm install @cgsec/chaingate && npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3
+
 # with ignore-scripts=true in your npm configuration: rebuild just that package
 cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scripts=false
 ```
 
 `--allow-scripts` applies to global installs only; npm rejects it for project installs, which use
-`allowScripts` in `package.json` instead. Do not enable all dependency scripts to fix this.
+`allowScripts` in your own `package.json`. The `allowScripts` entry in ChainGate's repository
+`package.json` covers only ChainGate's own development install; it grants nothing in your project.
+Do not enable all dependency scripts to fix this.
 
 **Tested platforms.** Only the combinations below have been tested. Anything not listed is untested,
 not supported.

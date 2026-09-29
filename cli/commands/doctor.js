@@ -9,7 +9,7 @@ import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
-import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken,
+import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken, staleLegacyLink,
   previousBundleId } from '../seed-bundle.js';
 import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
 import { probeNativeSqlite, nativeSqliteHelp } from '../native-sqlite.js';
@@ -144,6 +144,12 @@ export default async function doctor(args) {
         detail: active.files.db !== paths.witnessDb
           ? `immutable bundle and writable witness state are different files (${paths.witnessDb})`
           : 'the seed and the witness database are the same file' });
+      const stale = staleLegacyLink(paths.base);
+      if (stale) {
+        checks.push({ name: 'seed-v3-legacy-link', pass: false, severity: 'unverifiable',
+          detail: `stale activation link(s) from an older ChainGate version: ${stale.join(', ')}. `
+            + 'activation.json is authoritative; older versions would still read the link. Remove it.' });
+      }
       const prev = previousBundleId(paths.base);
       checks.push({ name: 'seed-v3-rollback', pass: true,
         severity: prev ? undefined : 'skipped',
