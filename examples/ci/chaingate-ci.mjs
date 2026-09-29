@@ -36,6 +36,7 @@
 // check pins WHICH seed that step used; it does not authenticate the JSON. No signing is introduced.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SCHEMA_ID = 'chaingate.check/1';
 const DISPOSITIONS = ['ALLOW', 'WARN', 'BLOCK'];
@@ -304,4 +305,12 @@ function main() {
   process.exit(failures.length ? 1 : 0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) main();
+// Run main() only when this file is the entry script. `new URL(import.meta.url).pathname` is not a
+// file path: on Windows it is /D:/..., and any space or non-ASCII character is percent-encoded, so the
+// comparison failed there and the consumer exited 0 without checking anything. Compare real paths.
+function isEntryScript() {
+  if (!process.argv[1]) return false;
+  const self = fileURLToPath(import.meta.url);
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(self); } catch { return path.resolve(process.argv[1]) === self; }
+}
+if (isEntryScript()) main();
