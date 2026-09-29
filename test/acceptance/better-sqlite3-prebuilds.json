@@ -1,0 +1,24 @@
+{
+  "package": "better-sqlite3",
+  "version": "12.11.1",
+  "source": "https://github.com/WiseLibs/better-sqlite3/releases/tag/v12.11.1",
+  "note": "sha256 of build/Release/better_sqlite3.node inside each official prebuild archive, by platform-arch and Node ABI (127 = Node 22, 137 = Node 24). Verified against GitHub asset digests on 2026-09-29.",
+  "native_sha256": {
+    "darwin-arm64": {
+      "127": "1946ab352978b5b3493f99080dc04ed6d0a4157c511c7139cbf50b3d44d8d560",
+      "137": "c6fac315df023cf5efec45a3511e6515c6b0f7461a4a284b1b7a79c7ef8febe7"
+    },
+    "darwin-x64": {
+      "127": "af38de1a26e51a3bee7ec05ec9810e9a39c5da41c31b3766ba5ca37f94bd8966",
+      "137": "682f2d9850acd02e6209a2c1c5f7db19ec8c51ecc761b71a5501df56557c2f11"
+    },
+    "linux-x64": {
+      "127": "df9fbd0d061f360d81fb51e265c53c9605020bd68219e34f33c07c85de15719a",
+      "137": "45cb92a176fb758533db6d9a343acdfc73e4de27ac4c20a0cb2a6fb5be3e84f2"
+    },
+    "win32-x64": {
+      "127": "c4b95a94a963258a9ef41b12fd3bb86f0b08a2ac5c5b499fe94de57a5443682d",
+      "137": "e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e"
+    }
+  }
+}

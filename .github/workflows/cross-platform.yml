@@ -18,21 +18,20 @@ name: cross-platform hosted compatibility
 on:
   workflow_dispatch:
   pull_request:
-  push:
-    branches: ['ci/**']
 
 permissions:
   contents: read
 
 jobs:
   unit:
-    name: unit / ${{ matrix.os }} / npm ${{ matrix.npm }}
+    name: unit / ${{ matrix.os }} / node ${{ matrix.node }} / npm ${{ matrix.npm }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15, macos-15-intel]   # macos-15 = arm64, macos-15-intel = x64
+        node: ['22', '24']        # the supported majors (package.json engines); nothing else is claimed
         npm: [bundled, latest]
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +39,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
       - name: npm version
         if: matrix.npm == 'latest'
         run: npm install -g npm@latest
@@ -49,8 +48,10 @@ jobs:
         run: echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v)" | tee versions.txt
       - name: install dependencies (allowScripts in package.json approves only better-sqlite3)
         run: npm ci --no-audit --no-fund
-      - name: native SQLite loads (fail fast instead of hanging the suite)
-        run: node -e "const D=require('better-sqlite3'); const d=new D(':memory:'); d.prepare('select 1').get(); d.close(); console.log('better-sqlite3', require('better-sqlite3/package.json').version, 'loads')"
+      - name: native SQLite loads, and is the official prebuild (fail fast instead of hanging the suite)
+        run: |
+          node -e "const D=require('better-sqlite3'); const d=new D(':memory:'); d.prepare('select 1').get(); d.close(); console.log('better-sqlite3', require('better-sqlite3/package.json').version, 'loads')"
+          node test/acceptance/check-native.mjs .
       - name: Windows spawn diagnostic (paths with 8.3 names, spaces, non-ASCII)
         if: runner.os == 'Windows'
         continue-on-error: true
@@ -69,20 +70,21 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-${{ matrix.os }}-npm-${{ matrix.npm }}
+          name: unit-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
           path: |
             versions.txt
             test-output.txt
             skipped.txt
 
   acceptance:
-    name: acceptance / ${{ matrix.os }} / npm ${{ matrix.npm }}
+    name: acceptance / ${{ matrix.os }} / node ${{ matrix.node }} / npm ${{ matrix.npm }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15, macos-15-intel]
+        node: ['22', '24']
         npm: [bundled, latest]
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +92,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
       - name: npm version
         if: matrix.npm == 'latest'
         run: npm install -g npm@latest
@@ -111,10 +113,15 @@ jobs:
         run: |
           T="$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
           if [ "$(npm config get allow-scripts)" != "undefined" ]; then
-            npm install -g "$T" --allow-scripts=better-sqlite3
+            npm install -g "$T" --allow-scripts=better-sqlite3 --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
           else
-            npm install -g "$T"   # this npm has no allow-scripts setting and runs install scripts; no retry
+            # this npm has no allow-scripts setting and runs install scripts; no retry
+            npm install -g "$T" --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
           fi
+          exit $st
+      - name: the installed native module is the official prebuild (no Python or compiler fallback)
+        shell: bash
+        run: node test/acceptance/check-native.mjs "$(npm root -g)/@cgsec/chaingate" "$RUNNER_TEMP/global-install.log"
       - name: acceptance, global install
         shell: bash
         run: node test/acceptance/acceptance.mjs --mode hosted --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
@@ -130,7 +137,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-${{ matrix.os }}-npm-${{ matrix.npm }}
+          name: acceptance-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
           path: |
             versions.txt
             ${{ runner.temp }}/acceptance-*.json
+            ${{ runner.temp }}/global-install.log
