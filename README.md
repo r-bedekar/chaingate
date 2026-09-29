@@ -164,10 +164,11 @@ Python or compiler needed).
 
 | OS | Architecture | Node.js | npm | How it was tested |
 |----|--------------|---------|-----|-------------------|
-| Linux (Ubuntu 24.04) | x64 | 22 | 10 | full local qualification (suite, lifecycle, parity, installed package, offline kit) |
-| Linux (Ubuntu 24.04) | x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
-| macOS 15 | arm64, x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
-| Windows (Server 2022, administrator) | x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
+| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | full local qualification (suite, lifecycle, parity, installed package, offline kit) |
+| Linux (Ubuntu 24.04) | x64 | 22.23.2; 24.21.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
+| macOS 15 | arm64 | 22.23.2; 24.20.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
+| macOS 15 | x64 | 22.23.2; 24.19.0 | 10.9.8, 12.1.0; 11.17.0, 12.1.0 | CI: test suite and install acceptance |
+| Windows Server 2022 (administrator account) | x64 | 22.23.2-22.23.3; 24.21.0 | 10.9.9, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
 | Windows 10/11, standard account | x64 | | | not yet tested |
 
 From source:
