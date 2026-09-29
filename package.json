@@ -44,8 +44,7 @@
     "undici": "6.28.1"
   },
   "devDependencies": {
-    "ajv": "8.17.1",
-    "cheerio": "^1.2.0"
+    "ajv": "8.17.1"
   },
   "exports": {
     ".": "./cli/index.js",
