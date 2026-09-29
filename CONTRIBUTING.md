@@ -5,11 +5,12 @@
 ```bash
 git clone https://github.com/r-bedekar/chaingate.git
 cd chaingate
-npm install    # also activates git guard hooks via prepare script
+npm install
+npm run hooks  # activates the git guard hooks (.githooks/)
 npm test       # 243 tests, should all pass
 ```
 
-Requires **Node.js 22+** (uses built-in `fetch`, `node:test`, ESM).
+Requires **Node.js 22 or 24** (the majors that are tested; see the README).
 
 ## Development
 
@@ -30,7 +31,7 @@ node --test test/gates/content-hash.test.js # single file
 
 ## Guard Hooks
 
-The repo includes pre-commit and commit-msg hooks (`.githooks/`) that block sensitive patterns from being committed. These activate automatically via the `prepare` script on `npm install`.
+The repo includes pre-commit and commit-msg hooks (`.githooks/`) that block sensitive patterns from being committed. Activate them once per clone with `npm run hooks`. (There is deliberately no `prepare` script: npm treats it as an install script of the published package and warns every user who installs it.)
 
 If you need to verify they're active:
 

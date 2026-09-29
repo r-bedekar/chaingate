@@ -119,7 +119,9 @@ jobs:
             # this npm has no allow-scripts setting and runs install scripts; no retry
             npm install -g "$T" --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
           fi
-          exit $st
+          [ "$st" = 0 ] || exit $st
+          # the package itself must not declare install scripts (npm would warn every user)
+          if grep -E 'install-scripts' "$RUNNER_TEMP/global-install.log" | grep -F '@cgsec/chaingate'; then echo 'npm lists an install script of @cgsec/chaingate'; exit 1; fi
       - name: the installed native module is the official prebuild (no Python or compiler fallback)
         shell: bash
         run: node test/acceptance/check-native.mjs "$(npm root -g)/@cgsec/chaingate" "$RUNNER_TEMP/global-install.log"

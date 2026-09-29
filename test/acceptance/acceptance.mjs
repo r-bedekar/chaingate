@@ -177,6 +177,8 @@ async function main() {
     fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify(pkg, null, 2));
     const inst = npmIn(['install', PACKAGE, '--no-audit', '--no-fund']);
     record(`project install (approval ${APPROVAL} install)`, inst.status === 0, tail(inst));
+    const own = `${inst.stdout || ''}${inst.stderr || ''}`.split(/\r?\n/).filter((l) => /install-scripts/.test(l) && l.includes('@cgsec/chaingate'));
+    record('npm does not list an install script of @cgsec/chaingate itself', own.length === 0, own.join(' | '));
     launcher = path.join(proj, 'node_modules', '.bin', WIN ? 'chaingate.cmd' : 'chaingate');
     if (APPROVAL === 'after') {
       const probe = spawnSync(process.execPath, ['-e', "new (require('better-sqlite3'))(':memory:').close()"], { cwd: proj, encoding: 'utf8', env: CHILD_ENV, timeout: 60_000 });
