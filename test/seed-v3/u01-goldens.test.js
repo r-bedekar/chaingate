@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import R from '../../seed/v3/reader.js';
@@ -71,15 +72,43 @@ function compareAll(seed, cases, golden, label) {
   return n;
 }
 
+// The goldens were captured on a synthetic seed built with better-sqlite3 11.10.0 (SQLite 3.49.2).
+// SQLite stamps the library version that last wrote a database into its header (bytes 96-99), so the
+// same generator under another SQLite produces a file that differs in exactly those bytes. The
+// evaluation is therefore run on the CAPTURED seed itself (its digest must equal the goldens' recorded
+// one), and a separate test proves today's generator still builds that seed apart from the stamp.
+// The goldens are unchanged.
+const CAPTURED_SEED = path.join(HERE, '..', 'fixtures', 'u04', 'synthetic-seed-captured.db');
+
 test('A2 synthetic: refactored gate and check reproduce every frozen golden exactly', () => {
   const golden = load('synthetic.json');
-  const { dir, dbPath } = buildSyntheticSeed();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'u01-captured-'));
+  const dbPath = path.join(dir, 'chaingate-seed.db');
+  fs.copyFileSync(CAPTURED_SEED, dbPath);
+  fs.copyFileSync(`${CAPTURED_SEED}.sha256`, `${dbPath}.sha256`);
+  assert.equal(sha256(fs.readFileSync(dbPath)), golden.seed_sha256,
+    'the seed evaluated is byte-identical to the one the goldens were captured on');
   const seed = R.openSeed(dbPath, { trust: R.TRUST_UNSIGNED_DEV });
   try {
-    assert.equal(fs.readFileSync(`${dbPath}.sha256`, 'utf8').split(/\s/)[0], golden.seed_sha256,
-      'the synthetic seed is byte-identical to the one the goldens were captured on');
     assert.equal(compareAll(seed, syntheticCases(), golden, 'synthetic'), golden.n);
   } finally { seed.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('A2 synthetic: the seed generator still builds the captured seed, apart from SQLite\'s version stamp', () => {
+  const captured = fs.readFileSync(CAPTURED_SEED);
+  const { dir, dbPath } = buildSyntheticSeed();
+  try {
+    const built = fs.readFileSync(dbPath);
+    assert.equal(built.length, captured.length, 'same size');
+    const differing = [];
+    for (let i = 0; i < built.length; i++) if (built[i] !== captured[i]) differing.push(i);
+    assert.ok(differing.every((i) => i >= 96 && i <= 99),
+      `only header bytes 96-99 (SQLITE_VERSION_NUMBER) may differ; differing offsets: ${differing.slice(0, 20)}`);
+    for (const buf of [built, captured]) {
+      const v = buf.readUInt32BE(96);                     // e.g. 3049002 = 3.49.2, 3053002 = 3.53.2
+      assert.ok(v >= 3000000 && v < 4000000, `header bytes 96-99 hold a SQLite 3 version number (got ${v})`);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('A2 rc3: refactored gate and check reproduce every frozen golden exactly on the real seed',

@@ -64,8 +64,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          grep -E '# SKIP' test-output.txt | sed -E 's/^ *//' | sort | uniq -c | sort -rn | tee skipped.txt || true
-          echo "skipped: $(grep -cE '# SKIP' test-output.txt || true)"
+          # TAP (Node 22 when piped) marks skips '# SKIP'; the spec reporter (Node 24 default) marks them '﹣ ... # reason'
+          grep -E '# SKIP|^ *﹣ ' test-output.txt | sed -E 's/^ *//' | sort | uniq -c | sort -rn | tee skipped.txt || true
+          echo "skipped: $(grep -cE '# SKIP|^ *﹣ ' test-output.txt || true)"
       - name: reports
         if: always()
         uses: actions/upload-artifact@v4
