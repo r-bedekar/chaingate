@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import http from 'node:http';
-import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,10 +75,10 @@ function getJson(url) {
   });
 }
 
-test('the real proxy starts and serves when installed under a path with a space and a non-ASCII character', async (t) => {
-  // A copy of the shipped runtime (the package.json "files" set) under such a path; dependencies are
-  // linked, not copied. The proxy is started exactly as `chaingate init` starts it: node <abs path>.
-  const base = mkdtempSync(join(tmpdir(), 'chaingate u04 zoë '));
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';   // a junction needs no privilege on Windows
+
+/** A copy of the shipped runtime (the package.json "files" set) under `base`; dependencies linked. */
+function installCopy(base) {
   const inst = join(base, 'node_modules', '@cgsec', 'chaingate');
   const files = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).files;
   for (const f of files) {
@@ -86,10 +86,13 @@ test('the real proxy starts and serves when installed under a path with a space 
     cpSync(join(ROOT, f), join(inst, f), { recursive: true });
   }
   cpSync(join(ROOT, 'package.json'), join(inst, 'package.json'));
-  symlinkSync(join(ROOT, 'node_modules'), join(inst, 'node_modules'), 'dir');
-  const home = join(base, 'home');
+  symlinkSync(join(ROOT, 'node_modules'), join(inst, 'node_modules'), LINK_TYPE);
+  return inst;
+}
+
+/** Start the proxy exactly as `chaingate init` does (node <abs path>) and ask it who it is. */
+async function startFrom(t, entry, home) {
   const port = await freePort();
-  const entry = join(inst, 'proxy', 'server.js');
   t.diagnostic(`entry: ${entry}`);
   const child = spawn(process.execPath, [entry], {
     env: { ...process.env, CHAINGATE_HOME: home, CHAINGATE_PORT: String(port), CHAINGATE_HOST: '127.0.0.1',
@@ -105,13 +108,37 @@ test('the real proxy starts and serves when installed under a path with a space 
       exited.then(() => false),
       new Promise((r) => { timer = setTimeout(() => r(false), 15_000); }),
     ]).finally(() => { clearInterval(iv); clearTimeout(timer); });
-    assert.equal(listening, true, `the proxy did not start listening; output:\n${out}`);
+    if (!listening) {
+      // Evidence for a failure on an unfamiliar platform: is the file there, and what is its real path?
+      let real = null; let listing = null;
+      try { real = realpathSync(entry); } catch (e) { real = `realpath failed: ${e.code}`; }
+      try { listing = readdirSync(dirname(entry)).join(', '); } catch (e) { listing = `readdir failed: ${e.code}`; }
+      assert.fail(`the proxy did not start listening.\n  entry exists: ${existsSync(entry)}\n  realpath: ${real}\n`
+        + `  directory: ${listing}\n  output:\n${out}`);
+    }
     const self = await getJson(`http://127.0.0.1:${port}/_chaingate/self`);
     assert.equal(self.status, 200);
-    assert.equal(self.body.pid, child.pid, 'the answering proxy is the process started from the space/non-ASCII path');
+    assert.equal(self.body.pid, child.pid, 'the answering proxy is the process started from this path');
   } finally {
     child.kill('SIGTERM');
     await Promise.race([exited, new Promise((r) => setTimeout(r, 5_000))]);
-    rmSync(base, { recursive: true, force: true });
   }
+}
+
+test('the real proxy starts and serves when installed under a path with a space and a non-ASCII character', async (t) => {
+  const base = mkdtempSync(join(tmpdir(), 'chaingate u04 zoë '));
+  try {
+    const inst = installCopy(base);
+    await startFrom(t, join(inst, 'proxy', 'server.js'), join(base, 'home'));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('the real proxy starts when its install directory is reached through a symlink (macOS /var, symlinked prefixes)', async (t) => {
+  const base = mkdtempSync(join(tmpdir(), 'chaingate u04 link '));
+  try {
+    const inst = installCopy(join(base, 'real'));
+    const linked = join(base, 'linked ë');
+    symlinkSync(inst, linked, LINK_TYPE);
+    await startFrom(t, join(linked, 'proxy', 'server.js'), join(base, 'home'));
+  } finally { rmSync(base, { recursive: true, force: true }); }
 });

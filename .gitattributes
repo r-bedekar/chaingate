@@ -1,0 +1,3 @@
+# No end-of-line conversion on checkout: several tests compare files byte for byte against
+# recorded digests (for example the frozen finding schema), and CRLF conversion on Windows breaks them.
+* -text

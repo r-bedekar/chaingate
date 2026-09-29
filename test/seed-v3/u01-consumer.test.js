@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stageBundle, activateBundle } from '../../cli/seed-bundle.js';
 import { writeConfig } from '../../config-store.js';
 import { openWitnessDB } from '../../witness/db.js';
@@ -16,7 +16,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
 const CLI = path.join(ROOT, 'cli', 'index.js');
 const CONSUMER = path.join(ROOT, 'examples', 'ci', 'chaingate-ci.mjs');
-const GUARD = path.join(ROOT, 'test', 'helpers', 'deny-network.mjs');
+// --import takes a URL: an absolute Windows path (D:\\...) is not one.
+const GUARD = pathToFileURL(path.join(ROOT, 'test', 'helpers', 'deny-network.mjs')).href;
 const CASES = new Map(syntheticCases().map((c) => [c.id, c]));
 
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'u01-ci-'));

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stageBundle, activateBundle } from '../../cli/seed-bundle.js';
 import { writeConfig } from '../../config-store.js';
 import { openWitnessDB } from '../../witness/db.js';
@@ -16,7 +16,8 @@ import { syntheticCases, buildSyntheticSeed, PROXY_POLICY } from './u01-cases.mj
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
 const CLI = path.join(ROOT, 'cli', 'index.js');
-const GUARD = path.join(ROOT, 'test', 'helpers', 'deny-network.mjs');
+// --import takes a URL: an absolute Windows path (D:\\...) is not one.
+const GUARD = pathToFileURL(path.join(ROOT, 'test', 'helpers', 'deny-network.mjs')).href;
 const GOLD = JSON.parse(fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'u01-goldens', 'synthetic.json'), 'utf8'));
 const CASES = new Map(syntheticCases().map((c) => [c.id, c]));
 const EXIT = { ALLOW: 0, WARN: 2, BLOCK: 3 };

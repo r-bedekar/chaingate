@@ -1,13 +1,18 @@
 # Cross-platform HOSTED COMPATIBILITY testing for @cgsec/chaingate.
 #
-# What this is: install + runtime acceptance on GitHub-hosted runners, with synthetic seeds only
-# (test/acceptance/make-fixtures.mjs). No real seed, no secrets, read-only token, no publishing,
-# tagging or release steps.
+# Synthetic seeds only (test/acceptance/make-fixtures.mjs): no real seed, no private corpus, no
+# secrets, read-only token, no publishing, tagging or release steps.
 #
-# What this is NOT: standard-account acceptance. Hosted runners may be elevated (the Windows ones
-# are administrators), so every run here uses `--mode hosted` and its report says "hosted
-# compatibility". Standard-account acceptance is a separate run of the same script with
-# `--mode standard` on a normal, non-elevated account. Neither substitutes for the other.
+# Two independent jobs per platform, so a unit-test failure cannot hide the install/runtime
+# acceptance result (or the other way round); the run fails if either fails:
+#   * unit        — the repository test suite. Tests that need the private seed or corpus inputs
+#                   (seed_export, the rc3 release candidate) skip here; the job lists every skip.
+#                   This is COMPATIBILITY coverage, distinct from the full local qualification.
+#   * acceptance  — installs the packed tarball the way users do (global; project with allowScripts
+#                   approval before install; project approval after install) and runs the
+#                   acceptance script in `--mode hosted`. Hosted runners may be elevated (Windows
+#                   runners are administrators), so this is NOT standard-account acceptance; that is
+#                   a separate `--mode standard` run on a normal account.
 name: cross-platform hosted compatibility
 
 on:
@@ -20,15 +25,14 @@ permissions:
   contents: read
 
 jobs:
-  hosted-compatibility:
-    name: ${{ matrix.os }} / node ${{ matrix.node }} / npm ${{ matrix.npm }}
+  unit:
+    name: unit / ${{ matrix.os }} / npm ${{ matrix.npm }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15, macos-15-intel]   # macos-15 = arm64, macos-15-intel = x64
-        node: ['22']
         npm: [bundled, latest]
     steps:
       - uses: actions/checkout@v4
@@ -36,46 +40,97 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '22'
+      - name: npm version
+        if: matrix.npm == 'latest'
+        run: npm install -g npm@latest
+      - name: record versions
+        shell: bash
+        run: echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v)" | tee versions.txt
+      - name: install dependencies (allowScripts in package.json approves only better-sqlite3)
+        run: npm ci --no-audit --no-fund
+      - name: native SQLite loads (fail fast instead of hanging the suite)
+        run: node -e "const D=require('better-sqlite3'); const d=new D(':memory:'); d.prepare('select 1').get(); d.close(); console.log('better-sqlite3', require('better-sqlite3/package.json').version, 'loads')"
+      - name: Windows spawn diagnostic (paths with 8.3 names, spaces, non-ASCII)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: bash
+        run: node test/acceptance/spawn-diagnostic.mjs
+      - name: unit and integration tests
+        shell: bash
+        run: npm test 2>&1 | tee test-output.txt; exit "${PIPESTATUS[0]}"
+      - name: list skipped tests and their reasons
+        if: always()
+        shell: bash
+        run: |
+          grep -E '# SKIP' test-output.txt | sed -E 's/^ *//' | sort | uniq -c | sort -rn | tee skipped.txt || true
+          echo "skipped: $(grep -cE '# SKIP' test-output.txt || true)"
+      - name: reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-${{ matrix.os }}-npm-${{ matrix.npm }}
+          path: |
+            versions.txt
+            test-output.txt
+            skipped.txt
+
+  acceptance:
+    name: acceptance / ${{ matrix.os }} / npm ${{ matrix.npm }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15, macos-15-intel]
+        npm: [bundled, latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: npm version
         if: matrix.npm == 'latest'
         run: npm install -g npm@latest
       - name: record versions
         shell: bash
         run: echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v) allow-scripts=$(npm config get allow-scripts)" | tee versions.txt
-      - name: install dependencies
+      - name: repository dependencies (for packing and synthetic fixtures)
         run: npm ci --no-audit --no-fund
-      - name: unit and integration tests
-        run: npm test
-      - name: pack the package
+      - name: native SQLite loads
+        run: node -e "const D=require('better-sqlite3'); new D(':memory:').close(); console.log('ok')"
+      - name: pack and make fixtures
         shell: bash
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
-          ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz
-      - name: synthetic fixtures
-        shell: bash
-        run: node test/acceptance/make-fixtures.mjs "$RUNNER_TEMP/fixtures"
-      - name: global install (scripts allowed for better-sqlite3 only, where npm supports allow-scripts)
+          node test/acceptance/make-fixtures.mjs "$RUNNER_TEMP/fixtures"
+      - name: global install (scripts allowed for better-sqlite3 only, where npm has allow-scripts)
         shell: bash
         run: |
           T="$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
           if [ "$(npm config get allow-scripts)" != "undefined" ]; then
             npm install -g "$T" --allow-scripts=better-sqlite3
           else
-            # this npm has no allow-scripts setting (it runs install scripts by default); no retry
-            npm install -g "$T"
+            npm install -g "$T"   # this npm has no allow-scripts setting and runs install scripts; no retry
           fi
-      - name: acceptance, global install (hosted compatibility)
+      - name: acceptance, global install
         shell: bash
         run: node test/acceptance/acceptance.mjs --mode hosted --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
-      - name: acceptance, project install (hosted compatibility; allowScripts in package.json)
+      - name: acceptance, project install, allowScripts approved before install
+        if: success() || failure()
         shell: bash
-        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local.json"
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-approval before --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-before.json"
+      - name: acceptance, project install, approval after install (npm approve-scripts + rebuild)
+        if: success() || failure()
+        shell: bash
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-approval after --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-after.json"
       - name: reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hosted-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
+          name: acceptance-${{ matrix.os }}-npm-${{ matrix.npm }}
           path: |
             versions.txt
             ${{ runner.temp }}/acceptance-*.json

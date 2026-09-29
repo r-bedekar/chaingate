@@ -46,6 +46,9 @@
   "devDependencies": {
     "ajv": "8.17.1"
   },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
+  },
   "exports": {
     ".": "./cli/index.js",
     "./seed/v3": "./seed/v3/index.js"

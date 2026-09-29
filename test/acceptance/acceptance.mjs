@@ -4,6 +4,8 @@
 //   node acceptance.mjs --mode standard --launcher global
 //   node acceptance.mjs --mode standard --launcher local --package <spec|tarball>
 //   options: --fixtures <dir> (default ./fixtures, from make-fixtures.mjs)  --report <file>  --keep
+//            --project-approval before|after   (local only: allowScripts written before `npm install`, or
+//            the install first and then `npm approve-scripts better-sqlite3` + `npm rebuild better-sqlite3`)
 //
 // MODES. `standard` is the acceptance run for a normal, NON-elevated account: an elevated (Windows
 // administrator / root) account is refused before anything runs. `hosted` is for CI runners, which
@@ -32,6 +34,7 @@ const opt = (name, dflt) => { const i = argv.indexOf(`--${name}`); return i >= 0
 const MODE = opt('mode', 'standard');
 const LAUNCHER_MODE = opt('launcher', 'global');
 const PACKAGE = opt('package', '@cgsec/chaingate');
+const APPROVAL = opt('project-approval', 'before');
 const KEEP = argv.includes('--keep');
 const FIX = path.resolve(opt('fixtures', path.join(HERE, 'fixtures')));
 const REPORT = path.resolve(opt('report', path.join(HERE, 'acceptance-report.json')));
@@ -39,7 +42,7 @@ const PORT = 6173;
 const CMD_TIMEOUT_MS = 180_000;
 const PROBE_TIMEOUT_MS = 3_000;
 
-if (!['standard', 'hosted'].includes(MODE) || !['global', 'local'].includes(LAUNCHER_MODE)) {
+if (!['standard', 'hosted'].includes(MODE) || !['global', 'local'].includes(LAUNCHER_MODE) || !['before', 'after'].includes(APPROVAL)) {
   console.error('usage: node acceptance.mjs --mode standard|hosted --launcher global|local [--package <spec>]');
   process.exit(2);
 }
@@ -51,7 +54,7 @@ const strippedVars = Object.keys(process.env).filter((k) => /^CHAINGATE_/i.test(
 const results = [];
 const report = { started: new Date().toISOString(), mode: MODE,
   label: MODE === 'standard' ? 'standard-account acceptance' : 'hosted compatibility (may be elevated; NOT standard-account acceptance)',
-  launcher_mode: LAUNCHER_MODE, package: PACKAGE, env: {}, results, finished: null, summary: null, aborted: null };
+  launcher_mode: LAUNCHER_MODE, project_approval: LAUNCHER_MODE === 'local' ? APPROVAL : null, package: PACKAGE, env: {}, results, finished: null, summary: null, aborted: null };
 function save() {
   try {
     report.summary = { pass: results.filter((r) => r.ok === true).length, fail: results.filter((r) => r.ok === false).length };
@@ -165,14 +168,38 @@ async function main() {
   if (LAUNCHER_MODE === 'local') {
     // Project installs approve install scripts in package.json (`allowScripts`); npm rejects
     // --allow-scripts on the command line for project installs. Older npm ignores the field.
-    fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ name: 'chaingate-accept', private: true,
-      allowScripts: { 'better-sqlite3': true } }, null, 2));
-    const inst = WIN
-      ? spawnSync(`npm install ${q(PACKAGE)} --no-audit --no-fund`, { cwd: proj, encoding: 'utf8', shell: true, timeout: 600_000, env: CHILD_ENV })
-      : spawnSync('npm', ['install', PACKAGE, '--no-audit', '--no-fund'], { cwd: proj, encoding: 'utf8', timeout: 600_000, env: CHILD_ENV });
-    record('project install (allowScripts approves only better-sqlite3)', inst.status === 0, (`${inst.stdout ?? ''}${inst.stderr ?? ''}`).trim().split('\n').slice(-3).join(' | '));
+    const npmIn = (args) => (WIN
+      ? spawnSync(`npm ${args.map(q).join(' ')}`, { cwd: proj, encoding: 'utf8', shell: true, timeout: 600_000, env: CHILD_ENV })
+      : spawnSync('npm', args, { cwd: proj, encoding: 'utf8', timeout: 600_000, env: CHILD_ENV }));
+    const tail = (r) => (`${r.stdout ?? ''}${r.stderr ?? ''}`).trim().split('\n').slice(-3).join(' | ');
+    const pkg = { name: 'chaingate-accept', private: true };
+    if (APPROVAL === 'before') pkg.allowScripts = { 'better-sqlite3': true };
+    fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify(pkg, null, 2));
+    const inst = npmIn(['install', PACKAGE, '--no-audit', '--no-fund']);
+    record(`project install (approval ${APPROVAL} install)`, inst.status === 0, tail(inst));
     launcher = path.join(proj, 'node_modules', '.bin', WIN ? 'chaingate.cmd' : 'chaingate');
-  } else {
+    if (APPROVAL === 'after') {
+      const probe = spawnSync(process.execPath, ['-e', "new (require('better-sqlite3'))(':memory:').close()"], { cwd: proj, encoding: 'utf8', env: CHILD_ENV, timeout: 60_000 });
+      const blocked = probe.status !== 0;
+      record('install scripts before approval', null, blocked ? 'better-sqlite3 native part NOT built (npm blocked the script)' : 'built (this npm ran the script without approval)');
+      if (blocked && fs.existsSync(launcher)) {
+        const dg = cg(['doctor', ...P, '--json']);
+        let nc = null; try { nc = JSON.parse(dg.stdout).find((c) => c.name === 'native-sqlite'); } catch { /* */ }
+        record('doctor reports the missing native module before approval', nc && nc.pass === false, nc ? nc.detail : `doctor exit ${dg.status}`);
+      }
+      const hasApprove = npmIn(['approve-scripts', '--allow-scripts-pending']).status === 0;
+      if (hasApprove) {
+        const ap = npmIn(['approve-scripts', 'better-sqlite3']);
+        record('npm approve-scripts better-sqlite3', ap.status === 0, tail(ap));
+        let allow = null; try { allow = JSON.parse(fs.readFileSync(path.join(proj, 'package.json'), 'utf8')).allowScripts; } catch { /* */ }
+        record('allowScripts now names only better-sqlite3', allow && Object.keys(allow).length === 1 && /^better-sqlite3(@|$)/.test(Object.keys(allow)[0]), JSON.stringify(allow));
+        const rb = npmIn(['rebuild', 'better-sqlite3']);
+        record('npm rebuild better-sqlite3', rb.status === 0, tail(rb));
+      } else {
+        record('npm approve-scripts', null, 'not available in this npm (it runs install scripts without approval)');
+      }
+    }
+    } else {
     const prefix = sh('npm prefix -g');
     launcher = WIN ? path.join(prefix, 'chaingate.cmd') : path.join(prefix, 'bin', 'chaingate');
   }
@@ -198,8 +225,15 @@ async function main() {
 
   // ── import, activate, start ────────────────────────────────────────────────────────────────────
   const init = cg(['init', ...P, '--seed', seed('A'), '--unsigned-development']);
-  let activeKind = 'absent';
-  try { const l = fs.lstatSync(path.join(seedsDir(), 'active')); activeKind = l.isSymbolicLink() ? 'symlink' : l.isDirectory() ? 'directory' : 'other'; } catch { /* absent */ }
+  // The activation record: seeds/activation.json on Windows (0.1.2+), the seeds/active symlink elsewhere.
+  const activeRecord = () => {
+    try { const j = JSON.parse(fs.readFileSync(path.join(seedsDir(), 'activation.json'), 'utf8')); return { kind: 'activation.json', id: j.active }; } catch { /* none */ }
+    try { const l = fs.lstatSync(path.join(seedsDir(), 'active'));
+      return { kind: l.isSymbolicLink() ? 'symlink' : l.isDirectory() ? 'directory' : 'other', id: path.basename(fs.realpathSync(path.join(seedsDir(), 'active'))) }; } catch { /* absent or dangling */ }
+    return { kind: 'absent', id: null };
+  };
+  const activeKind = activeRecord().kind;
+  report.activation_record = activeKind;
   record('seed A imported and activated (activation link created)', activeKind !== 'absent', `active: ${activeKind}; init exit ${init.status}: ${init.out.split('\n').slice(-3).join(' | ')}`);
   record('init --seed A --unsigned-development (import + activate + start proxy)', init.status === 0, init.out.split('\n').slice(-6).join(' | '));
   const s = await self();
@@ -250,15 +284,17 @@ async function main() {
   await restart('previous seed A still active and usable after the refused update', cases.seedA_sha256);
 
   // ── interrupted activation leftovers ───────────────────────────────────────────────────────────
-  const stale = path.join(seedsDir(), 'active.switching-424242');
-  try { fs.writeFileSync(stale, 'leftover from an interrupted switch'); } catch (e) { record('create interrupted-switch leftover', false, e.message); }
-  await restart('restart with an interrupted-switch leftover present', cases.seedA_sha256);
-  fs.rmSync(stale, { force: true });
+  const stales = [path.join(seedsDir(), 'active.switching-424242'), path.join(seedsDir(), 'activation.json.tmp-424242')];
+  for (const stale of stales) {
+    try { fs.writeFileSync(stale, '{"leftover from an interrupted switch'); } catch (e) { record('create interrupted-switch leftover', false, e.message); }
+  }
+  await restart('restart with interrupted-switch leftovers present (symlink and record temporaries)', cases.seedA_sha256);
+  for (const stale of stales) fs.rmSync(stale, { force: true });
 
   // ── broken activation fails closed ─────────────────────────────────────────────────────────────
   cg(['stop', ...P]);
-  let activeId = null;
-  try { activeId = path.basename(fs.realpathSync(path.join(seedsDir(), 'active'))); } catch (e) { record('resolve the active bundle', false, e.message); }
+  const activeId = activeRecord().id;
+  if (!activeId) record('resolve the active bundle', false, 'no activation record found');
   if (activeId) {
     const moved = path.join(seedsDir(), `${activeId}.moved-aside`);
     fs.renameSync(path.join(seedsDir(), activeId), moved);

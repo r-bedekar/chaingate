@@ -14,7 +14,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync,
-  accessSync, symlinkSync, constants as fsConstants } from 'node:fs';
+  accessSync, symlinkSync, realpathSync, constants as fsConstants } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -32,7 +33,7 @@ const PKG = 'chaingate-cli-fixture';
 const VERSION = '1.0.0';
 const PUBLISHED_ISO = '2026-09-01T00:00:00.000Z';
 const PUBLISHED_S = Math.floor(Date.parse(PUBLISHED_ISO) / 1000);
-const CLI = new URL('../../cli/index.js', import.meta.url).pathname;
+const CLI = fileURLToPath(new URL('../../cli/index.js', import.meta.url));   // .pathname is /D:/... on Windows
 
 const SCHEMA = `
 CREATE TABLE packages (id INTEGER PRIMARY KEY, package_name TEXT NOT NULL UNIQUE, latest_version TEXT,
@@ -202,7 +203,8 @@ test('a RETAINED bundle is re-verified, not trusted for having the right directo
   }
   // and activating it works by directory name
   activateBundle(base, repaired.dir_name);
-  assert.equal(resolveActiveBundle(base).dir, repaired.dir);
+  // compared by REAL path: resolve returns one, and macOS's temp directory is a symlink (/var -> /private/var)
+  assert.equal(resolveActiveBundle(base).dir, realpathSync(repaired.dir));
 });
 
 test('an activation link that exists but does not resolve REFUSES, and an absent one does not', () => {
@@ -396,6 +398,7 @@ test('init REFUSES, before installing anything, when the configured policy canno
   assert.match(`${r.stdout}${r.stderr}`, /policy|not usable/);
   assert.equal(readFileSync(npmrc, 'utf8'), before, '.npmrc untouched');
   assert.equal(existsSync(join(base, 'seeds', 'active')), false, 'nothing activated');
+  assert.equal(existsSync(join(base, 'seeds', 'activation.json')), false, 'nothing activated (Windows record)');
 });
 
 // ---------------------------------------------------------------------------------------------

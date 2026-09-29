@@ -96,12 +96,12 @@ function response(body, type = 'application/json') {
  * Records every connection, the requests it carried, and whether the CLIENT closed it.
  */
 function startRawUpstream(onRequest) {
-  const stats = { connections: 0, requests: [], perConnection: new Map(), clientClosed: 0 };
+  const stats = { connections: 0, requests: [], perConnection: new Map(), clientClosed: 0, closed: 0 };
   const sockets = new Set();
   const server = net.createServer((socket) => {
     const conn = ++stats.connections; sockets.add(socket); stats.perConnection.set(conn, 0);
     socket.on('end', () => { stats.clientClosed += 1; });
-    socket.on('close', () => sockets.delete(socket));
+    socket.on('close', () => { stats.closed += 1; sockets.delete(socket); });
     socket.on('error', () => {});
     let buf = '';
     socket.on('data', (d) => {
@@ -122,7 +122,12 @@ function startRawUpstream(onRequest) {
   })));
 }
 
-/** The sockets themselves: one request per connection, `connection: close`, closed by the client. */
+/**
+ * The sockets themselves: one request per connection, `connection: close` on every request, and
+ * every connection closed after its single response. This upstream never closes a socket itself,
+ * so each close is the client's; it may close cleanly (FIN) or by reset, which some platforms
+ * (macOS) do. Either proves the connection was not kept for reuse.
+ */
 async function assertNoSocketReuse(up, label) {
   const { stats } = up;
   assert.ok(stats.requests.length > 0, `${label}: the upstream saw traffic`);
@@ -131,8 +136,8 @@ async function assertNoSocketReuse(up, label) {
   assert.equal(stats.connections, stats.requests.length, `${label}: one connection per request`);
   const keepAlive = stats.requests.filter((r) => !/\r\nconnection: close(\r\n|$)/i.test(r.head));
   assert.equal(keepAlive.length, 0, `${label}: every request asked for connection: close`);
-  await waitFor(() => stats.clientClosed === stats.connections, 2_000);
-  assert.equal(stats.clientClosed, stats.connections, `${label}: the client closed every connection after its response`);
+  await waitFor(() => stats.closed === stats.connections, 2_000);
+  assert.equal(stats.closed, stats.connections, `${label}: every connection was closed by the client after its response (FIN or reset)`);
 }
 
 /**
