@@ -1,34 +1,39 @@
-# Cross-platform install and runtime acceptance for @cgsec/chaingate.
-# PREPARED LOCALLY; pushing it needs separate approval. Runs only on manual dispatch and on pull
-# requests, never on a schedule. It uses only synthetic seeds (test/acceptance/make-fixtures.mjs):
-# no real seed, no secrets, and no network access beyond installing npm dependencies.
+# Cross-platform HOSTED COMPATIBILITY testing for @cgsec/chaingate.
 #
-# Limitation: GitHub-hosted Windows runners run as an administrator, so this job cannot show
-# behaviour on a STANDARD Windows account (seed activation creates a symbolic link, which a standard
-# account may not be allowed to do). That is checked separately with test/acceptance/acceptance.mjs
-# on a standard account.
-name: cross-platform acceptance
+# What this is: install + runtime acceptance on GitHub-hosted runners, with synthetic seeds only
+# (test/acceptance/make-fixtures.mjs). No real seed, no secrets, read-only token, no publishing,
+# tagging or release steps.
+#
+# What this is NOT: standard-account acceptance. Hosted runners may be elevated (the Windows ones
+# are administrators), so every run here uses `--mode hosted` and its report says "hosted
+# compatibility". Standard-account acceptance is a separate run of the same script with
+# `--mode standard` on a normal, non-elevated account. Neither substitutes for the other.
+name: cross-platform hosted compatibility
 
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches: ['ci/**']
 
 permissions:
   contents: read
 
 jobs:
-  acceptance:
+  hosted-compatibility:
     name: ${{ matrix.os }} / node ${{ matrix.node }} / npm ${{ matrix.npm }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14, macos-13]   # macos-14 = arm64, macos-13 = x64
+        os: [ubuntu-24.04, windows-2022, macos-15, macos-15-intel]   # macos-15 = arm64, macos-15-intel = x64
         node: ['22']
         npm: [bundled, latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -37,8 +42,7 @@ jobs:
         run: npm install -g npm@latest
       - name: record versions
         shell: bash
-        run: |
-          echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v)" | tee versions.txt
+        run: echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v) allow-scripts=$(npm config get allow-scripts)" | tee versions.txt
       - name: install dependencies
         run: npm ci --no-audit --no-fund
       - name: unit and integration tests
@@ -51,20 +55,27 @@ jobs:
       - name: synthetic fixtures
         shell: bash
         run: node test/acceptance/make-fixtures.mjs "$RUNNER_TEMP/fixtures"
-      - name: global install (normal launcher)
+      - name: global install (scripts allowed for better-sqlite3 only, where npm supports allow-scripts)
         shell: bash
-        run: npm install -g "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --allow-scripts=better-sqlite3 || npm install -g "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
-      - name: acceptance, global install
+        run: |
+          T="$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
+          if [ "$(npm config get allow-scripts)" != "undefined" ]; then
+            npm install -g "$T" --allow-scripts=better-sqlite3
+          else
+            # this npm has no allow-scripts setting (it runs install scripts by default); no retry
+            npm install -g "$T"
+          fi
+      - name: acceptance, global install (hosted compatibility)
         shell: bash
-        run: node test/acceptance/acceptance.mjs --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
-      - name: acceptance, project (local) install
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
+      - name: acceptance, project install (hosted compatibility; allowScripts in package.json)
         shell: bash
-        run: node test/acceptance/acceptance.mjs --launcher local --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local.json"
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local.json"
       - name: reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
+          name: hosted-${{ matrix.os }}-node${{ matrix.node }}-npm-${{ matrix.npm }}
           path: |
             versions.txt
             ${{ runner.temp }}/acceptance-*.json

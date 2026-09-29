@@ -9,7 +9,7 @@ import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
-import { resolveActiveBundle, verifyBundleDir, activeBundleId,
+import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken,
   previousBundleId } from '../seed-bundle.js';
 import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
 import { probeNativeSqlite, nativeSqliteHelp } from '../native-sqlite.js';
@@ -105,8 +105,20 @@ export default async function doctor(args) {
       detail: `${paths.configFile}: ${configFault}` });
   }
 
-  const active = resolveActiveBundle(paths.base);
-  if (!active) {
+  // A link that exists but does not resolve is a FAILED check, reported with the rest: never
+  // "no seed" (that would read as detection deliberately off), and never an aborted doctor run
+  // that prints no checks and no JSON.
+  let active = null;
+  let broken = null;
+  try { active = resolveActiveBundle(paths.base); } catch (err) {
+    if (!(err instanceof ActivationBroken)) throw err;
+    broken = err;
+  }
+  if (broken) {
+    checks.push({ name: 'seed-v3', pass: false, broken_activation: true,
+      detail: `activation link ${broken.link} exists but does not resolve; detection has no usable seed. `
+        + 'Fix: `chaingate update-seed --rollback`, or `chaingate init --seed <bundle>`' });
+  } else if (!active) {
     checks.push({ name: 'seed-v3', pass: true, severity: 'skipped',
       detail: 'no v3 bundle active (run `chaingate init --seed <bundle>`)' });
   } else {
@@ -143,9 +155,9 @@ export default async function doctor(args) {
   const policyComplete = Object.keys(POLICY_VALUES).every((k) => policy[k]);
   checks.push({
     name: 'policy',
-    pass: active ? policyComplete : true,
-    severity: active && !policyComplete ? 'unverifiable' : (active ? undefined : 'skipped'),
-    detail: active
+    pass: active ? policyComplete : !broken,
+    severity: active && !policyComplete ? 'unverifiable' : (active || broken ? undefined : 'skipped'),
+    detail: broken ? 'not evaluated: the activation is broken (see seed-v3)' : active
       ? `on_unusable_input=${policy.on_unusable_input || 'UNSET'} `
         + `on_no_evidence=${policy.on_no_evidence || 'UNSET'}`
         + (policyComplete ? '' : ' — unresolved policy is not permission; the proxy refuses to start')

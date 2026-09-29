@@ -134,18 +134,23 @@ npx chaingate --help
 ```
 
 **The SQLite module has a native part.** npm installs it with `better-sqlite3`'s own install
-script. Some npm versions and configurations skip dependency install scripts; the package then
-installs but cannot open a database. `chaingate doctor` reports this as `native-sqlite` and prints
-the fix, which allows only that one package's script:
+script. Current npm runs dependency install scripts by default but warns about any not approved in
+`allowScripts`, and npm documents that a future release will block them. An `ignore-scripts=true`
+configuration skips them today. If the script did not run, the package installs but cannot open a
+database; `chaingate doctor` reports this as `native-sqlite` and prints the fix. The fix allows only
+that one package's script:
 
 ```bash
-npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3    # when npm blocks install scripts
-# or, with ignore-scripts=true in your npm configuration, rebuild just that package:
+# global install
+npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3
+# project install, in the project directory (npm versions with allowScripts)
+npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3
+# with ignore-scripts=true in your npm configuration: rebuild just that package
 cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scripts=false
 ```
 
-For a project install, leave out `-g` and use `node_modules/@cgsec/chaingate`. Do not enable all
-dependency scripts to fix this.
+`--allow-scripts` applies to global installs only; npm rejects it for project installs, which use
+`allowScripts` in `package.json` instead. Do not enable all dependency scripts to fix this.
 
 **Tested platforms.** Only the combinations below have been tested. Anything not listed is untested,
 not supported.

@@ -28,7 +28,7 @@ test('guidance enables only better-sqlite3 scripts, and never recommends enablin
     assert.match(text, /better-sqlite3 11\.10\.0/);
     assert.match(text, /chaingate doctor/);
     for (const line of text.split('\n')) {
-      if (/--allow-scripts|--ignore-scripts=false/.test(line)) {
+      if (/--allow-scripts|--ignore-scripts=false|approve-scripts/.test(line)) {
         assert.match(line, /better-sqlite3/, `a script-enabling command must name better-sqlite3: ${line}`);
         assert.doesNotMatch(line, /--allow-scripts(=\*|=all|\s|$)/, `no blanket allow: ${line}`);
       }
@@ -38,5 +38,9 @@ test('guidance enables only better-sqlite3 scripts, and never recommends enablin
   const missing = nativeSqliteHelp('missing', '11.10.0').join('\n');
   assert.match(missing, /npm install -g @cgsec\/chaingate --allow-scripts=better-sqlite3/);
   assert.match(missing, /npm rebuild better-sqlite3 --ignore-scripts=false/);
+  assert.match(missing, /npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3/, 'project installs use allowScripts');
+  for (const line of missing.split('\n')) {
+    if (/--allow-scripts/.test(line)) assert.match(line, /npm install -g /, `--allow-scripts only on a global install: ${line}`);
+  }
   assert.match(missing, /PowerShell: .*npm rebuild better-sqlite3 --ignore-scripts=false/);
 });

@@ -1,8 +1,9 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fmt, renderTable, colorDisposition } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { readPid } from '../proxy-control.js';
 import { openWitnessDB } from '../../witness/db.js';
+import { resolveActiveBundle, bundleFiles, ActivationBroken } from '../seed-bundle.js';
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -23,6 +24,23 @@ export default async function status(args) {
     return EXIT.ERROR;
   }
 
+  // The v3 detection seed: what the activation record points at, from the bundle's recorded
+  // manifest. Status does not re-hash a 1.9 GB database; `chaingate doctor` verifies it.
+  let seedV3 = { active: false };
+  try {
+    const a = resolveActiveBundle(paths.base);
+    if (a) {
+      let m = {};
+      try { m = JSON.parse(readFileSync(bundleFiles(a.dir).manifest, 'utf8')); } catch { /* reported below */ }
+      seedV3 = { active: true, bundle_id: a.id, sha256: m.sha256 ?? null, trust: m.trust ?? null,
+        signed: m.signed ?? null, corpus_snapshot_digest: m.corpus_snapshot_digest ?? null,
+        staged_at: m.staged_at ?? null, verified: false };
+    }
+  } catch (err) {
+    if (!(err instanceof ActivationBroken)) throw err;
+    seedV3 = { active: false, broken: true, link: err.link };
+  }
+
   const db = openWitnessDB(paths.witnessDb, { readonly: true });
 
   try {
@@ -39,9 +57,10 @@ export default async function status(args) {
         decisions: stats,
         recent,
         seed: { version: seedVersion, exported_at: seedExported },
+        seed_v3: seedV3,
         proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST },
       }, null, 2));
-      return EXIT.OK;
+      return seedV3.broken ? EXIT.ERROR : EXIT.OK;
     }
 
     const proxyStatus = pid
@@ -50,11 +69,19 @@ export default async function status(args) {
 
     const seedLine = seedVersion
       ? `${seedVersion} (exported ${seedExported ?? 'unknown'})`
-      : fmt.dim('none (observing from live traffic)');
+      : fmt.dim('none installed (v3 detection does not need it)');
+
+    const v3Line = seedV3.broken
+      ? fmt.red(`BROKEN: the activation link ${seedV3.link} does not resolve. Run \`chaingate update-seed --rollback\` or \`chaingate init --seed <bundle>\``)
+      : seedV3.active
+        ? `bundle ${seedV3.bundle_id}  sha256 ${String(seedV3.sha256 ?? 'unknown').slice(0, 16)}...  trust ${seedV3.trust ?? 'unknown'}`
+          + fmt.dim('  (recorded; `chaingate doctor` verifies it)')
+        : fmt.dim('none active (run `chaingate init --seed <bundle>`)');
 
     console.log(renderTable([
       ['Witness store:', `${counts.packages} packages, ${counts.versions} versions, ${counts.files} files`],
-      ['Seed version:', seedLine],
+      ['Detection seed (v3):', v3Line],
+      ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
       ['Decisions:', `${stats.total} total · ${stats.ALLOW} ALLOW · ${stats.WARN} WARN · ${stats.BLOCK} BLOCK`],
     ]));
@@ -71,5 +98,5 @@ export default async function status(args) {
     db.close();
   }
 
-  return EXIT.OK;
+  return seedV3.broken ? EXIT.ERROR : EXIT.OK;
 }

@@ -1,7 +1,8 @@
 // The SQLite module (better-sqlite3) has a native part that npm installs through the package's own
-// install script. Some npm versions and configurations skip dependency install scripts; the package
-// then installs "successfully" and fails the first time a database is opened, with a stack trace
-// about a missing bindings file. This module recognises that failure and says how to fix it,
+// install script. npm currently runs dependency install scripts by default and warns about ones not
+// covered by `allowScripts`; npm documents that a future release will block them, and an
+// `ignore-scripts=true` configuration skips them today. The package then installs "successfully"
+// and fails the first time a database is opened, with a stack trace about a missing bindings file. This module recognises that failure and says how to fix it,
 // allowing only better-sqlite3's own script — never all dependency scripts.
 import { createRequire } from 'node:module';
 
@@ -40,19 +41,22 @@ export function nativeSqliteHelp(kind, version) {
   const lines = [];
   if (kind === 'abi') {
     lines.push(`ChainGate's SQLite module (${mod}) was built for a different Node.js version than the one running now.`,
-      'Reinstall ChainGate with the Node.js version you will use:',
-      '  npm install -g @cgsec/chaingate');
+      'Rebuild it with the Node.js version you will use:',
+      '  Global install:  cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3',
+      '  Project install: npm rebuild better-sqlite3   (in the project directory)');
   } else {
     lines.push(`ChainGate cannot load its SQLite module (${mod}): the native part is not installed.`,
-      "npm installs it with better-sqlite3's install script, which was skipped during installation.",
-      'Fix it by allowing that one package\'s script (not all dependency scripts):',
-      '  npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3',
-      '    (the command npm itself suggests when it blocks dependency install scripts)',
+      "npm installs it with better-sqlite3's install script, which did not run during installation.",
+      "Fix it by allowing that one package's script (never all dependency scripts):",
+      '  Global install:',
+      '    npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3',
+      '  Project install (npm versions with allowScripts), in the project directory:',
+      '    npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3',
       'If your npm configuration sets ignore-scripts=true, rebuild only that package from the install directory:',
       '  cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scripts=false',
       "  PowerShell: Set-Location (Join-Path (npm root -g) '@cgsec/chaingate'); npm rebuild better-sqlite3 --ignore-scripts=false");
   }
-  lines.push('For a project (local) install, leave out -g and use node_modules/@cgsec/chaingate as the directory.',
+  lines.push('For a project install with ignore-scripts=true, run `npm rebuild better-sqlite3 --ignore-scripts=false` in the project directory.',
     'Then run `chaingate doctor` to confirm.');
   return lines;
 }
