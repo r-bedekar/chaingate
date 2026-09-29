@@ -222,8 +222,8 @@ seed signature-verified at runtime: the tool still reports `authenticated: false
 
 ## Platform support
 
-Only the combinations in the README's "Tested platforms" table have been tested. Windows and macOS
-are not yet tested.
+Only the combinations in the README's "Tested platforms" table have been tested. Windows on a
+standard (non-administrator) account is not yet tested.
 
 On Windows (from 0.1.2), the active and previous seed bundles are recorded in one file,
 `seeds\activation.json`, which is replaced in a single rename: Windows cannot rename a symbolic link

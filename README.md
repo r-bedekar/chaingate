@@ -123,7 +123,8 @@ research corpus. This is a pilot measurement, not a population estimate:
 Five minutes, no account, no feed subscription. The seed bundle is verified locally,
 so this flow works without fetching a bundle over the network.
 
-Install from npm (Node.js 22 or later). The command is `chaingate` either way:
+Install from npm (Node.js 22 or 24; `package.json` declares exactly those majors). The command is
+`chaingate` either way:
 
 ```bash
 npm install -g @cgsec/chaingate        # global
@@ -157,14 +158,17 @@ cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scri
 `package.json` covers only ChainGate's own development install; it grants nothing in your project.
 Do not enable all dependency scripts to fix this.
 
-**Tested platforms.** Only the combinations below have been tested. Anything not listed is untested,
-not supported.
+**Tested platforms.** Only the combinations below have been tested; anything not listed is untested,
+not supported. The SQLite module installs from its official prebuilt binary on each of them (no
+Python or compiler needed).
 
-| OS | Architecture | Node.js | npm | Status |
-|----|--------------|---------|-----|--------|
-| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | Tested: full qualification, global and project install |
-| Windows | x64 | | | Not yet tested |
-| macOS | | | | Not yet tested |
+| OS | Architecture | Node.js | npm | How it was tested |
+|----|--------------|---------|-----|-------------------|
+| Linux (Ubuntu 24.04) | x64 | 22 | 10 | full local qualification (suite, lifecycle, parity, installed package, offline kit) |
+| Linux (Ubuntu 24.04) | x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
+| macOS 15 | arm64, x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
+| Windows (Server 2022, administrator) | x64 | 22, 24 | 10, 12 | CI: test suite and install acceptance (qualification in progress for this candidate) |
+| Windows 10/11, standard account | x64 | | | not yet tested |
 
 From source:
 

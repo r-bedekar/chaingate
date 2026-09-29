@@ -36,10 +36,10 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^22.0.0 || ^24.0.0"
   },
   "dependencies": {
-    "better-sqlite3": "11.10.0",
+    "better-sqlite3": "12.11.1",
     "semver": "7.7.4",
     "undici": "6.28.1"
   },
@@ -47,7 +47,7 @@
     "ajv": "8.17.1"
   },
   "allowScripts": {
-    "better-sqlite3@11.10.0": true
+    "better-sqlite3@12.11.1": true
   },
   "exports": {
     ".": "./cli/index.js",
