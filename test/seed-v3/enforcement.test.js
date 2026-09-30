@@ -260,7 +260,7 @@ test('PERMITTED: the install succeeds and the preinstall marker appears (positiv
     assert.ok(r.recorded, 'no decision was recorded for this version');
     const permittedGate = r.recorded.gates_fired.find((x) => x.gate === 'seed-v3');
     assert.ok(permittedGate, `seed-v3 did not fire: ${JSON.stringify(r.recorded.gates_fired)}`);
-    assert.match(permittedGate.detail, /cft-policy-1\.0/);
+    assert.match(permittedGate.detail, /cft-policy-1\.1/);
     // no advisory pins it — the ONLY difference from the blocked half
     assert.doesNotMatch(permittedGate.detail, new RegExp(ADVISORY));
     // What "permitted" means here is NOT BLOCKED: the rewriter strips a version iff its disposition
@@ -286,7 +286,7 @@ test('BLOCKED: the policy refusal occurs, the install fails, and the marker neve
     const seedGate = fired.find((x) => x.gate === 'seed-v3');
     assert.ok(seedGate, `seed-v3 did not fire: ${JSON.stringify(fired)}`);
     assert.equal(seedGate.result, 'BLOCK');
-    assert.match(seedGate.detail, /cft-policy-1\.0/);
+    assert.match(seedGate.detail, /cft-policy-1\.1/);
     assert.match(seedGate.detail, new RegExp(ADVISORY));
     assert.match(seedGate.detail, /known-malicious-pin/);
 

@@ -1,4 +1,5 @@
-// U-01 A9 — every chaingate.check/1 shape validates against seed/v3/chaingate-check-1.schema.json, every
+// U-01 A9 — every check-record shape validates against the schema this runtime writes (U-05: chaingate.check/2,
+// seed/v3/chaingate-check-2.schema.json; historical /1 records are validated in u05-check2.test.js), every
 // finding against the CFT-03 finding schema (byte copy in test/fixtures/cft03, sha256 3ce4f826…), and
 // the schema REJECTS invented, null-filled and cross-shape members.
 //
@@ -21,7 +22,7 @@ import { syntheticCases, rc3Cases, buildSyntheticSeed, RC3_DIR } from './u01-cas
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
-const CHECK_SCHEMA = path.join(ROOT, 'seed', 'v3', 'chaingate-check-1.schema.json');
+const CHECK_SCHEMA = path.join(ROOT, 'seed', 'v3', 'chaingate-check-2.schema.json');
 const FINDING_SCHEMA = path.join(ROOT, 'test', 'fixtures', 'cft03', 'finding.schema.json');
 const TOOL = { name: 'chaingate', version: '0.1.0' };
 
@@ -67,7 +68,9 @@ function invalids(valid) {
   bad.refused_null_finding = { ...c(rf), finding: null };
   bad.tool_error_with_seed = { ...c(te), seed: c(ev.seed) };
   bad.tool_error_with_decision = { ...c(te), decision: c(ev.decision) };
-  bad.unknown_schema = { ...c(ev), schema: 'chaingate.check/2' };
+  bad.unknown_schema = { ...c(ev), schema: 'chaingate.check/3' };
+  bad.previous_schema_id = { ...c(ev), schema: 'chaingate.check/1' };
+  bad.refused_without_decided_by = (() => { const r = c(rf); delete r.explanation.structured.decided_by; return r; })();
   bad.unknown_result = { ...c(ev), result: 'maybe' };
   bad.override_blocking = { ...c(ev), effective: { action: 'BLOCK', basis: 'override',
     override: { reason: 'x', created_at: null, scope: 'exact-version' } } };
@@ -127,7 +130,7 @@ test('A9 (ajv, the approved validator) all shapes valid, findings valid, invalid
     {
       const full = new AjvCtor({ strict: true });
       full.addSchema({ $schema: 'https://json-schema.org/draft/2020-12/schema', $id: findingSchema.$id, type: 'object' });
-      assert.doesNotThrow(() => full.compile(checkSchema), 'chaingate-check-1 passes full strict mode');
+      assert.doesNotThrow(() => full.compile(checkSchema), 'chaingate-check-2 passes full strict mode');
     }
     // The FROZEN CFT-03 finding schema trips exactly one strict lint, strictRequired: a `required` inside
     // an if/then branch names a property defined outside that branch. That is valid JSON Schema, and the

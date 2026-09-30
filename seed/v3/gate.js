@@ -134,6 +134,9 @@ function compareToRecorded(candidateS, recordedS) {
   return 'ambiguous';
 }
 
+const stubReason = (version) => `${version} is a 0.0.x-security takedown stub (FU-2 E4): it is excluded `
+  + 'from lineage grouping and can hold no predecessor';
+
 const PLACEMENTS = Object.freeze({
   RECORDED: 'recorded',
   APPEND: 'append',
@@ -156,6 +159,9 @@ function resolvePlacement(seed, packageName, version, publishedS) {
 
   const pkg = seed.db.prepare('SELECT id FROM packages WHERE package_name = ?').get(packageName);
   if (!pkg) {
+    // A takedown stub is outside lineage grouping whether or not the seed represents its package (U-05, revision 2
+    // §3.3: an all-stub package reported `uncovered-package`). Placement only; the finding is unchanged.
+    if (isStub(version)) return no(PLACEMENTS.INELIGIBLE_STUB, stubReason(version));
     return no(PLACEMENTS.UNCOVERED_PACKAGE, 'the seed does not cover this package');
   }
 
@@ -178,11 +184,7 @@ function resolvePlacement(seed, packageName, version, publishedS) {
   }
 
   // E4 / E5: outside lineage grouping entirely, so it holds no predecessor.
-  if (isStub(version)) {
-    return no(PLACEMENTS.INELIGIBLE_STUB,
-      `${version} is a 0.0.x-security takedown stub (FU-2 E4): it is excluded from lineage `
-      + 'grouping and can hold no predecessor');
-  }
+  if (isStub(version)) return no(PLACEMENTS.INELIGIBLE_STUB, stubReason(version));
   if (publishedS === null || publishedS === undefined) {
     return no(PLACEMENTS.INELIGIBLE_NO_PUBLICATION_TIME,
       'the release has no publication time (FU-2 E5): it is excluded from lineage grouping and '
@@ -297,12 +299,18 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input
   const version = input.version;
   const manifest = input.rawManifest;
 
+  // The advisory pin FIRST (cft-policy-1.1, D4). It names this exact version and needs neither a manifest, a
+  // placement nor a finding, so it is looked up before anything that can fail and carried into every decision below:
+  // a refusal can no longer discard it. A lookup that throws is carried as a recorded failure, never as "no pin".
+  const looked = POL.lookupPin(seed, pkg, version);
+  const pinCtx = { pin: looked.pin, pinLookupError: looked.error };
+
   // A missing manifest is an UNUSABLE INPUT, which is policy's question and not this module's.
   // Answering it with a bare SKIP here bypassed policy entirely and let the aggregate permit.
   if (!manifest || typeof manifest !== 'object') {
     return { decision: POL.decide(null, {
       refusal: new Error(`no raw packument manifest supplied for ${pkg}@${version}`),
-      config, packageName: pkg, version,
+      config, packageName: pkg, version, ...pinCtx,
     }), finding: null, placement: null };
   }
 
@@ -328,14 +336,12 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input
     // The placement travels WITH the finding. Where Channel-A cannot be compared, policy records
     // the gate's own reason rather than the checker's `uncovered_package`, and keeps what does not
     // depend on placement: the DAC trajectory and an exact-version advisory pin.
-    decision = POL.decide(finding, {
-      pin: POL.pinFor(seed, pkg, version), config, override: null, placement: place,
-    });
+    decision = POL.decide(finding, { ...pinCtx, config, override: null, placement: place });
   } catch (e) {
     // A refusal from any layer is an UNUSABLE INPUT, and policy decides what that means — this
-    // module does not get to turn it into an ALLOW.
+    // module does not get to turn it into an ALLOW. The pin found above survives it.
     decision = POL.decide(null, {
-      refusal: e, config, packageName: pkg, version,
+      refusal: e, config, packageName: pkg, version, ...pinCtx,
     });
     finding = null;
     place = null;
@@ -365,7 +371,13 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
   /** One GateResult from a decision. Every exit from `evaluate` goes through here, so no path can
    *  skip policy or forget to report the decision. */
   function resultFrom(decision, sink) {
-    if (sink) sink(decision);
+    // The decision exists before the sink sees it. A sink that throws used to escape `evaluate`, and the runner then
+    // answered with `onError` -- replacing a computed decision (a pin BLOCK included) with the input rule. The decision
+    // stands; the sink's failure is stated beside it (U-05 Amendment 1, G4).
+    let sinkFailure = null;
+    if (sink) {
+      try { sink(decision); } catch (e) { sinkFailure = e; }
+    }
     // `disposition === null` is unreachable: construction refuses a gate with an unresolved policy.
     // Kept as a named refusal rather than an assumption, because silence here means permission.
     if (decision.disposition === null) {
@@ -385,7 +397,8 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
       detail: `${decision.policy_version}: ${why}`
         + (decision.placement ? ` [placement: ${decision.placement}]` : '')
         + (decision.evidence_complete ? '' : ` [evidence incomplete: ${decision.not_evaluated.length}`
-          + ' observation(s) NOT_EVALUATED]'),
+          + ' observation(s) NOT_EVALUATED]')
+        + (sinkFailure ? ` [decision callback failed: ${sinkFailure && sinkFailure.message}; this decision stands]` : ''),
     };
   }
 
@@ -396,13 +409,38 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
    *
    * It is not the runner's decision and it is not this module's: an unusable input is exactly the
    * case `on_unusable_input` governs, so policy answers it.
+   *
+   * `identity` (U-05 Amendment 1): the caller's request-bound `{packageName, version}` when it holds both, and
+   * `overridden: true` when an exact-version override exists for them. With an identity the advisory pin for that
+   * exact version is looked up in THIS gate's seed -- the one accepted at wiring -- and a pin BLOCKs, as it does on
+   * every other unusable-input path. Without one nothing is looked up and nothing is invented. An overridden version
+   * is not looked up either, so each failure path treats it exactly as before.
    */
-  function onError(err) {
+  function onError(err, identity = null) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const pkg = identity && identity.packageName;
+    const version = identity && identity.version;
+    const known = typeof pkg === 'string' && pkg !== '' && typeof version === 'string' && version !== '';
+    let looked = { pin: null, error: null, attempted: false };
+    let note;
+    if (!known) {
+      note = 'advisory not consulted: package and version are not known on this path';
+    } else if (identity.overridden === true) {
+      note = `advisory not consulted on a failure path: an exact-version override exists for ${pkg}@${version}`;
+    } else {
+      looked = POL.lookupPin(seed, pkg, version);
+      if (looked.error) {
+        note = `advisory pin lookup FAILED for ${pkg}@${version} (${looked.error.message}); the input rule decides`;
+      } else if (!looked.pin) note = `no recorded advisory pins ${pkg}@${version}`;
+    }
     const decision = POL.decide(null, {
-      refusal: err instanceof Error ? err : new Error(String(err)), config,
+      refusal: error, config, pin: looked.pin, pinLookupError: looked.error,
+      packageName: known ? pkg : null, version: known ? version : null,
     });
+    const pinned = looked.pin ? decision.results.find((x) => x.gate === POL.PIN_GATE) : null;
     return { gate: SEED_V3_GATE, result: decision.disposition,
-      detail: `${decision.policy_version}: the seed-v3 path could not run (${err && err.message})` };
+      detail: `${decision.policy_version}: the seed-v3 path could not run (${error.message})`
+        + (pinned ? ` | ${pinned.gate}: ${pinned.detail}` : '') + (note ? ` | ${note}` : '') };
   }
 
   // The same answer as a plain value, for the case where even onError cannot be consulted. Declared

@@ -1,15 +1,21 @@
 // U-01 A7 — explain() is pure and deterministic, and complete about what it could not see.
+//
+// U-05 (Amendment 1): the explanation goldens are VERSION-1 explanations of chaingate.check/1 records. Since 0.1.3
+// writes /2, the records explained here are the /1 records the RELEASED 0.1.2 produced for the same cases
+// (test/fixtures/u05/historical-check-1.json, T1 capture). The goldens are unchanged and still reproduced byte for
+// byte; version 2 is tested in u05-check2.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { explain } from '../../seed/v3/explain.js';
-import { explainRecords, EXPLAIN_GOLDEN_IDS } from './u01-explain-goldens.capture.mjs';
+import { EXPLAIN_GOLDEN_IDS } from './u01-explain-goldens.capture.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GOLDEN = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'fixtures', 'u01-goldens', 'explain.json'), 'utf8'));
-const RECORDS = explainRecords();
+const HISTORICAL = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'fixtures', 'u05', 'historical-check-1.json'), 'utf8'));
+const RECORDS = EXPLAIN_GOLDEN_IDS.map((id) => HISTORICAL.records.find((r) => r.id === id).record);
 const byId = (id) => RECORDS[EXPLAIN_GOLDEN_IDS.indexOf(id)];
 
 function deepFreeze(o) {
@@ -86,7 +92,8 @@ test('A7 a refusal explains the refusal only', () => {
   assert.match(r.text[0], /REFUSED: no finding exists for this input/);
   assert.match(r.text[1], /_npmUser is string/);
   assert.equal(r.text.at(-1), '  nothing was evaluated: this is NOT a clean result');
-  assert.throws(() => explain({ result: 'tool_error' }), /nothing to explain/);
+  assert.throws(() => explain({ schema: 'chaingate.check/1', result: 'tool_error' }), /nothing to explain/);
+  assert.throws(() => explain({ schema: 'chaingate.check/9', result: 'refused' }), /no explanation for check schema/);
 });
 
 test('A7 control: the hostile environment does throw when touched', () => {

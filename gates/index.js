@@ -111,8 +111,23 @@ function declaredErrorResult(mod) {
   return VALID_RESULTS.has(mod?.onErrorResult) ? mod.onErrorResult : 'SKIP';
 }
 
-function normalizeResult(moduleName, raw, mod = null) {
+// IDENTITY (U-05 Amendment 1). Every failure below happens for a known package and version -- the runner holds both
+// in its input -- and a module's `onError(err, identity)` is told them, so a gate whose BLOCK rests on a recorded
+// advisory for that exact version can still find it. A module that declares nothing ignores them: unchanged.
+function identityOf(input) {
+  const pkg = input?.packageName;
+  const version = input?.version;
+  return typeof pkg === 'string' && pkg !== '' && typeof version === 'string' && version !== ''
+    ? { packageName: pkg, version } : null;
+}
+
+function normalizeResult(moduleName, raw, mod = null, identity = null, { askOnError = true } = {}) {
   if (raw == null || typeof raw !== 'object' || !VALID_RESULTS.has(raw.result)) {
+    // Malformed output is a failure of the module like a throw is, so a module that DECLARES what its failure means
+    // is asked (once), with the identity. A module that declares no onError -- every pilot gate -- is unchanged.
+    if (askOnError && typeof mod?.onError === 'function') {
+      return moduleErrorResult(mod, moduleName, new Error('malformed gate output'), null, identity);
+    }
     return {
       gate: moduleName,
       result: declaredErrorResult(mod),
@@ -127,10 +142,10 @@ function normalizeResult(moduleName, raw, mod = null) {
 }
 
 /** What one module's failure means, as the module itself declares it. */
-function moduleErrorResult(mod, name, err, log) {
+function moduleErrorResult(mod, name, err, log, identity = null) {
   if (typeof mod?.onError === 'function') {
     try {
-      return normalizeResult(name, mod.onError(err), mod);
+      return normalizeResult(name, mod.onError(err, identity), mod, identity, { askOnError: false });
     } catch (inner) {
       log?.error?.(`[gates] ${name}.onError threw: ${inner.message}`);
       return {
@@ -206,6 +221,7 @@ export function createGateRunner({
     const insufficientHistory = priorCount < MIN_HISTORY_DEPTH;
 
     const results = [];
+    const identity = identityOf(input);
     for (const mod of modules) {
       const name = mod?.name ?? 'anonymous';
       if (insufficientHistory && !HISTORY_INDEPENDENT_GATES.has(name)) {
@@ -218,12 +234,12 @@ export function createGateRunner({
       }
       try {
         const raw = mod.evaluate(gateInput);
-        results.push(normalizeResult(name, raw, mod));
+        results.push(normalizeResult(name, raw, mod, identity));
       } catch (err) {
         log.warn(
           `[gates] ${name} threw on ${gateInput.packageName}@${gateInput.version}: ${err.message}`,
         );
-        results.push(moduleErrorResult(mod, name, err, log));
+        results.push(moduleErrorResult(mod, name, err, log, identity));
       }
     }
 
@@ -239,9 +255,24 @@ export function createGateRunner({
    * version could not be parsed at all. Built from each module's own declaration, so a caller that
    * previously manufactured `ALLOW` out of an exception can ask instead of assuming. With no module
    * declaring anything this aggregates to ALLOW, which is exactly the previous behaviour.
+   *
+   * `identity` (U-05 Amendment 1): the caller's request-bound `{packageName, version}` when it holds both. The
+   * exact-version override is checked here, because no failure path ever reached the override short-circuit above:
+   * for an overridden version the modules are told so and consult no advisory, which keeps that version's outcome
+   * exactly as it was. An unreadable override store counts as no override, as in runGates.
    */
-  runGates.failureDecision = (err) => {
-    const results = modules.map((mod) => moduleErrorResult(mod, mod?.name ?? 'anonymous', err, log));
+  runGates.failureDecision = (err, identity = null) => {
+    let id = identityOf(identity);
+    if (id && getOverride && typeof getOverride === 'function') {
+      let overridden = false;
+      try {
+        overridden = Boolean(getOverride(id.packageName, id.version));
+      } catch (e) {
+        log.warn(`[gates] override lookup failed for ${id.packageName}@${id.version}: ${e.message}`);
+      }
+      id = { ...id, overridden };
+    }
+    const results = modules.map((mod) => moduleErrorResult(mod, mod?.name ?? 'anonymous', err, log, id));
     return { disposition: aggregate(results), results, override: null };
   };
 

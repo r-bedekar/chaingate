@@ -133,7 +133,7 @@ test('PROBE 1: the real gate THROWS mid-evaluation and the pinned version is sti
     // the runner recorded WHICH gate failed and that policy answered for it
     const fired = decision.results.find((x) => x.gate === 'seed-v3');
     assert.ok(fired, `seed-v3 absent from ${JSON.stringify(decision.results)}`);
-    assert.match(fired.detail, /cft-policy-1\.0/);
+    assert.match(fired.detail, /cft-policy-1\.1/);
     // ...and the version does not survive the rewrite
     const { packument: out } = rewritePackument(packument(), observed.decisions);
     assert.equal(Object.prototype.hasOwnProperty.call(out.versions, VERSION), false,
@@ -162,7 +162,7 @@ test('PROBE 1b: an error the gate does NOT catch reaches the runner, which uses 
     assert.notEqual(decision.disposition, 'ALLOW');
     assert.equal(decision.disposition, 'BLOCK');
     const fired = decision.results.find((x) => x.gate === 'seed-v3');
-    assert.match(fired.detail, /cft-policy-1\.0/);
+    assert.match(fired.detail, /cft-policy-1\.1/);
     assert.match(fired.detail, /something outside the gate broke/);
   } finally { s.seed.close(); s.db.close(); }
 });

@@ -1,6 +1,13 @@
 // U-01 A2/A3/A4 — the refactored gate AND `check` each reproduce the goldens captured from the frozen
 // 306bccde gate (test/fixtures/u01-goldens, commit "U-01 A1"). Agreement with each other is not
 // enough; each is compared with the recorded answer.
+//
+// U-05 (T2, revision 2 §6): the goldens are FROZEN and unchanged. They record cft-policy-1.0; this runtime is
+// cft-policy-1.1. The exact reproduction by the released 0.1.2 is T1 (qualification evidence, outside the suite).
+// Here each golden is compared after the ENUMERATED expected differences of U-05-S2-DECISION-TABLES-20260930.md
+// T-2, and only those: D1 the decision's policy_version, D2 the policy prefix of the gate detail. The tables
+// predict no other difference on these inputs (no pinned refusal, no absent-package stub, no failure path), so
+// anything else fails here.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,6 +27,18 @@ const load = (f) => JSON.parse(fs.readFileSync(path.join(GOLD, f), 'utf8'));
 const TOOL = { name: 'chaingate', version: 'test' };
 
 const isRefusal = (d) => d.results.length === 1 && d.results[0].gate === 'seed-v3:input';
+
+// T-2 D1/D2, written from the decision tables (not from runtime output). Applied to a COPY of the golden.
+const POLICY_1_0 = 'cft-policy-1.0';
+const POLICY_1_1 = 'cft-policy-1.1';
+function expectedUnder11(g) {
+  const out = structuredClone(g);
+  assert.equal(out.decision.policy_version, POLICY_1_0, `${g.id}: the golden records policy 1.0`);
+  out.decision.policy_version = POLICY_1_1;                                          // D1
+  assert.ok(out.gate_result.detail.startsWith(`${POLICY_1_0}: `), `${g.id}: golden detail prefix`);
+  out.gate_result.detail = `${POLICY_1_1}: ${out.gate_result.detail.slice(POLICY_1_0.length + 2)}`;   // D2
+  return out;
+}
 
 function viaGate(seed, c) {
   const decisions = [];
@@ -41,7 +60,7 @@ function compareAll(seed, cases, golden, label) {
   assert.deepEqual(cases.map((c) => c.id), golden.records.map((r) => r.id), `${label}: case set drifted from the goldens`);
   let n = 0;
   for (const c of cases) {
-    const g = byId.get(c.id);
+    const g = expectedUnder11(byId.get(c.id));
     assert.equal(sha256(canonical(c.doc)), g.request.document_sha256, `${c.id}: input document changed since capture`);
     assert.equal(g.threw, null);
 

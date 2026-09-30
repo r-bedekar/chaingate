@@ -39,9 +39,21 @@
 // the move that turns missing evidence into a clean result. So this module REFUSES TO DECIDE until
 // an operator sets them, and says which ones are unset. A refusal to decide is not an ALLOW.
 
+//
+// CFT-POLICY-1.1 (U-05, D4). One change of substance, and it follows from the criterion above rather than adding a
+// new one: a recorded advisory naming this exact version is a fact about the ARTIFACT, not about the input, so it
+// stands on the unusable-input paths too. Under 1.0 every refusal and contract mismatch decided from
+// `on_unusable_input` alone and never consulted the pin -- under WARN a known-malicious version was only warned about,
+// and under BLOCK the decision named the input instead of the advisory. Under 1.1 the pin row comes first and the
+// input row stays beside it. A pin lookup that FAILS is recorded (`not_evaluated` policy/pin_lookup) and the input
+// rule decides; it is never read as "no advisory". Everything else in the decision table is unchanged.
 import K from './contract.js';
 
-const POLICY_CONTRACT_VERSION = 'cft-policy-1.0';
+const POLICY_CONTRACT_VERSION = 'cft-policy-1.1';
+const PIN_GATE = 'seed-v3:known-malicious-pin';
+// The seed contract whose pins are keyed by package name (reader.js SEED_CONTRACT_1_1). A literal here, not an import:
+// policy.js imports nothing from the detection path.
+const PIN_BY_NAME_SEED_CONTRACT = 'cft-seed-v3-contract-1.1';
 const IMPLEMENTED_DETECTION_CONTRACT = K.CONTRACT_VERSION;
 
 const ALLOW = 'ALLOW';
@@ -106,6 +118,14 @@ function normaliseConfig(config = {}) {
 
 const r = (gate, result, detail) => ({ gate, result, detail });
 
+const reasonOf = (err) => (err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+const pinBlockRow = (pin, pkg, version) => r(PIN_GATE, BLOCK,
+  `recorded advisory ${pin.advisory_id} pins ${pkg}@${version}${pin.source ? ` (source ${pin.source})` : ''}`);
+const pinFailedRow = (err) => r(PIN_GATE, SKIP,
+  `advisory pin lookup FAILED (${reasonOf(err)}): whether an advisory names this version is NOT known`);
+const pinLookupMissing = (err) => ({ where: 'policy', name: 'pin_lookup', reason: reasonOf(err) });
+const inputResult = (choice) => (choice === 'BLOCK' ? BLOCK : (choice === 'WARN' ? WARN : SKIP));
+
 /** D1's aggregation, unchanged: any BLOCK -> BLOCK, else any WARN -> WARN, else ALLOW. */
 function aggregate(results) {
   if (results.some((x) => x.result === BLOCK)) return BLOCK;
@@ -165,6 +185,7 @@ function thresholdResults(prefix, agg) {
  * @param {object|null} finding   a CFT-03 finding, or null when there is none
  * @param {object} ctx
  *   ctx.pin        a known_malicious_pins row for THIS package and version, or null
+ *   ctx.pinLookupError  the error a pin lookup threw, or null (1.1): recorded, and the input rule decides
  *   ctx.refusal    the SeedRefused / CandidateRejected that prevented evaluation, or null
  *   ctx.config     the operator's answers to OPEN_CHOICES
  *   ctx.override   an override row (D1 short-circuit), or null
@@ -173,6 +194,7 @@ function thresholdResults(prefix, agg) {
  */
 function decide(finding, ctx = {}) {
   const { pin = null, refusal = null, override = null } = ctx;
+  const pinLookupError = pin ? null : (ctx.pinLookupError ?? null);
   const config = normaliseConfig(ctx.config || {});
   const base = {
     placement: null,
@@ -205,40 +227,40 @@ function decide(finding, ctx = {}) {
     };
   }
 
-  // 1. UNSUPPORTED INPUT or TRUST FAILURE. There is no finding, so there is nothing to be clean.
-  if (refusal || !finding) {
-    const detail = refusal
-      ? `${refusal.name || 'refused'}: ${(refusal.reasons || [refusal.message]).join('; ')}`
-      : 'no finding was produced';
+  // An UNUSABLE INPUT: there is no finding to read (1), or one written under another detection contract (2).
+  // `on_unusable_input` decides the input row. A recorded advisory for this exact version is not about the input:
+  // under 1.1 it comes first and BLOCKs whatever that choice says (D4), and a failed lookup is recorded beside it.
+  const unusable = (detail, name) => {
     const choice = config.on_unusable_input;
-    const results = [r('seed-v3:input', choice === 'BLOCK' ? BLOCK : (choice === 'WARN' ? WARN : SKIP),
-      detail)];
+    const results = [];
+    if (pin) results.push(pinBlockRow(pin, base.package, base.version));
+    else if (pinLookupError) results.push(pinFailedRow(pinLookupError));
+    results.push(r('seed-v3:input', inputResult(choice), detail));
+    const notEvaluated = [{ where: 'policy', name, reason: detail }];
+    if (pinLookupError) notEvaluated.push(pinLookupMissing(pinLookupError));
     return {
       ...base,
-      disposition: choice === 'REFUSE_TO_DECIDE' ? null : aggregate(results),
+      // A pin is a recorded fact and stands on its own, as it does when nothing was evaluated (row 8).
+      disposition: pin ? BLOCK : (choice === 'REFUSE_TO_DECIDE' ? null : aggregate(results)),
       results,
       evidence_complete: false,
-      not_evaluated: [{ where: 'policy', name: 'input', reason: detail }],
+      not_evaluated: notEvaluated,
       undecided: choice === 'REFUSE_TO_DECIDE' ? ['on_unusable_input'] : [],
     };
+  };
+
+  // 1. UNSUPPORTED INPUT or TRUST FAILURE. There is no finding, so there is nothing to be clean.
+  if (refusal || !finding) {
+    return unusable(refusal
+      ? `${refusal.name || 'refused'}: ${(refusal.reasons || [refusal.message]).join('; ')}`
+      : 'no finding was produced', 'input');
   }
 
   // A finding produced under a detection contract this policy version was not written against is an
   // unsupported input too: the field meanings are exactly what policy is reading.
   if (finding.contract_version !== IMPLEMENTED_DETECTION_CONTRACT) {
-    const detail = `finding declares detection contract ${finding.contract_version}; this policy `
-      + `implements ${IMPLEMENTED_DETECTION_CONTRACT}`;
-    const choice = config.on_unusable_input;
-    const results = [r('seed-v3:input', choice === 'BLOCK' ? BLOCK : (choice === 'WARN' ? WARN : SKIP),
-      detail)];
-    return {
-      ...base,
-      disposition: choice === 'REFUSE_TO_DECIDE' ? null : aggregate(results),
-      results,
-      evidence_complete: false,
-      not_evaluated: [{ where: 'policy', name: 'detection_contract_version', reason: detail }],
-      undecided: choice === 'REFUSE_TO_DECIDE' ? ['on_unusable_input'] : [],
-    };
+    return unusable(`finding declares detection contract ${finding.contract_version}; this policy `
+      + `implements ${IMPLEMENTED_DETECTION_CONTRACT}`, 'detection_contract_version');
   }
 
   // PLACEMENT. Channel-A compares a release against its predecessor in a lineage; the DAC
@@ -253,12 +275,17 @@ function decide(finding, ctx = {}) {
 
   // 2. KNOWN-MALWARE PIN — a recorded advisory naming this exact version. Locked criterion, not a
   //    choice: this is the same true-positive-by-construction standard that lets content-hash block.
+  //    A lookup that FAILED is not "no advisory": it is recorded and the input rule decides it (1.1).
+  const policyMissing = [];
   if (pin) {
-    results.push(r('seed-v3:known-malicious-pin', BLOCK,
-      `recorded advisory ${pin.advisory_id} pins ${base.package}@${base.version}`
-      + `${pin.source ? ` (source ${pin.source})` : ''}`));
+    results.push(pinBlockRow(pin, base.package, base.version));
+  } else if (pinLookupError) {
+    results.push(pinFailedRow(pinLookupError));
+    results.push(r('seed-v3:input', inputResult(config.on_unusable_input),
+      `advisory pin lookup FAILED (${reasonOf(pinLookupError)}); on_unusable_input decides it`));
+    policyMissing.push(pinLookupMissing(pinLookupError));
   } else {
-    results.push(r('seed-v3:known-malicious-pin', ALLOW, 'no recorded advisory pins this version'));
+    results.push(r(PIN_GATE, ALLOW, 'no recorded advisory pins this version'));
   }
 
   // 3. TRAJECTORY AND CHANNEL-A THRESHOLDS — inference over history, so WARN at most.
@@ -300,6 +327,11 @@ function decide(finding, ctx = {}) {
     }
     // ALLOW: D1's fail-open, chosen explicitly by an operator rather than arrived at by omission.
   }
+  if (pinLookupError && config.on_unusable_input === 'REFUSE_TO_DECIDE') {
+    // Whether an advisory names this version is unknown, and the operator has not said what that means.
+    if (!undecided.includes('on_unusable_input')) undecided.push('on_unusable_input');
+    disposition = null;
+  }
 
   return {
     ...base,
@@ -307,29 +339,52 @@ function decide(finding, ctx = {}) {
     results,
     placement: placement ? placement.kind : null,
     channel_a_usable: channelAUsable,
-    evidence_complete: missing.length === 0,
-    not_evaluated: missing,
+    evidence_complete: missing.length === 0 && policyMissing.length === 0,
+    not_evaluated: [...missing, ...policyMissing],
     undecided,
   };
 }
 
 /** Look up a recorded advisory pin for one package and version. Read-only, and its own query so the
- *  detection path never has to know this table exists. */
+ *  detection path never has to know this table exists.
+ *
+ *  Seed contract 1.1 keys pins by NAME, so a pin is found whether or not the package is represented (D4: the 1.0
+ *  join made a pin row without a `packages` row invisible). A 1.0 seed keeps the 1.0 join exactly. */
 function pinFor(seed, packageName, version) {
-  const row = seed.db.prepare(
-    'SELECT k.advisory_id AS advisory_id, k.source AS source FROM known_malicious_pins k '
-    + 'JOIN packages p ON p.id = k.package_id WHERE p.package_name = ? AND k.version = ? LIMIT 1',
+  const byName = seed.meta?.seed_contract_version === PIN_BY_NAME_SEED_CONTRACT;
+  const row = seed.db.prepare(byName
+    ? 'SELECT advisory_id, source FROM known_malicious_pins WHERE package_name = ? AND version = ? '
+      + 'ORDER BY advisory_id LIMIT 1'
+    : 'SELECT k.advisory_id AS advisory_id, k.source AS source FROM known_malicious_pins k '
+      + 'JOIN packages p ON p.id = k.package_id WHERE p.package_name = ? AND k.version = ? LIMIT 1',
   ).get(packageName, version);
   return row || null;
+}
+
+/**
+ * `pinFor` for callers that must not lose the result to an exception (the "safePinFor" of the D4 proposal).
+ * Looks up only an EXACT identity -- both a non-empty string -- in the seed the caller hands it, which is the seed the
+ * caller accepted under its configured trust mode. Never throws: a failure is RETURNED, so it can be recorded.
+ * @returns {{pin: object|null, error: Error|null, attempted: boolean}}
+ */
+function lookupPin(seed, packageName, version) {
+  if (typeof packageName !== 'string' || !packageName || typeof version !== 'string' || !version) {
+    return { pin: null, error: null, attempted: false };
+  }
+  try {
+    return { pin: pinFor(seed, packageName, version), error: null, attempted: true };
+  } catch (e) {
+    return { pin: null, error: e instanceof Error ? e : new Error(String(e)), attempted: true };
+  }
 }
 
 export {
   POLICY_CONTRACT_VERSION, IMPLEMENTED_DETECTION_CONTRACT, DISPOSITIONS, OPEN_CHOICES,
   OPEN_CHOICE_KEYS, PolicyConfigInvalid, normaliseConfig, aggregate, notEvaluated,
-  thresholdResults, decide, pinFor, ALLOW, WARN, BLOCK, SKIP,
+  thresholdResults, decide, pinFor, lookupPin, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
 };
 export default {
   POLICY_CONTRACT_VERSION, IMPLEMENTED_DETECTION_CONTRACT, DISPOSITIONS, OPEN_CHOICES,
   OPEN_CHOICE_KEYS, PolicyConfigInvalid, normaliseConfig, aggregate, notEvaluated,
-  thresholdResults, decide, pinFor, ALLOW, WARN, BLOCK, SKIP,
+  thresholdResults, decide, pinFor, lookupPin, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
 };

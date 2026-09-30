@@ -147,7 +147,7 @@ test('A11 set completeness: missing, empty set, empty manifest, duplicate, unexp
 
 test('A11 validation: unknown schema, missing seed.sha256, untrusted seed, truncated, malformed, extra member, inconsistent effective', () => {
   const cases = {
-    'unknown schema': [mutate('allow-append', (r) => { r.schema = 'chaingate.check/2'; }), /schema is "chaingate\.check\/2"/],
+    'unknown schema': [mutate('allow-append', (r) => { r.schema = 'chaingate.check/3'; }), /schema is "chaingate\.check\/3"/],
     'missing seed.sha256': [mutate('allow-append', (r) => { delete r.seed.sha256; }), /seed\.sha256 is missing/],
     truncated: [OUT['allow-append'].slice(0, 200), /unparseable or truncated/],
     malformed: ['{"schema": "chaingate.check/1",,}', /unparseable or truncated/],

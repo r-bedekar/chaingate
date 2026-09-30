@@ -154,7 +154,7 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log)
       // through. Ask the witness what the configured gates say a total failure means instead.
       try {
         observed = typeof witness.failureDecisionsFor === 'function'
-          ? witness.failureDecisionsFor(parsed, err) : null;
+          ? witness.failureDecisionsFor(parsed, err, packageName) : null;
       } catch (inner) {
         log?.error?.(`[witness] ${packageName}: failure decision unavailable: ${inner.message}`);
         observed = null;

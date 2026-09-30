@@ -12,7 +12,7 @@ import { fmt, renderGate } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { explain } from '../../seed/v3/explain.js';
-import { CHECK_SCHEMA_ID, EXIT_TOOL_ERROR } from '../check-record.js';
+import { CHECK_SCHEMA_IDS, EXIT_TOOL_ERROR, recordCompatibility } from '../check-record.js';
 import { runCheck, parseTarget } from './check.js';
 
 export const UNBOUND_LABEL = 'CACHED — UNBOUND: produced without recorded seed/rule/policy identities; '
@@ -55,12 +55,16 @@ export function explainSaved(file) {
   try { rec = JSON.parse(readFileSync(file, 'utf8')); } catch (e) {
     return { error: `cannot read a check result from ${file}: ${e.code || e.message}` };
   }
-  if (!rec || rec.schema !== CHECK_SCHEMA_ID) {
-    return { error: `${file} is not a ${CHECK_SCHEMA_ID} result (schema ${JSON.stringify(rec?.schema ?? null)})` };
+  if (!rec || !CHECK_SCHEMA_IDS.includes(rec.schema)) {
+    return { error: `${file} is not a ${CHECK_SCHEMA_IDS.join(' or ')} result (schema ${JSON.stringify(rec?.schema ?? null)})` };
   }
   if (rec.result === 'tool_error') {
     return { error: `${file} is a tool error (${rec.error?.code}): nothing was evaluated, so there is nothing to explain` };
   }
+  // A supported schema id is not enough: the policy, explanation, detection and seed versions must be the combination
+  // that schema carries, and a refused explanation's deciding rows must be the decision's (U-05 Amendment 1).
+  const problems = recordCompatibility(rec);
+  if (problems.length) return { error: `${file} is not a record this chaingate reads: ${problems.join('; ')}` };
   try { return { explanation: explain(rec) }; } catch (e) {
     return { error: `${file}: ${e.message}` };
   }

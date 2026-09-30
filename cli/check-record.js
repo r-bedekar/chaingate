@@ -1,4 +1,4 @@
-// U-01 — build one `chaingate.check/1` record.
+// U-01 — build one check record: `chaingate.check/2` since 0.1.3 (U-05 Amendment 1), `/1` before.
 //
 // Three shapes, and an absent member is OMITTED, never null-filled (plan §3.7):
 //   evaluated   seed, candidate, finding, decision, effective, explanation
@@ -16,7 +16,69 @@ import { createHash } from 'node:crypto';
 import G from '../seed/v3/gate.js';
 import { explain } from '../seed/v3/explain.js';
 
-export const CHECK_SCHEMA_ID = 'chaingate.check/1';
+export const CHECK_SCHEMA_ID = 'chaingate.check/2';
+
+/**
+ * The combinations a check record may carry, one per schema (U-05 Amendment 1). 0.1.3 writes only /2; /1 records are
+ * what 0.1.2 and earlier wrote, and are still read. Anything else -- including a /1 record claiming policy 1.1 or a
+ * 1.1 seed, which no release ever wrote -- is refused by name, never guessed at.
+ */
+export const SUPPORTED_RECORDS = Object.freeze({
+  'chaingate.check/1': Object.freeze({ explain_version: 'chaingate-explain-1', policy_version: 'cft-policy-1.0',
+    detection_contract_version: 'cft-detection-contract-1.0', seed_contract_versions: ['cft-seed-v3-contract-1.0'] }),
+  'chaingate.check/2': Object.freeze({ explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.1',
+    detection_contract_version: 'cft-detection-contract-1.0',
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1'] }),
+});
+export const CHECK_SCHEMA_IDS = Object.freeze(Object.keys(SUPPORTED_RECORDS));
+
+/**
+ * Why a saved record is not one this runtime reads, or [] when it is. Checks the version combination, and that a
+ * refused explanation's `decided_by` (/2) is exactly the decision's deciding rows -- the structured attribution must
+ * say what the decision says. Shape is the schema's job; this is about meaning.
+ */
+export function recordCompatibility(rec) {
+  if (!rec || typeof rec !== 'object') return ['the record is not an object'];
+  if (typeof rec.schema !== 'string' || !Object.hasOwn(SUPPORTED_RECORDS, rec.schema)) {
+    return [`schema ${JSON.stringify(rec.schema ?? null)} is not supported (supported: ${CHECK_SCHEMA_IDS.join(', ')})`];
+  }
+  if (rec.result === 'tool_error') return [];
+  const want = SUPPORTED_RECORDS[rec.schema];
+  const p = [];
+  const got = (v) => JSON.stringify(v ?? null);
+  const d = rec.decision || {};
+  const s = rec.explanation && rec.explanation.structured ? rec.explanation.structured : {};
+  if (d.policy_version !== want.policy_version) {
+    p.push(`decision.policy_version ${got(d.policy_version)}: ${rec.schema} records carry ${want.policy_version}`);
+  }
+  if (s.explain_version !== want.explain_version) {
+    p.push(`explanation.structured.explain_version ${got(s.explain_version)}: ${rec.schema} records carry ${want.explain_version}`);
+  }
+  if (!want.seed_contract_versions.includes(rec.seed && rec.seed.contract_version)) {
+    p.push(`seed.contract_version ${got(rec.seed && rec.seed.contract_version)}: ${rec.schema} records carry `
+      + `${want.seed_contract_versions.join(' or ')}`);
+  }
+  if (rec.result === 'evaluated' && (!rec.finding || rec.finding.contract_version !== want.detection_contract_version)) {
+    p.push(`finding.contract_version ${got(rec.finding && rec.finding.contract_version)}: ${rec.schema} records carry `
+      + `${want.detection_contract_version}`);
+  }
+  if (rec.result === 'refused') {
+    const has = Object.hasOwn(s, 'decided_by');
+    if (rec.schema === 'chaingate.check/1' && has) {
+      p.push('explanation.structured.decided_by is not a member of a chaingate.check/1 refused explanation');
+    }
+    if (rec.schema === 'chaingate.check/2') {
+      const deciding = (Array.isArray(d.results) ? d.results : []).filter((x) => x && x.result === d.disposition)
+        .map((x) => ({ gate: x.gate, detail: x.detail }));
+      if (!has || !Array.isArray(s.decided_by)) p.push('explanation.structured.decided_by is missing');
+      else if (JSON.stringify(s.decided_by.map((x) => ({ gate: x && x.gate, detail: x && x.detail })))
+        !== JSON.stringify(deciding)) {
+        p.push("explanation.structured.decided_by does not match the decision's deciding rows");
+      }
+    }
+  }
+  return p;
+}
 export const RESULT = Object.freeze({ EVALUATED: 'evaluated', REFUSED: 'refused', TOOL_ERROR: 'tool_error' });
 export const EXIT_FOR_ACTION = Object.freeze({ ALLOW: 0, WARN: 2, BLOCK: 3 });
 export const EXIT_TOOL_ERROR = 4;

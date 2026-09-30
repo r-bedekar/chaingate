@@ -1,0 +1,821 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chaingate.dev/schemas/chaingate-check-2.json",
+  "title": "chaingate.check/2 \u2014 one check result",
+  "description": "Three shapes. An absent member is OMITTED, never null-filled. decision.disposition is always the evaluated disposition; effective carries an exact-version override and its provenance. The finding is the CFT-03 finding, unchanged, and carries no action vocabulary. Version 2 (0.1.3, policy cft-policy-1.1): a refused result's structured explanation carries decided_by, the decision rows that decided it (for example a recorded advisory pin), with explanation version chaingate-explain-2. Version 1 is unchanged and historical version-1 records are still read.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "result",
+        "tool",
+        "request",
+        "seed",
+        "candidate",
+        "finding",
+        "decision",
+        "effective",
+        "explanation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chaingate.check/2"
+        },
+        "tool": {
+          "$ref": "#/$defs/tool"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "result": {
+          "const": "evaluated"
+        },
+        "seed": {
+          "$ref": "#/$defs/seed"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "finding": {
+          "$ref": "https://chaingate.dev/schemas/finding-1.0.json"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "effective": {
+          "$ref": "#/$defs/effective"
+        },
+        "explanation": {
+          "$ref": "#/$defs/explanation_evaluated"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "result",
+        "tool",
+        "request",
+        "seed",
+        "decision",
+        "effective",
+        "explanation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chaingate.check/2"
+        },
+        "tool": {
+          "$ref": "#/$defs/tool"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "result": {
+          "const": "refused"
+        },
+        "seed": {
+          "$ref": "#/$defs/seed"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "effective": {
+          "$ref": "#/$defs/effective"
+        },
+        "explanation": {
+          "$ref": "#/$defs/explanation_refused"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "result",
+        "tool",
+        "request",
+        "error"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chaingate.check/2"
+        },
+        "tool": {
+          "$ref": "#/$defs/tool"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "result": {
+          "const": "tool_error"
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "version"
+      ],
+      "properties": {
+        "package": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "packument-file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_id",
+        "sha256",
+        "trust",
+        "authenticated",
+        "contract_version",
+        "rule_versions",
+        "corpus_snapshot_digest"
+      ],
+      "properties": {
+        "bundle_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}(\\.r[0-9]+)?$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "trust": {
+          "enum": [
+            "authenticated",
+            "unsigned-development"
+          ]
+        },
+        "authenticated": {
+          "type": "boolean"
+        },
+        "contract_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rule_versions": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "corpus_snapshot_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_digest",
+        "placement"
+      ],
+      "properties": {
+        "candidate_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "placement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason",
+            "lineage_id",
+            "ord",
+            "channel_a_usable"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "recorded",
+                "append",
+                "new-major-cold-start",
+                "historical-omitted",
+                "ineligible-stub",
+                "ineligible-no-publication-time",
+                "uncovered-package",
+                "unresolved"
+              ]
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lineage_id": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "ord": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "channel_a_usable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "result_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "result",
+        "detail"
+      ],
+      "properties": {
+        "gate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCK",
+            "SKIP"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "not_evaluated_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "where",
+        "name",
+        "reason"
+      ],
+      "properties": {
+        "where": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stated_by": {
+          "const": "placement"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version",
+        "policy_config_sha256",
+        "disposition",
+        "results",
+        "evidence_complete",
+        "not_evaluated"
+      ],
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "pattern": "^cft-policy-"
+        },
+        "policy_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "disposition": {
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCK"
+          ]
+        },
+        "results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/result_row"
+          }
+        },
+        "evidence_complete": {
+          "type": "boolean"
+        },
+        "not_evaluated": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/not_evaluated_row"
+          }
+        }
+      }
+    },
+    "override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "created_at",
+        "scope"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "const": "exact-version"
+        }
+      }
+    },
+    "effective": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "basis"
+          ],
+          "properties": {
+            "action": {
+              "enum": [
+                "ALLOW",
+                "WARN",
+                "BLOCK"
+              ]
+            },
+            "basis": {
+              "const": "evaluation"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "basis",
+            "override"
+          ],
+          "properties": {
+            "action": {
+              "const": "ALLOW"
+            },
+            "basis": {
+              "const": "override"
+            },
+            "override": {
+              "$ref": "#/$defs/override"
+            }
+          }
+        }
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "state"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "BROKE",
+            "HELD",
+            "NOT_EVALUATED"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stated_by": {
+          "const": "placement"
+        }
+      }
+    },
+    "structured_effective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "basis"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCK"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "evaluation",
+            "override"
+          ]
+        },
+        "override": {
+          "$ref": "#/$defs/override"
+        }
+      }
+    },
+    "ne_brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "where",
+        "name",
+        "reason"
+      ],
+      "properties": {
+        "where": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "explanation_evaluated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "structured"
+      ],
+      "properties": {
+        "text": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "structured": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "explain_version",
+            "result",
+            "package",
+            "version",
+            "effective",
+            "disposition",
+            "policy_version",
+            "placement",
+            "decided_by",
+            "results",
+            "channel_a",
+            "dac_trajectory",
+            "not_evaluated",
+            "evidence_complete",
+            "evaluated_any"
+          ],
+          "properties": {
+            "explain_version": {
+              "const": "chaingate-explain-2"
+            },
+            "result": {
+              "const": "evaluated"
+            },
+            "package": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "effective": {
+              "$ref": "#/$defs/structured_effective"
+            },
+            "disposition": {
+              "enum": [
+                "ALLOW",
+                "WARN",
+                "BLOCK"
+              ]
+            },
+            "policy_version": {
+              "type": "string"
+            },
+            "placement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "reason"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "recorded",
+                    "append",
+                    "new-major-cold-start",
+                    "historical-omitted",
+                    "ineligible-stub",
+                    "ineligible-no-publication-time",
+                    "uncovered-package",
+                    "unresolved"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "decided_by": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gate",
+                  "detail"
+                ],
+                "properties": {
+                  "gate": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/result_row"
+              }
+            },
+            "channel_a": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "groups",
+                "publisher_constituents"
+              ],
+              "properties": {
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/state"
+                  },
+                  "minItems": 5,
+                  "maxItems": 5
+                },
+                "publisher_constituents": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/state"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              }
+            },
+            "dac_trajectory": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "predicates"
+              ],
+              "properties": {
+                "predicates": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/state"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              }
+            },
+            "not_evaluated": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ne_brief"
+              }
+            },
+            "evidence_complete": {
+              "type": "boolean"
+            },
+            "evaluated_any": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "explanation_refused": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "structured"
+      ],
+      "properties": {
+        "text": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "structured": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "explain_version",
+            "result",
+            "package",
+            "version",
+            "refusal",
+            "disposition",
+            "effective",
+            "not_evaluated",
+            "decided_by"
+          ],
+          "properties": {
+            "explain_version": {
+              "const": "chaingate-explain-2"
+            },
+            "result": {
+              "const": "refused"
+            },
+            "package": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "refusal": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "disposition": {
+              "enum": [
+                "ALLOW",
+                "WARN",
+                "BLOCK"
+              ]
+            },
+            "effective": {
+              "$ref": "#/$defs/structured_effective"
+            },
+            "not_evaluated": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ne_brief"
+              }
+            },
+            "decided_by": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gate",
+                  "detail"
+                ],
+                "properties": {
+                  "gate": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z_]*$"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

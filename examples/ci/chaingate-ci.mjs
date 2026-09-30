@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// chaingate-ci — one offline CI consumer of `chaingate.check/1` results. Node standard library only.
+// chaingate-ci — one offline CI consumer of `chaingate.check/2` results (0.1.3) and of historical
+// `chaingate.check/1` results (0.1.2 and earlier). Node standard library only.
 //
 //   node chaingate-ci.mjs --expected <manifest> --results <dir> --trusted-seed <sha256> [...]
 //                         [--trusted-seeds-file <file>] [--ignore-overrides] [--summary <file>]
@@ -16,8 +17,10 @@
 // Exit 2: usage error.
 //
 // WHAT IT CHECKS. Not full JSON Schema validation (that runs in the chaingate test suite, against
-// seed/v3/chaingate-check-1.schema.json). It performs this specified structural validation:
-//   schema id exactly chaingate.check/1 · result one of evaluated|refused|tool_error · the members
+// seed/v3/chaingate-check-1.schema.json and chaingate-check-2.schema.json). It performs this specified structural
+// validation:
+//   schema id chaingate.check/1 or /2, with that schema's version COMBINATION (below) · result one of
+//   evaluated|refused|tool_error · the members
 //   each shape requires and no others · inside every object the contract defines (tool, request,
 //   source, seed, candidate, placement, decision and its rows, effective, override, explanation,
 //   error): every required member present, no other member, each of the right type or enum, with
@@ -26,6 +29,11 @@
 //   duplicate, unexpected and empty sets all fail) · evaluated/refused results carry a seed.sha256 in
 //   the trusted list · `effective` consistent with `decision` and the override rule · unparseable or
 //   truncated files fail.
+//
+// VERSION COMBINATIONS. Each schema carries exactly one combination of explanation, policy, detection-contract and
+// seed-contract versions (COMBINATIONS below); any other is rejected naming the member. A /2 refused result must name
+// its deciding rows in explanation.structured.decided_by, equal to the decision rows whose result is the disposition
+// (under cft-policy-1.1 a recorded advisory pin can decide a refusal); a /1 refused result carries no decided_by.
 //
 // THE OVERRIDE RULE. decision.disposition is the evaluated disposition and is never rewritten.
 // effective.action is ALLOW with basis "override" and the override's provenance when an exact-version
@@ -38,7 +46,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SCHEMA_ID = 'chaingate.check/1';
+const COMBINATIONS = {
+  'chaingate.check/1': { explain_version: 'chaingate-explain-1', policy_version: 'cft-policy-1.0',
+    detection_contract_version: 'cft-detection-contract-1.0', seed_contract_versions: ['cft-seed-v3-contract-1.0'] },
+  'chaingate.check/2': { explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.1',
+    detection_contract_version: 'cft-detection-contract-1.0',
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1'] },
+};
+const SCHEMA_IDS = Object.keys(COMBINATIONS);
 const DISPOSITIONS = ['ALLOW', 'WARN', 'BLOCK'];
 const RESULT_VALUES = ['ALLOW', 'WARN', 'BLOCK', 'SKIP'];
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -163,7 +178,9 @@ const SPEC = {
 export function validateRecord(rec) {
   const p = [];
   if (!isObj(rec)) return ['top level is not an object'];
-  if (rec.schema !== SCHEMA_ID) return [`schema is ${JSON.stringify(rec.schema)}, expected ${SCHEMA_ID}`];
+  if (typeof rec.schema !== 'string' || !has(COMBINATIONS, rec.schema)) {
+    return [`schema is ${JSON.stringify(rec.schema)}, expected one of ${SCHEMA_IDS.join(', ')}`];
+  }
   // A string, and an OWN key of SHAPES: an array would coerce to its element (["evaluated"] ->
   // "evaluated") and a prototype name ("__proto__", "constructor", "toString") would find an inherited
   // property instead of a shape.
@@ -215,6 +232,44 @@ export function validateRecord(rec) {
       for (const k of FINDING_MEMBERS) if (!has(rec.finding, k)) p.push(`finding.${k} is missing`);
       for (const k of Object.keys(rec.finding)) if (!FINDING_MEMBERS.includes(k)) p.push(`finding.${k} is not an allowed member`);
       if (!T.nonEmpty(rec.finding.contract_version)) p.push('finding.contract_version must be a non-empty string');
+    }
+  }
+  if (!p.length) p.push(...combinationProblems(rec));
+  return p;
+}
+
+/** The version combination of a structurally valid evaluated or refused record, and a refused /2 attribution. */
+function combinationProblems(rec) {
+  const want = COMBINATIONS[rec.schema];
+  const p = [];
+  const s = isObj(rec.explanation.structured) ? rec.explanation.structured : {};
+  if (rec.decision.policy_version !== want.policy_version) {
+    p.push(`decision.policy_version ${JSON.stringify(rec.decision.policy_version)} is not the ${want.policy_version} `
+      + `that ${rec.schema} carries`);
+  }
+  if (s.explain_version !== want.explain_version) {
+    p.push(`explanation.structured.explain_version ${JSON.stringify(s.explain_version ?? null)} is not the `
+      + `${want.explain_version} that ${rec.schema} carries`);
+  }
+  if (!want.seed_contract_versions.includes(rec.seed.contract_version)) {
+    p.push(`seed.contract_version ${JSON.stringify(rec.seed.contract_version)} is not one ${rec.schema} carries `
+      + `(${want.seed_contract_versions.join(', ')})`);
+  }
+  if (rec.result === 'evaluated' && rec.finding.contract_version !== want.detection_contract_version) {
+    p.push(`finding.contract_version ${JSON.stringify(rec.finding.contract_version)} is not the `
+      + `${want.detection_contract_version} that ${rec.schema} carries`);
+  }
+  if (rec.result === 'refused') {
+    if (rec.schema === 'chaingate.check/1' && has(s, 'decided_by')) {
+      p.push('explanation.structured.decided_by is not a member of a chaingate.check/1 refused explanation');
+    } else if (rec.schema === 'chaingate.check/2') {
+      const deciding = rec.decision.results.filter((x) => x.result === rec.decision.disposition)
+        .map((x) => JSON.stringify([x.gate, x.detail]));
+      if (!Array.isArray(s.decided_by)) p.push('explanation.structured.decided_by is missing (required in chaingate.check/2)');
+      else if (JSON.stringify(s.decided_by.map((x) => JSON.stringify([isObj(x) ? x.gate : null, isObj(x) ? x.detail : null])))
+        !== JSON.stringify(deciding)) {
+        p.push("explanation.structured.decided_by does not match the decision's deciding rows");
+      }
     }
   }
   return p;
@@ -296,7 +351,7 @@ function main() {
     rows.push(row);
   }
 
-  const summary = { consumer: 'chaingate-ci', schema: SCHEMA_ID, gate_on: o.ignoreOverrides ? 'decision.disposition' : 'effective.action',
+  const summary = { consumer: 'chaingate-ci', schema: SCHEMA_IDS, gate_on: o.ignoreOverrides ? 'decision.disposition' : 'effective.action',
     expected: expected.size, results: files.length, passed: failures.length === 0, failures, warnings, rows };
   if (o.summary) fs.writeFileSync(o.summary, `${JSON.stringify(summary, null, 2)}\n`);
   for (const r of rows) console.log(`${r.outcome.padEnd(16)} ${r.pair}${r.basis === 'override' ? '  (override)' : ''}`);

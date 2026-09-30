@@ -11,7 +11,11 @@ import C from './checker.js';
 import { pyStrip } from './normalize.js';
 
 const SUPPORTED_SCHEMA_VERSIONS = [3];
-const SUPPORTED_SEED_CONTRACT_VERSIONS = ['cft-seed-v3-contract-1.0'];
+// 1.1 (U-05, D4): advisory pins are keyed by package NAME, so a pin no longer presumes a represented package.
+// Its pin table carries `package_name` with an index on (package_name, version); see pinLayoutProblem().
+const SEED_CONTRACT_1_0 = 'cft-seed-v3-contract-1.0';
+const SEED_CONTRACT_1_1 = 'cft-seed-v3-contract-1.1';
+const SUPPORTED_SEED_CONTRACT_VERSIONS = [SEED_CONTRACT_1_0, SEED_CONTRACT_1_1];
 const IMPLEMENTED_DETECTION_CONTRACT = K.CONTRACT_VERSION;
 const REQUIRED_TABLES = ['seed_metadata', 'packages', 'lineages', 'lineage_state', 'spine', 'events'];
 const SUPPORTED_RULE_VERSIONS = {
@@ -71,6 +75,24 @@ function sha256File(p) {
 }
 
 const isHex = (v, n) => v.length === n && /^[0-9a-f]*$/.test(v);
+
+/**
+ * The pin layout a 1.1 seed must carry, or null. A 1.1 seed is looked up by name, so a seed that DECLARES 1.1 without
+ * the name column or its index would either fail every lookup or scan the table per release: refused by name instead.
+ * A 1.0 seed is not checked here; its layout is unchanged from the reader that shipped with it.
+ */
+function pinLayoutProblem(db, tables) {
+  if (!tables.has('known_malicious_pins')) return 'missing table known_malicious_pins';
+  const cols = db.prepare("SELECT name FROM pragma_table_info('known_malicious_pins')").all().map((r) => r.name);
+  if (!cols.includes('package_name')) {
+    return `known_malicious_pins has no package_name column (columns: ${cols.join(', ')})`;
+  }
+  const indexed = db.prepare("SELECT name FROM pragma_index_list('known_malicious_pins')").all().some((ix) => {
+    const keys = db.prepare('SELECT name FROM pragma_index_info(?) ORDER BY seqno').all(ix.name).map((r) => r.name);
+    return keys[0] === 'package_name' && keys[1] === 'version';
+  });
+  return indexed ? null : 'known_malicious_pins has no index on (package_name, version)';
+}
 
 // Python's int() strips Python whitespace, which is not JavaScript's; and [0-9] rather than \d
 // because Python's \d also matches e.g. ARABIC-INDIC digits that int() would then convert.
@@ -212,6 +234,10 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
       : `seed declares contract_version=${JSON.stringify(raw.contract_version)}; this reader implements ${JSON.stringify(SUPPORTED_SEED_CONTRACT_VERSIONS)}`;
     meta.seed_contract_version = raw.contract_version === undefined ? null : raw.contract_version;
     meta.detection_contract_version = IMPLEMENTED_DETECTION_CONTRACT;
+    if (raw.contract_version === SEED_CONTRACT_1_1) {
+      const bad = pinLayoutProblem(db, tables);
+      checks.pin_layout = bad === null ? true : `seed declares ${SEED_CONTRACT_1_1} but ${bad}`;
+    }
 
     const absent = REQUIRED_BINDING_KEYS.filter((k) => !raw[k]);
     checks.required_bindings = absent.length ? `seed_metadata is missing or empty for: ${absent.join(', ')}` : true;
@@ -313,7 +339,8 @@ function openSeed(dbPath, opts = {}) {
 }
 
 export {
-  SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, IMPLEMENTED_DETECTION_CONTRACT,
+  SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0, SEED_CONTRACT_1_1,
+  IMPLEMENTED_DETECTION_CONTRACT,
   REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS, REQUIRED_BINDING_KEYS,
   TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES,
   CANDIDATE_SPEC, CANDIDATE_REQUIRED, PROVIDER_CLASSES,
@@ -324,8 +351,8 @@ export {
 
 // A default export as well: the consumer is used both as `import R from` and
 // `import { verify } from`, and the runtime package is ESM.
-export default { SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS,
-  IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
+export default { SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0,
+  SEED_CONTRACT_1_1, IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
   REQUIRED_BINDING_KEYS, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES, CANDIDATE_SPEC,
   CANDIDATE_REQUIRED, PROVIDER_CLASSES, SeedRefused, CandidateRejected, sha256File,
   validateField, candidateFromMapping, verify, verifySignature, Seed, openSeed
