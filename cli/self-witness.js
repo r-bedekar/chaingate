@@ -95,7 +95,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
     return {
       status: 'unverifiable',
       reason: 'lockfile_missing',
-      detail: `npm recorded no install integrity for ${name} (normal for global installs, which have no .package-lock.json; also npm link and other package managers), so there is nothing to compare`,
+      detail: `npm recorded no install integrity for ${install.root} (normal for global installs, which have no .package-lock.json; also npm link and other package managers), so there is nothing to compare`,
       version: install.version,
     };
   }

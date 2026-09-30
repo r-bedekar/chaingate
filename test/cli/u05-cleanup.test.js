@@ -100,6 +100,7 @@ test('self-witness: a normal global install (no .package-lock.json) is skipped, 
     assert.equal(r.status, 'unverifiable');
     assert.equal(r.reason, 'lockfile_missing', 'reason code unchanged');
     assert.match(r.detail, /normal for global installs/);
+    assert.ok(r.detail.includes(path.join('node_modules', ...OWN_PACKAGE_NAME.split('/'))), 'names the install root it examined');
     assert.doesNotMatch(r.detail, /dev install/);
     assert.equal(classifySelfWitnessSeverity(r, true), 'skipped');
   } finally { g.cleanup(); }
