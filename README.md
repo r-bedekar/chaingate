@@ -83,7 +83,8 @@ trees, publisher metadata, provenance status.
 
 **ALLOW / WARN / BLOCK enforcement** with a persisted decision log, per-version
 overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = tool error). `chaingate check --json`
-emits a versioned `chaingate.check/1` record; `examples/ci/` has an offline CI consumer for it.
+emits a versioned `chaingate.check/2` record (0.1.2 and earlier wrote `chaingate.check/1`, which is still
+read); `examples/ci/` has an offline CI consumer for both.
 
 **Seed verification.** Every seed is checked against its `.sha256` file before use. A seed counts as
 **authenticated** only when its Ed25519 signature verifies against a key built into the runtime. An
@@ -216,14 +217,17 @@ against the active seed. It always evaluates afresh and never reports a stored d
 ```console
 $ chaingate check express@4.22.3 --packument ./express.json
 express@4.22.3: ALLOW
-  evaluated disposition: ALLOW under cft-policy-1.0
+  evaluated disposition: ALLOW under cft-policy-1.1
   placement: recorded
   ...
 $ echo $?
 0
 ```
 
-Exit codes: 0 ALLOW, 2 WARN, 3 BLOCK, 4 tool error. `--json` gives the `chaingate.check/1` record.
+Exit codes: 0 ALLOW, 2 WARN, 3 BLOCK, 4 tool error. `--json` gives the `chaingate.check/2` record.
+
+A version named in a recorded advisory is blocked even when the release cannot be evaluated (for example a
+manifest the adapter rejects), and the result names the advisory.
 
 **4. Explain.** `chaingate why` explains a result. It never changes one:
 

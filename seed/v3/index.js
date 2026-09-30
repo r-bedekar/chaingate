@@ -7,7 +7,7 @@
 //
 // No ALLOW / WARN / BLOCK is produced by the DETECTION path here. A finding carries evidence and
 // coverage; mapping that to an action is policy, which is a separately versioned contract
-// (`policy.js`, cft-policy-1.0) and is exported alongside rather than folded in. Nothing in the
+// (`policy.js`, cft-policy-1.1) and is exported alongside rather than folded in. Nothing in the
 // detection path imports it.
 
 import contract from './contract.js';

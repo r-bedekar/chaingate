@@ -1,4 +1,4 @@
-# chaingate-ci: an offline CI consumer of `chaingate.check/1`
+# chaingate-ci: an offline CI consumer of `chaingate.check/2` (and `/1`)
 
 `chaingate-ci.mjs` gates a CI job on the JSON that `chaingate check --json` writes. It uses the Node
 standard library only and makes no network access.
@@ -40,7 +40,13 @@ By default the consumer gates on `effective.action`, so an overridden release pa
 
 It performs a specified structural validation, listed at the top of the script. It does **not** perform
 full JSON Schema validation. That runs in the chaingate test suite against
-`seed/v3/chaingate-check-1.schema.json`.
+`seed/v3/chaingate-check-2.schema.json` (and `chaingate-check-1.schema.json` for older results).
+
+**Versions.** chaingate 0.1.3 writes `chaingate.check/2` with policy `cft-policy-1.1`; 0.1.2 and earlier
+wrote `chaingate.check/1` with `cft-policy-1.0`. The consumer accepts each schema only with its own
+combination of explanation, policy, detection-contract and seed-contract versions, and rejects any other
+combination, naming the member. In a `/2` refused result, `explanation.structured.decided_by` must list
+exactly the decision rows that decided it: under `cft-policy-1.1` a recorded advisory can decide a refusal.
 
 **Trust boundary.** The consumer trusts results produced by its own controlled CI step. The
 trusted-seed check pins which seed that step used. It does not authenticate the JSON, and no signing
