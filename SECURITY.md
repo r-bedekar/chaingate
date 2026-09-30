@@ -113,6 +113,21 @@ write access is outside what the signatures can protect. At that
 level, the protection is the filesystem permissions on
 `~/.chaingate/`.
 
+### What `chaingate doctor` checks about ChainGate itself
+
+The `self-witness` check compares two recorded values: the tarball integrity that npm recorded when
+it installed `@cgsec/chaingate` (in `node_modules/.package-lock.json`), and the integrity the witness
+store holds for that version. It shows whether the package npm installed is the one the witness
+recorded. It has limits:
+
+- It does not hash the installed files, so changes made to them after installation are not detected.
+- It cannot run for a normal global install (`npm install -g`), because npm writes no
+  `.package-lock.json` for global installs. Doctor reports it as skipped. The same applies to
+  `npm link` and to other package managers.
+- It needs a witness baseline for the installed version. That baseline comes from a legacy witness
+  seed or from the proxy recording the registry's metadata. With a v3 seed only, the baseline is not
+  authenticated.
+
 ## Build and signing
 
 Seed bundles are built on the maintainer's private collection

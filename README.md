@@ -164,6 +164,19 @@ with no Python or compiler.
 | Windows Server 2022 (administrator account) | x64 | 22.23.2-22.23.3; 24.21.0 | 10.9.9, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
 | Windows 10 Pro (standard account) | x64 | 24.21.0 | 11.19.0 | install acceptance: global and project installs |
 
+**On Windows:**
+
+- If PowerShell refuses to run `npm` or `chaingate` ("running scripts is disabled on this system"),
+  type `npm.cmd` and `chaingate.cmd` instead. The Command Prompt uses the `.cmd` launchers
+  automatically. You do not need to change the execution policy.
+- Approve the SQLite script in the install command, so npm does not warn about it or skip it:
+  `npm.cmd install -g @cgsec/chaingate --allow-scripts=better-sqlite3`. To approve it once for all
+  your global installs: `npm.cmd config set allow-scripts=better-sqlite3 --location=user`.
+- Start ChainGate with your v3 seed:
+  `chaingate.cmd init --seed C:\path\to\chaingate-seed.db --unsigned-development`. Without `--seed`,
+  `init` downloads the older legacy witness seed instead (see below).
+- [SEEDS.md](SEEDS.md) shows how to check a seed file's SHA-256 in PowerShell.
+
 From source:
 
 ```bash
@@ -186,7 +199,7 @@ signed legacy witness seed (about 100 MB) and tells you so. For v3 detection, al
 ```console
 $ chaingate init --seed ./seed-v3/chaingate-seed.db --unsigned-development
 ✓ v3 seed bundle bf5b8bf1ec68897e active
-  sha256 974c7d7ea2f24ef6…  snapshot d47e8679d6dd…  trust unsigned-development
+  sha256 974c7d7ea2f24ef6...  snapshot d47e8679d6dd...  trust unsigned-development
   policy on_unusable_input=BLOCK on_no_evidence=WARN
 ✓ .npmrc updated
 ```
@@ -229,6 +242,11 @@ $ chaingate stop
 ✓ Proxy stopped
 ✓ .npmrc restored
 ```
+
+While ChainGate's block is in your `.npmrc`, npm sends every request to the proxy. If the proxy is
+not running, for example after a restart, npm cannot install anything until you either run
+`chaingate init` again, which restarts the proxy on the active seed, or run `chaingate stop`, which
+restores `.npmrc`.
 
 **Updating the seed.** Switch to another v3 seed you have with
 `chaingate update-seed --seed <bundle>/chaingate-seed.db [--unsigned-development]`, and go back to the
