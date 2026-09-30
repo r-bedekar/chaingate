@@ -175,7 +175,7 @@ test('checkSelfWitness: unverifiable when chaingate not in witness (pre-publish)
     });
     assert.equal(r.status, 'unverifiable');
     assert.equal(r.reason, 'not_in_witness');
-    assert.match(r.detail, /pre-publish/);
+    assert.match(r.detail, /has no witness baseline yet/);
     assert.equal(r.version, '0.1.0');
   } finally {
     t.cleanup();
@@ -263,6 +263,6 @@ test('the UNRELATED unscoped `chaingate` in the witness store is never used as o
     const r = checkSelfWitness(foreign, { startFileUrl: t.entryFileUrl });
     assert.equal(r.status, 'unverifiable');
     assert.equal(r.reason, 'not_in_witness');
-    assert.match(r.detail, /^@cgsec\/chaingate@0\.1\.0 not yet in witness store/);
+    assert.match(r.detail, /^@cgsec\/chaingate@0\.1\.0 has no witness baseline yet/);
   } finally { t.cleanup(); }
 });

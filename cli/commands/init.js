@@ -42,7 +42,7 @@ export default async function init(args) {
     const existingPid = readPid(paths.pidFile);
     const registryUrl = `http://${DEFAULT_HOST}:${DEFAULT_PORT}`;
 
-    console.log(fmt.dim('(dry-run — no changes will be made)'));
+    console.log(fmt.dim('(dry-run: no changes will be made)'));
     console.log('');
     console.log('Planned actions:');
     console.log(`  1. Create directory: ${paths.base}`);
@@ -63,7 +63,7 @@ export default async function init(args) {
     } else {
       console.log(`  4. Use default upstream: ${DEFAULT_UPSTREAM}`);
     }
-    console.log(`  5. Patch .npmrc (${rc}) with chaingate block → registry=${registryUrl}`);
+    console.log(`  5. Patch .npmrc (${rc}) with chaingate block: registry=${registryUrl}`);
     if (scopedRegs.length > 0) {
       console.log(`     (${scopedRegs.length} scoped registries will be preserved)`);
     }
@@ -172,8 +172,8 @@ export default async function init(args) {
 
     console.log(fmt.ok(`v3 seed bundle ${identity.bundle_id} active`
       + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
-    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}…  `
-      + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}…  `
+    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}...  `
+      + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}...  `
       + `trust ${identity.trust}${identity.authenticated ? ' (authenticated)' : ''}`));
     console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
       + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
@@ -188,6 +188,8 @@ export default async function init(args) {
       db.applySchema();
       db.close();
       console.log(fmt.ok('Witness database created (writable, separate from the seed)'));
+    } else {
+      console.log(fmt.ok('Using the existing witness database (writable, separate from the seed)'));
     }
     opts.seedPath = null;
     opts.noSeed = true;
@@ -207,7 +209,7 @@ export default async function init(args) {
         await verifySeed(opts.seedPath, sha256Path, sigPath);
       } catch (err) {
         console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
-        console.error('  This seed bundle cannot be trusted — it may be tampered or corrupted.');
+        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
         console.error('  ChainGate refuses to import an unverified seed. Aborting.');
         return EXIT.ERROR;
       }
@@ -233,7 +235,7 @@ export default async function init(args) {
         console.log(fmt.ok(`Seed verified (${result.fingerprint})`));
       } catch (err) {
         console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
-        console.error('  This seed bundle cannot be trusted — it may be tampered or corrupted.');
+        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
         console.error('  ChainGate refuses to import an unverified seed. Aborting.');
         return EXIT.ERROR;
       }
@@ -246,6 +248,8 @@ export default async function init(args) {
         + 'automatically; install it with `chaingate init --seed <bundle>/chaingate-seed.db` '
         + '(add --unsigned-development for an unsigned bundle).'));
     }
+  } else if (v3Installed) {
+    // the witness database was created or reused beside the v3 seed above, and reported there
   } else if (existsSync(paths.witnessDb)) {
     console.log(fmt.ok('Existing witness database found'));
   } else if (opts.noSeed) {
@@ -321,8 +325,8 @@ export default async function init(args) {
     if (!got) return ['no v3 seed loaded'];
     const out = [];
     if (got.sha256 !== intended.sha256) {
-      out.push(`seed digest ${String(got.sha256).slice(0, 16)}… != `
-        + `${intended.sha256.slice(0, 16)}…`);
+      out.push(`seed digest ${String(got.sha256).slice(0, 16)}... != `
+        + `${intended.sha256.slice(0, 16)}...`);
     }
     if (got.bundle_id !== intended.bundle_id) {
       out.push(`bundle ${got.bundle_id} != ${intended.bundle_id}`);
@@ -411,7 +415,7 @@ export default async function init(args) {
     console.log(fmt.ok(`Proxy running on ${registryUrl} (pid ${pid})`));
     if (self.seed_v3) {
       console.log(fmt.dim(`  active bundle ${self.seed_v3.bundle_id} `
-        + `sha256 ${String(self.seed_v3.sha256).slice(0, 16)}…`));
+        + `sha256 ${String(self.seed_v3.sha256).slice(0, 16)}...`));
       console.log(fmt.dim(`  trust ${self.seed_v3.trust}`
         + `${self.seed_v3.authenticated ? ' (authenticated)' : ''}`
         + `  policy ${JSON.stringify(self.seed_v3.policy)}`));

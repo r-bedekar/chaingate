@@ -55,9 +55,9 @@ export function aggregateExit(checks) {
 
 // Translate a self-witness check result + witness state into a doctor
 // display severity. Pure function, exported for testing. Two reasons can
-// be skipped: lockfile_missing (non-npm install path, e.g. tarball-style
-// global install) and not_in_witness when the witness has zero chaingate
-// entries (pre-publish, expected). Any other unverifiable reason — or
+// be skipped: lockfile_missing (npm recorded no install integrity: normal
+// global installs, npm link, other package managers) and not_in_witness when
+// the witness has zero chaingate entries (nothing to compare against). Any other unverifiable reason — or
 // not_in_witness when the witness already knows about chaingate (stale
 // local seed) — is a real problem.
 export function classifySelfWitnessSeverity(selfResult, witnessHasChaingate) {
@@ -134,10 +134,10 @@ export default async function doctor(args) {
       checks.push({
         name: 'seed-v3',
         pass: !writable,
-        detail: `bundle ${id.bundle_id} sha256 ${id.sha256.slice(0, 16)}… `
-          + `schema v${id.schema_version} snapshot ${String(id.corpus_snapshot_digest).slice(0, 12)}… `
+        detail: `bundle ${id.bundle_id} sha256 ${id.sha256.slice(0, 16)}... `
+          + `schema v${id.schema_version} snapshot ${String(id.corpus_snapshot_digest).slice(0, 12)}... `
           + `trust ${id.trust}${id.authenticated ? ' (authenticated)' : ''}`
-          + (writable ? ' — WRITABLE, a seed should be read-only' : ' — read-only'),
+          + (writable ? ', WRITABLE: a seed should be read-only' : ', read-only'),
       });
       checks.push({ name: 'seed-v3-separate-from-witness',
         pass: active.files.db !== paths.witnessDb,
@@ -166,11 +166,11 @@ export default async function doctor(args) {
     detail: broken ? 'not evaluated: the activation is broken (see seed-v3)' : active
       ? `on_unusable_input=${policy.on_unusable_input || 'UNSET'} `
         + `on_no_evidence=${policy.on_no_evidence || 'UNSET'}`
-        + (policyComplete ? '' : ' — unresolved policy is not permission; the proxy refuses to start')
+        + (policyComplete ? '' : '; unresolved policy is not permission, so the proxy refuses to start')
       : 'no bundle active, so no policy is in force',
   });
   checks.push({ name: 'domain-version-count', pass: true,
-    detail: 'from-packument (internal: package-scoped, derived per document — not an operator setting)' });
+    detail: 'from-packument (internal: package-scoped, derived per document; not an operator setting)' });
 
   // 1. Chaingate directory exists and is writable
   {
@@ -180,7 +180,7 @@ export default async function doctor(args) {
     checks.push({
       name: 'chaingate-dir',
       pass: ok && writable,
-      detail: ok ? (writable ? paths.base : `${paths.base} (not writable)`) : 'missing — run `chaingate init`',
+      detail: ok ? (writable ? paths.base : `${paths.base} (not writable)`) : 'missing: run `chaingate init`',
     });
   }
 
@@ -255,7 +255,7 @@ export default async function doctor(args) {
         name: 'seed-signature',
         pass: false,
         severity: 'skipped',
-        detail: 'no persisted .sha256/.sig (expected for --no-seed installs)',
+        detail: 'no legacy witness seed signature on disk (none is installed by a v3-only setup or --no-seed; the v3 seed is reported under seed-v3)',
       });
     } else {
       try {
@@ -279,11 +279,11 @@ export default async function doctor(args) {
     }
   }
 
-  // 7. Self-witness — installed chaingate integrity vs witness-recorded baseline.
-  //    Severity comes from classifySelfWitnessSeverity, which separates
-  //    "check found a problem" (tamper / unverifiable) from "check doesn't
-  //    apply here" (skipped). Pre-publish state and tarball-style global
-  //    installs are skipped, not unverifiable. See cli/self-witness.js for
+  // 7. Self-witness: npm's RECORDED install integrity vs the witness baseline. It does not hash
+  //    the installed files. Severity comes from classifySelfWitnessSeverity, which separates
+  //    "check found a problem" (tamper / unverifiable) from "check doesn't apply here"
+  //    (skipped). Normal global installs (no .package-lock.json) and a witness without any
+  //    ChainGate baseline are skipped, not unverifiable. See cli/self-witness.js for
   //    the underlying status/reason codes.
   {
     if (!existsSync(paths.witnessDb)) {
@@ -356,7 +356,7 @@ export default async function doctor(args) {
             name: 'proxy-identity',
             pass: false,
             severity: 'tamper',
-            detail: `mismatch — proxy version=${self.version} cli=${CLI_VERSION}; proxy pid=${self.pid} pidfile=${pidFromFile}`,
+            detail: `mismatch: proxy version=${self.version} cli=${CLI_VERSION}; proxy pid=${self.pid} pidfile=${pidFromFile}`,
           });
         }
       } catch (err) {
@@ -378,10 +378,12 @@ export default async function doctor(args) {
   console.log(fmt.bold('ChainGate Doctor\n'));
   for (const c of checks) {
     let icon;
-    if (c.pass) icon = fmt.ok(c.name);
+    // severity first: a check that does not apply is shown as skipped even when it records pass,
+    // so the icons agree with the skipped count printed below.
+    if (c.severity === 'skipped') icon = fmt.skip(`${c.name} [skipped]`);
+    else if (c.pass) icon = fmt.ok(c.name);
     else if (c.severity === 'tamper') icon = fmt.fail(`${c.name} [TAMPER]`);
     else if (c.severity === 'unverifiable') icon = fmt.warn(`${c.name} [unverifiable]`);
-    else if (c.severity === 'skipped') icon = fmt.skip(`${c.name} [skipped]`);
     else icon = fmt.fail(c.name);
     console.log(`  ${icon}  ${fmt.dim(c.detail)}`);
   }
@@ -397,10 +399,10 @@ export default async function doctor(args) {
       console.log(fmt.green('All checks passed.'));
     }
   } else if (exitCode === EXIT.INTEGRITY_TAMPER) {
-    console.log(fmt.red('TAMPER signal — cryptographic checks disagree.'));
+    console.log(fmt.red('TAMPER signal: cryptographic checks disagree.'));
     console.log(fmt.red(`  Do not use this installation. Reinstall ${OWN_PACKAGE_NAME} from a trusted source.`));
   } else if (exitCode === EXIT.INTEGRITY_UNVERIFIABLE) {
-    console.log(fmt.yellow('Unverifiable — integrity checks could not complete.'));
+    console.log(fmt.yellow('Unverifiable: integrity checks could not complete.'));
     console.log(fmt.dim('  Expected for pre-publish, dev, or --no-seed installs. See detail above.'));
   } else {
     const fails = checks.filter((c) => !c.pass).length;

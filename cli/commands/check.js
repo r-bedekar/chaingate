@@ -164,7 +164,7 @@ export function printHuman(record) {
   console.log(head.replace(action, colorDisposition(action)));
   for (const line of rest) console.log(line);
   const s = record.seed;
-  console.log(fmt.dim(`  seed ${s.bundle_id ?? '(named directly)'} sha256 ${s.sha256.slice(0, 16)}… `
+  console.log(fmt.dim(`  seed ${s.bundle_id ?? '(named directly)'} sha256 ${s.sha256.slice(0, 16)}... `
     + `trust ${s.trust}${s.authenticated ? '' : ' (NOT authenticated)'}`));
 }
 

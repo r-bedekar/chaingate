@@ -1,6 +1,6 @@
 {
   "name": "@cgsec/chaingate",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local npm proxy that checks each new package version against that package's own release history",
   "type": "module",
   "main": "proxy/server.js",

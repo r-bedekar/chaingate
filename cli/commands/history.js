@@ -43,11 +43,11 @@ export default async function history(args) {
       return EXIT.OK;
     }
 
-    console.log(fmt.bold(`${opts.target} — ${versions.length} versions\n`));
+    console.log(fmt.bold(`${opts.target}: ${versions.length} versions\n`));
 
     for (const v of versions) {
       const decision = db.getLatestDecision(opts.target, v.version);
-      const disp = decision ? colorDisposition(decision.disposition) : fmt.dim('—');
+      const disp = decision ? colorDisposition(decision.disposition) : fmt.dim('-');
       const pub = v.published_at ? fmt.dim(v.published_at.slice(0, 10)) : fmt.dim('unknown');
       const publisher = v.publisher_email ? fmt.dim(v.publisher_email) : '';
       const method = v.publish_method ? fmt.dim(`[${v.publish_method}]`) : '';

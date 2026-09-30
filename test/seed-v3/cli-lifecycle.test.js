@@ -309,6 +309,10 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
         // INIT
         const init = cli(['init', ...scopeArgs, '--seed', b1, '--unsigned-development'], ctx);
         assert.equal(init.status, 0, `init must SUCCEED:\n${init.stdout}\n${init.stderr}`);
+        // U-05: the witness database is reported once (it used to be "created" and then "found")
+        const wdb = `${init.stdout}${init.stderr}`.split('\n').filter((l) => /witness database/i.test(l));
+        assert.equal(wdb.length, 1, `one witness-database line:\n${wdb.join('\n')}`);
+        assert.match(wdb[0], /Witness database created \(writable, separate from the seed\)/);
         const id1 = verifyBundleDir(resolveActiveBundle(base).dir).identity;
         assert.equal(id1.corpus_snapshot_digest, 'a'.repeat(64));
         assert.throws(() => accessSync(resolveActiveBundle(base).files.db, fsConstants.W_OK));

@@ -56,6 +56,6 @@ export function colorDisposition(disposition) {
 export function renderGate(gate) {
   const disp = colorDisposition(gate.result ?? gate.disposition);
   const name = fmt.bold(gate.gate ?? gate.name ?? 'unknown');
-  const detail = gate.detail ? fmt.dim(` — ${gate.detail}`) : '';
+  const detail = gate.detail ? fmt.dim(`: ${gate.detail}`) : '';
   return `  ${disp} ${name}${detail}`;
 }

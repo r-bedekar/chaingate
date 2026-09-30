@@ -251,7 +251,7 @@ test('doctor: witness DB present but no .sha256/.sig → severity=skipped', asyn
     const c = findCheck(checks, 'seed-signature');
     assert.equal(c.pass, false);
     assert.equal(c.severity, 'skipped');
-    assert.match(c.detail, /no persisted/);
+    assert.match(c.detail, /no legacy witness seed signature on disk/);
   } finally {
     f.cleanup();
   }

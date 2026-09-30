@@ -56,7 +56,7 @@ export async function updateSeedV3(opts, paths, deps) {
       return EXIT.ERROR;
     }
     console.log(fmt.ok(`Rolled back to bundle ${identity.bundle_id}`));
-    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}… trust ${identity.trust}`));
+    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}... trust ${identity.trust}`));
     console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
     console.log(fmt.dim('  Witness state untouched: decisions taken under it are still recorded.'));
     return EXIT.OK;
@@ -118,8 +118,8 @@ export async function updateSeedV3(opts, paths, deps) {
 
   console.log(fmt.ok(`Bundle ${identity.bundle_id} active`
     + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
-  console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}… `
-    + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}… trust ${identity.trust}`));
+  console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}... `
+    + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}... trust ${identity.trust}`));
   console.log(fmt.dim(`  Previous bundle ${activeId || '(none)'} kept for `
     + '`chaingate update-seed --rollback`.'));
   console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
@@ -263,7 +263,7 @@ export default async function updateSeed(
   const pkgDelta = newCounts.packages - currentCounts.packages;
   const verDelta = newCounts.versions - currentCounts.versions;
 
-  console.log(fmt.ok(`Seed updated: ${currentVersion ?? 'none'} → ${newVersion}`));
+  console.log(fmt.ok(`Seed updated: ${currentVersion ?? 'none'} to ${newVersion}`));
   console.log(fmt.dim(`  Packages: ${newCounts.packages} (${pkgDelta >= 0 ? '+' : ''}${pkgDelta})`));
   console.log(fmt.dim(`  Versions: ${newCounts.versions} (${verDelta >= 0 ? '+' : ''}${verDelta})`));
 

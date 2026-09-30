@@ -1,22 +1,19 @@
-// Self-witness check — ChainGate verifies its own installed integrity
-// against its own witness store.
+// Self-witness check: compares two RECORDED integrity values for ChainGate's own package.
 //
-// The witness records every published `chaingate` version's `dist.integrity`
-// (npm SRI string, e.g. `sha512-<base64>`) from the registry packument. The
-// seed that delivers the witness is signed with an Ed25519 key independent of
-// npm. The installed package's integrity — npm's own hash from install time —
-// is recorded in `node_modules/.package-lock.json`. Doctor compares the two.
+// What it compares:
+//   - the tarball integrity (npm SRI string, e.g. `sha512-<base64>`) that npm recorded at install
+//     time in `node_modules/.package-lock.json`, and
+//   - the integrity the witness store holds for the same version. That baseline comes from a
+//     legacy witness seed, or from the proxy recording the registry's metadata when it saw the
+//     package. Neither source is authenticated for v3-only setups.
 //
-// Trust boundaries (all three must be compromised for a silent attack):
-//   1. npm publish pipeline (→ registry integrity → installed lockfile)
-//   2. VPS collector + Ed25519 seed signing key (→ witness integrity)
-//   3. GitHub Release tarball delivery (seed bundle)
-//
-// Scope this check does NOT cover:
-//   - Post-install file tampering of node_modules/chaingate/** (requires
-//     reproducible tarball reconstruction; out of scope for V1).
-//   - Package managers that don't write .package-lock.json next to the
-//     install root (pnpm, yarn berry). These report 'unverifiable'.
+// What it does NOT do:
+//   - It does not hash the installed files. Changes made to the installed files after install are
+//     not detected (that would need the tarball rebuilt from the installed files).
+//   - It cannot run where npm records no install integrity: normal `npm install -g` installs (npm
+//     writes no `.package-lock.json` for global installs), `npm link`, and other package managers
+//     (pnpm, yarn berry). Doctor reports these as skipped.
+//   - It needs a witness baseline for the installed version; without one it has nothing to compare.
 //
 // Pre-publish state: until chaingate is published to npm and a seed run
 // picks it up, witness.getBaseline(OWN_PACKAGE_NAME, v) returns null → status
@@ -89,7 +86,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
     return {
       status: 'unverifiable',
       reason: 'install_root_not_found',
-      detail: `could not locate the ${name} install root (not running from npm install?)`,
+      detail: `could not locate the ${name} install root (not running from an npm install?)`,
     };
   }
 
@@ -98,7 +95,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
     return {
       status: 'unverifiable',
       reason: 'lockfile_missing',
-      detail: `no .package-lock.json integrity next to ${install.root} (dev install, npm link, or non-npm package manager)`,
+      detail: `npm recorded no install integrity for ${name} (normal for global installs, which have no .package-lock.json; also npm link and other package managers), so there is nothing to compare`,
       version: install.version,
     };
   }
@@ -120,7 +117,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
     return {
       status: 'unverifiable',
       reason: 'not_in_witness',
-      detail: `${name}@${install.version} not yet in witness store (expected for pre-publish installs; run \`chaingate update-seed\` after a release lands)`,
+      detail: `${name}@${install.version} has no witness baseline yet, so there is nothing to compare`,
       version: install.version,
       installedIntegrity,
     };
@@ -130,7 +127,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
     return {
       status: 'tamper',
       reason: 'integrity_mismatch',
-      detail: `installed ${name} integrity differs from witness baseline — trust path broken (registry tamper or seed compromise)`,
+      detail: `npm's recorded integrity for ${name} differs from the witness baseline: the package npm installed is not the one the witness recorded (registry tampering, or a wrong baseline)`,
       version: install.version,
       installedIntegrity,
       witnessIntegrity: baseline.integrity_hash,
@@ -140,7 +137,7 @@ export function checkSelfWitness(witnessDb, { startFileUrl = import.meta.url, na
   return {
     status: 'verified',
     reason: 'integrity_match',
-    detail: `${name}@${install.version} integrity matches seed-recorded baseline`,
+    detail: `npm's recorded integrity for ${name}@${install.version} matches the witness baseline (installed files are not re-hashed)`,
     version: install.version,
     integrity: baseline.integrity_hash,
   };

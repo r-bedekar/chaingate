@@ -123,8 +123,8 @@ export function verifyBundleDir(dir, { trust } = {}) {
   const dbDigest = sha256File(f.db);
   if (manifest.sha256 !== dbDigest) {
     return { ok: false, identity: null,
-      why: `database digest ${dbDigest.slice(0, 16)}… does not match the manifest's `
-        + `${String(manifest.sha256).slice(0, 16)}…` };
+      why: `database digest ${dbDigest.slice(0, 16)}... does not match the manifest's `
+        + `${String(manifest.sha256).slice(0, 16)}...` };
   }
   const sigDigest = existsSync(f.sig) ? sha256File(f.sig) : null;
   const id = bundleIdOf(dbDigest, sigDigest);
@@ -185,8 +185,8 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
     if (sha256Path && existsSync(sha256Path)) {
       const claimed = String(readFileSync(sha256Path, 'utf8')).trim().split(/\s+/)[0];
       if (claimed !== dbDigest) {
-        throw new Error(`bundle digest ${claimed.slice(0, 16)}… does not describe the bytes supplied `
-          + `(${dbDigest.slice(0, 16)}…)`);
+        throw new Error(`bundle digest ${claimed.slice(0, 16)}... does not describe the bytes supplied `
+          + `(${dbDigest.slice(0, 16)}...)`);
       }
     }
     writeFileSync(staged.sha256, `${dbDigest}  ${SEED_V3_FILENAME}\n`);

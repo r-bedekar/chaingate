@@ -176,7 +176,7 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log)
         }
         for (const d of summary.dist_tag_downgrades) {
           log?.warn?.(
-            `[rewriter] ${packageName}: dist-tag ${d.tag} ${d.from} → ${d.to ?? 'DROPPED'}`,
+            `[rewriter] ${packageName}: dist-tag ${d.tag} ${d.from} -> ${d.to ?? 'DROPPED'}`,
           );
         }
         const body = Buffer.from(JSON.stringify(rewritten), 'utf8');
@@ -564,9 +564,9 @@ if (isDirectRun) {
   const server = await startProxyServer();
   const { port, host, upstream, witnessDbPath } = server.config;
   console.log(
-    `chaingate-proxy listening on http://${host}:${port} → ${upstream} (pid ${process.pid})`,
+    `chaingate-proxy listening on http://${host}:${port}, upstream ${upstream} (pid ${process.pid})`,
   );
-  console.log(`chaingate-proxy witness db → ${witnessDbPath}`);
+  console.log(`chaingate-proxy witness db: ${witnessDbPath}`);
   const shutdown = (signal) => () => {
     console.log(`[${signal}] shutting down chaingate-proxy`);
     server.close(() => process.exit(0));

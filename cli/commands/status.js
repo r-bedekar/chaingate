@@ -83,7 +83,7 @@ export default async function status(args) {
       ['Detection seed (v3):', v3Line],
       ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
-      ['Decisions:', `${stats.total} total · ${stats.ALLOW} ALLOW · ${stats.WARN} WARN · ${stats.BLOCK} BLOCK`],
+      ['Decisions:', `${stats.total} total, ${stats.ALLOW} ALLOW, ${stats.WARN} WARN, ${stats.BLOCK} BLOCK`],
     ]));
 
     if (recent.length > 0) {
