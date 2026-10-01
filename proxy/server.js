@@ -21,6 +21,8 @@ import { openSeed, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV } from '../seed/v3/re
 import { CHAINGATE_SEED_PUBKEY_B64, CHAINGATE_SEED_PUBKEY_FINGERPRINT } from '../witness/seed_verify.js';
 import { rewritePackument } from '../gates/rewriter.js';
 import { createUnstoredBlocks } from './unstored-blocks.js';
+import { createLogBoundary } from './log-boundary.js';
+import { storageReport } from './storage-health.js';
 import { createDepFetcher } from './dep-fetcher.js';
 
 // Read our own package version once at module-load — used by `/_chaingate/self`
@@ -196,6 +198,7 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log,
       observeErr = err;
     }
     if (observeErr) {
+      if (ctx.counters) ctx.counters.observation_errors += 1;
       log?.warn?.(`[witness] ${packageName}: observe failed: ${observeErr.message}`);
       // Serving the raw document here discarded every decision the packument would have earned --
       // one exception anywhere in the observe path and a known-malware version went straight
@@ -399,7 +402,12 @@ function defaultLogger() {
 export function createProxyServer(configOverrides = {}, hooks = {}) {
   const config = loadConfig(process.env, configOverrides);
 
-  const log = defaultLogger();
+  // U-05 gap-closure r2, A1: every line goes through ONE boundary. A logger that throws can no longer turn a handled
+  // error into an unhandled request failure, and output is rate-bounded (proxy/log-boundary.js). `info` is a no-op in the
+  // shipped logger and spends no budget. `hooks.logBudget` is for tests only.
+  // Its once-a-minute tick (suppression summary, pending transitions) starts when the server listens, so a start-up that
+  // refuses leaves no timer behind.
+  const log = createLogBoundary(defaultLogger(), { silentLevels: ['info'], timers: false, ...(hooks.logBudget ?? {}) });
 
   // Fail-LOUD on witness open. If the DB path is unwritable, corrupt, or
   // points at a missing parent dir we cannot auto-create, the proxy refuses
@@ -527,7 +535,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   const overriddenLive = (name, version) => {
     try { return Boolean(witnessDb?.getOverride(name, version)); } catch { return false; }
   };
-  const ctx = { unstored, failuresBlock, overriddenLive };
+  const counters = { observation_errors: 0 };
+  const ctx = { unstored, failuresBlock, overriddenLive, counters };
 
   const handler = async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -568,6 +577,11 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           config_source: config.configSource ?? null,
         } : null,
         unstored_blocks: unstored.describe(),
+        // U-05 gap-closure r2, Addendum 1 §B: the process's decision-storage state, from its own signals.
+        storage: storageReport({ health: witness?.storageHealth?.() ?? null, count: unstored.count,
+          full: Boolean(unstored.full), observationErrors: counters.observation_errors }),
+        logging: (({ emitted, suppressed, truncated, failures, transitions, transitions_suppressed }) => ({ emitted,
+          suppressed, truncated, failures, transitions, transitions_suppressed }))(log.stats()),
       });
       return;
     }
@@ -695,7 +709,23 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     }
   };
 
-  const server = http.createServer(handler);
+  // The last guard (U-05 gap-closure r2, A1): whatever escapes the handler -- a response that cannot be written inside
+  // its own catch, for example -- ends this one request without a logger and without an unhandled rejection.
+  const finalGuard = (res, err) => {
+    try {
+      if (res.headersSent) { if (!res.writableEnded) res.destroy(err); return; }
+      writeJson(res, 500, { error: 'chaingate_internal_error' });
+    } catch { try { res.destroy(); } catch { /* nothing left */ } }
+  };
+  const server = http.createServer((req, res) => {
+    Promise.resolve().then(() => handler(req, res)).catch((err) => finalGuard(res, err));
+  });
+  let logTick = null;
+  server.on('listening', () => {
+    if (logTick) return;
+    logTick = setInterval(() => { try { log.tick(); } catch { /* reporting only */ } }, 60_000);
+    logTick.unref?.();
+  });
   server.config = config;
   server.witness = witness;
   server.witnessDb = witnessDb;
@@ -708,6 +738,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     // touch a closing DB. stop() is graceful — current request finishes,
     // queue aborts, promise resolves.
     const finish = () => {
+      if (logTick) { clearInterval(logTick); logTick = null; }
+      log.tick();                                            // the last suppression summary, if any
       origClose(() => {
         try { witness?.close(); } catch { /* already closed */ }
         try { seedV3?.close(); } catch { /* already closed */ }

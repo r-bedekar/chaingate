@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { npmrcPath } from '../npmrc.js';
-import { readPid, isPortInUse } from '../proxy-control.js';
+import { readPidRecord, isPortInUse } from '../proxy-control.js';
+import { witnessStorageCheck } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
@@ -202,13 +203,17 @@ export default async function doctor(args) {
     checks.push({ name: 'witness-db', pass, detail });
   }
 
-  // 3. Proxy PID alive
+  // 3. Proxy PID alive. Three answers (U-05 gap-closure r2): a refused liveness check is reported as exactly that.
+  const pidRecord = readPidRecord(paths.pidFile);
   {
-    const pid = readPid(paths.pidFile);
+    const st = pidRecord?.state;
     checks.push({
       name: 'proxy-pid',
-      pass: !!pid,
-      detail: pid ? `running (pid ${pid})` : 'not running',
+      pass: st === 'alive',
+      detail: st === 'alive' ? `running (pid ${pidRecord.pid})`
+        : st === 'indeterminate' ? `pid ${pidRecord.pid}: the operating system refused the liveness check (${pidRecord.code}); `
+          + 'not established whether it is running or is the ChainGate proxy'
+          : 'not running',
     });
   }
 
@@ -332,8 +337,9 @@ export default async function doctor(args) {
   //    or pid mismatch means the running proxy is not the one just installed —
   //    a tamper signal (exit 5). Unreachable when the proxy is down is not
   //    a tamper signal; just skip.
+  let selfDoc = null;
   {
-    const pidFromFile = readPid(paths.pidFile);
+    const pidFromFile = pidRecord?.state === 'alive' ? pidRecord.pid : null;
     if (!pidFromFile) {
       checks.push({
         name: 'proxy-identity',
@@ -343,6 +349,7 @@ export default async function doctor(args) {
     } else {
       try {
         const self = await fetchProxySelf(DEFAULT_HOST, DEFAULT_PORT);
+        selfDoc = self && typeof self === 'object' ? self : null;
         const versionMatch = self.version === CLI_VERSION;
         const pidMatch = Number(self.pid) === Number(pidFromFile);
         if (versionMatch && pidMatch) {
@@ -368,6 +375,10 @@ export default async function doctor(args) {
       }
     }
   }
+
+  // 9. The running proxy's decision-storage state (U-05 gap-closure r2, Addendum 1 §B): BLOCKs held only in memory, FULL,
+  //    and the write evidence. Persisted decisions are the witness-db check's; this reads the process.
+  checks.push(witnessStorageCheck({ pid: pidRecord, self: selfDoc }));
 
   // Output
   if (opts.json) {

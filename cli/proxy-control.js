@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, unlinkSync, existsSync, openSync } from 'node:fs';
+import http from 'node:http';
 import { createConnection } from 'node:net';
+import { DEFAULT_PORT, DEFAULT_HOST } from './constants.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -17,6 +19,34 @@ export function isAlive(pid) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Is this pid alive? THREE answers, never two (U-05 gap-closure r2): `alive` (signal 0 delivered), `dead` (ESRCH), or
+ * `indeterminate` (EPERM or any other error) -- which says only that the operating system refused the check, not that
+ * the pid is ours, and not that it is gone. `isAlive` above folds `indeterminate` into "not alive"; nothing that signals
+ * or cleans up may rely on it.
+ */
+export function probePid(pid, kill = process.kill) {
+  try {
+    kill(pid, 0);
+    return { state: 'alive' };
+  } catch (err) {
+    if (err?.code === 'ESRCH') return { state: 'dead' };
+    return { state: 'indeterminate', code: err?.code ?? 'unknown' };
+  }
+}
+
+/**
+ * The pid record, with its three-state liveness: null (no record), { pid: null, state: 'malformed' }, or
+ * { pid, state, code? }. The file stays a plain pid (other readers, e.g. the acceptance harness, parse it as a number).
+ */
+export function readPidRecord(pidFile, { kill = process.kill } = {}) {
+  if (!existsSync(pidFile)) return null;
+  const raw = readFileSync(pidFile, 'utf8').trim();
+  const pid = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(pid) || pid <= 0) return { pid: null, state: 'malformed' };
+  return { pid, ...probePid(pid, kill) };
 }
 
 /**
@@ -51,24 +81,118 @@ export function spawnProxy({ pidFile, logFile, env = {} }) {
   return child.pid;
 }
 
+/** GET /_chaingate/self with its own deadline and a 64 KiB response cap. Never throws. */
+export function fetchSelf(host, port, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (r) => { if (!done) { done = true; clearTimeout(timer); resolve(r); } };
+    const req = http.get({ host, port, path: '/_chaingate/self', agent: false, timeout: timeoutMs }, (res) => {
+      let size = 0; const chunks = [];
+      res.on('data', (c) => {
+        size += c.length;
+        if (size > 65536) { req.destroy(); finish({ ok: false, why: 'answered with more than 64 KiB' }); return; }
+        chunks.push(c);
+      });
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        let json = null;
+        try { json = JSON.parse(body); } catch { /* not JSON */ }
+        if (res.statusCode !== 200) finish({ ok: false, why: `answered HTTP ${res.statusCode}` });
+        else if (!json || typeof json !== 'object' || Array.isArray(json)) finish({ ok: false, why: 'answered, but not with a JSON object' });
+        else finish({ ok: true, json });
+      });
+      res.on('error', (e) => finish({ ok: false, why: `answer failed (${e.message})` }));
+    });
+    req.on('timeout', () => { req.destroy(); finish({ ok: false, why: `no answer within ${timeoutMs} ms` }); });
+    req.on('error', (e) => finish({ ok: false, why: e.code === 'ECONNREFUSED' ? 'nothing is listening' : `connection failed (${e.code ?? e.message})` }));
+    const timer = setTimeout(() => { req.destroy(); finish({ ok: false, why: `no answer within ${timeoutMs} ms` }); }, timeoutMs + 100);
+  });
+}
+
+/** What answered on the port, in words, for messages. */
+function describeListener(r) {
+  if (!r.ok) return r.why;
+  const j = r.json;
+  return j.service === 'chaingate-proxy'
+    ? `a ChainGate proxy (pid ${j.pid}, version ${j.version ?? 'unknown'})`
+    : `a service that calls itself ${JSON.stringify(String(j.service ?? 'nothing'))}`;
+}
+
+export const STOP_OUTCOMES = Object.freeze(['not_running', 'stopped', 'stopped_port_taken', 'timeout', 'unverified',
+  'permission_denied']);
+
 /**
- * Send SIGTERM to the proxy and clean up the PID file.
- * @returns {boolean} true if a process was killed.
+ * Stop the proxy recorded in `pidFile`, truthfully (U-05 gap-closure r2, revision 2 §6, Addendum 1 §D).
+ *
+ * Nothing is signalled unless the recorded pid is alive AND the process answering /_chaingate/self on the port says it
+ * is the ChainGate proxy with that same pid; the pid is probed again immediately before SIGTERM. "Stopped" is reported
+ * only when the pid is gone AND the port refuses connections, within one bounded wait -- never an arbitrary sleep.
+ * A PID-reuse window of milliseconds remains between the last probe and SIGTERM; with signals it cannot be removed.
+ *
+ * @returns {Promise<{outcome, pid, detail, waitedMs?}>}  outcome in STOP_OUTCOMES. The pid record is removed only for
+ *          not_running, stopped and stopped_port_taken.
  */
-export function stopProxy(pidFile) {
-  const pid = readPid(pidFile);
-  if (pid == null) {
-    // Clean up stale pid file
-    if (existsSync(pidFile)) unlinkSync(pidFile);
-    return false;
+export async function stopProxy(pidFile, { port = DEFAULT_PORT, host = DEFAULT_HOST, waitMs = 8000, selfTimeoutMs = 1500,
+  pollMs = 100, kill = process.kill } = {}) {
+  const removeRecord = () => { try { unlinkSync(pidFile); } catch { /* already gone */ } };
+  const rec = readPidRecord(pidFile, { kill });
+  if (!rec || rec.state === 'malformed' || rec.state === 'dead') {
+    if (rec) removeRecord();
+    const listening = await isPortInUse(port, host);
+    const extra = listening ? `; ${host}:${port} is in use by ${describeListener(await fetchSelf(host, port, selfTimeoutMs))}, `
+      + 'which this command did not start and did not stop' : '';
+    const what = !rec ? 'no pid record' : rec.state === 'malformed' ? 'the pid record was not a pid (removed)'
+      : `pid ${rec.pid} is not running (stale record removed)`;
+    return { outcome: 'not_running', pid: rec?.pid ?? null, detail: `${what}${extra}` };
   }
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch {
-    // Already dead
+  const { pid } = rec;
+  const denied = (code) => ({ outcome: 'permission_denied', pid,
+    detail: `the operating system refused the liveness check for pid ${pid} (${code}): this user cannot signal that pid. `
+      + 'It was not established whether it is the ChainGate proxy. Nothing was signalled; the pid record was left in place' });
+  if (rec.state === 'indeterminate') return denied(rec.code);
+
+  const self = await fetchSelf(host, port, selfTimeoutMs);
+  const owned = self.ok && self.json.service === 'chaingate-proxy' && Number.isInteger(self.json.pid) && self.json.pid === pid;
+  if (!owned) {
+    const why = !self.ok ? `${host}:${port} ${self.why}`
+      : self.json.service !== 'chaingate-proxy'
+        ? `${host}:${port} is answered by a service that calls itself ${JSON.stringify(String(self.json.service ?? 'nothing'))}, not chaingate-proxy`
+        : `the ChainGate proxy on ${host}:${port} reports pid ${self.json.pid}, not the recorded pid ${pid}`;
+    return { outcome: 'unverified', pid,
+      detail: `pid ${pid} is alive, but it was not established that it is this ChainGate proxy: ${why}. Nothing was `
+        + `signalled; the pid record was left in place. If you are sure pid ${pid} is the proxy, stop it with your `
+        + 'operating system tools, then run `chaingate stop` again' };
   }
-  try { unlinkSync(pidFile); } catch { /* ok */ }
-  return true;
+
+  const again = probePid(pid, kill);                 // as late as possible before the signal
+  if (again.state === 'indeterminate') return denied(again.code);
+  const started = Date.now();
+  if (again.state === 'alive') {
+    try {
+      kill(pid, 'SIGTERM');
+    } catch (err) {
+      if (err?.code !== 'ESRCH') return denied(err?.code ?? 'unknown');   // ESRCH: it exited in between
+    }
+  }
+  for (;;) {
+    const p = probePid(pid, kill).state;
+    const listening = await isPortInUse(port, host);
+    if (p === 'dead' && !listening) {
+      removeRecord();
+      return { outcome: 'stopped', pid, waitedMs: Date.now() - started, detail: `pid ${pid} exited and ${host}:${port} is closed` };
+    }
+    if (p === 'dead' && listening) {
+      removeRecord();
+      return { outcome: 'stopped_port_taken', pid, waitedMs: Date.now() - started,
+        detail: `pid ${pid} exited, but ${host}:${port} is now answered by ${describeListener(await fetchSelf(host, port, selfTimeoutMs))}` };
+    }
+    if (Date.now() - started >= waitMs) {
+      return { outcome: 'timeout', pid, waitedMs: Date.now() - started,
+        detail: `after ${Math.round((Date.now() - started) / 100) / 10} s: pid ${pid} is ${p === 'alive' ? 'still alive' : `in state ${p}`}, `
+          + `${host}:${port} is ${listening ? 'still accepting connections' : 'closed'}. The pid record was left in place` };
+    }
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
 }
 
 /**

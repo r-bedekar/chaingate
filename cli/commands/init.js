@@ -2,7 +2,7 @@ import { mkdirSync, existsSync, copyFileSync, accessSync, constants as fsConstan
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { npmrcPath, readCurrentRegistry, applyChaingateBlock, findScopedRegistries } from '../npmrc.js';
-import { readPid, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
+import { readPid, readPidRecord, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
   isAlive } from '../proxy-control.js';
 import { fetchSeedBundle } from '../seed-download.js';
 import { verifySeed } from '../../witness/seed_verify.js';
@@ -28,6 +28,11 @@ function parseArgs(args) {
     else if (args[i] === '--unsigned-development') opts.unsignedDev = true;
   }
   return opts;
+}
+
+/** `init --force` may start a new proxy only once the old one is known to be gone (U-05 gap-closure r2, revision 2 §6). */
+export function restartAllowed(outcome) {
+  return outcome === 'stopped' || outcome === 'not_running';
 }
 
 export default async function init(args) {
@@ -94,6 +99,13 @@ export default async function init(args) {
   if (!gate.ok) return gate.exit;
 
   // 2. Check for existing installation
+  const pidRecord = readPidRecord(paths.pidFile);
+  if (pidRecord?.state === 'indeterminate') {
+    console.error(fmt.fail(`The operating system refused the liveness check for the recorded pid ${pidRecord.pid} `
+      + `(${pidRecord.code}). It was not established whether it is the ChainGate proxy, so init will not start or restart one.`));
+    console.error(`  Inspect pid ${pidRecord.pid} with your operating system tools, then run \`chaingate stop\`.`);
+    return EXIT.ERROR;
+  }
   const existingPid = readPid(paths.pidFile);
   if (existingPid && !opts.force) {
     console.log(fmt.warn(`Proxy already running (pid ${existingPid}). Use --force to reinitialize.`));
@@ -290,7 +302,7 @@ export default async function init(args) {
   const portBusy = await isPortInUse(port, host);
   if (portBusy && !existingPid) {
     console.error(fmt.fail(`Port ${port} is already in use by another process.`));
-    console.error(`  Set CHAINGATE_PORT to use a different port.`);
+    console.error(`  ChainGate's proxy always uses ${host}:${port}. Stop whatever is listening there, then run init again.`);
     return EXIT.ERROR;
   }
 
@@ -361,7 +373,12 @@ export default async function init(args) {
     } else if (opts.force) {
       // A CONTROLLED restart: stop the old process, start a new one, and re-check identity.
       console.log(fmt.warn(`Restarting proxy (pid ${running}) to activate the new bundle...`));
-      stopProxy(paths.pidFile);
+      const stopped = await stopProxy(paths.pidFile, { port, host });
+      if (!restartAllowed(stopped.outcome)) {
+        console.error(fmt.fail(`The running proxy was not stopped (${stopped.outcome}): ${stopped.detail}`));
+        console.error('  No new proxy was started and .npmrc was left as it is.');
+        return EXIT.ERROR;
+      }
       running = null;
     } else {
       // Or say so plainly, rather than leaving the operator to assume the new seed is in force.

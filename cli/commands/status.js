@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fmt, renderTable, colorDisposition } from '../format.js';
 import { resolvePaths } from '../paths.js';
-import { readPid } from '../proxy-control.js';
+import { readPidRecord, fetchSelf } from '../proxy-control.js';
+import { describeStorage } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { resolveActiveBundle, bundleFiles, ActivationBroken } from '../seed-bundle.js';
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
@@ -49,7 +50,15 @@ export default async function status(args) {
     const recent = db.getRecentDecisions(5);
     const seedVersion = db.getSeedMetadata('seed_version');
     const seedExported = db.getSeedMetadata('exported_at');
-    const pid = readPid(paths.pidFile);
+    // The proxy process: three-state liveness, and what it says about itself (U-05 gap-closure r2, Addendum 1 §B). Its
+    // in-memory BLOCK count is the PROCESS's state; the decision totals above are what the database holds.
+    const pidRecord = readPidRecord(paths.pidFile);
+    const pid = pidRecord?.state === 'alive' ? pidRecord.pid : null;
+    let self = null;
+    if (pid) {
+      const r = await fetchSelf(DEFAULT_HOST, DEFAULT_PORT, 1500);
+      if (r.ok) self = r.json;
+    }
 
     if (opts.json) {
       console.log(JSON.stringify({
@@ -58,14 +67,21 @@ export default async function status(args) {
         recent,
         seed: { version: seedVersion, exported_at: seedExported },
         seed_v3: seedV3,
-        proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST },
+        proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST,
+          pid_state: pidRecord?.state ?? 'none', responding: Boolean(self),
+          storage: self?.storage ?? null, unstored_blocks: self?.unstored_blocks ?? null, self },
       }, null, 2));
       return seedV3.broken ? EXIT.ERROR : EXIT.OK;
     }
 
     const proxyStatus = pid
-      ? fmt.green(`running on ${DEFAULT_HOST}:${DEFAULT_PORT} (pid ${pid})`)
-      : fmt.red('stopped');
+      ? (self ? fmt.green(`running on ${DEFAULT_HOST}:${DEFAULT_PORT} (pid ${pid})`)
+        : fmt.yellow(`running (pid ${pid}), not answering on ${DEFAULT_HOST}:${DEFAULT_PORT}`))
+      : pidRecord?.state === 'indeterminate'
+        ? fmt.yellow(`pid ${pidRecord.pid}: liveness check refused (${pidRecord.code}); not established whether it is running`)
+        : fmt.red('stopped');
+    const storageState = self?.storage?.state;
+    const storageText = describeStorage(self);
 
     const seedLine = seedVersion
       ? `${seedVersion} (exported ${seedExported ?? 'unknown'})`
@@ -83,6 +99,8 @@ export default async function status(args) {
       ['Detection seed (v3):', v3Line],
       ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
+      ...(storageText && storageState !== 'healthy' && storageState !== 'no_evidence'
+        ? [['Decision storage:', (['recovered'].includes(storageState) ? fmt.dim : fmt.red)(storageText)]] : []),
       ['Decisions:', `${stats.total} total, ${stats.ALLOW} ALLOW, ${stats.WARN} WARN, ${stats.BLOCK} BLOCK`],
     ]));
 
