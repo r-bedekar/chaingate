@@ -111,8 +111,11 @@ test('M2 overrides are checked live; an override ALLOW keeps the entry; removing
       await rememberPinned(h);
       h.proxy.witnessDb.insertOverride('p', '1.3.0', 'operator exception for the test');
       assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 200, 'override: allowed');
-      const again = await get(`${h.proxyUrl}/p`);                   // computes the override ALLOW (not stored)
-      assert.ok(versionsOf(again).includes('1.3.0'), 'the packument serves the overridden version');
+      const again = await get(`${h.proxyUrl}/p`);                   // the override ALLOW, combined with the write failure
+      // A1-OV (ratified; as 0.1.2): on a write-failure path the failure declaration still applies to an overridden
+      // version -- LIVE blocks it in the packument, WARN serves it. The tarball gate honours the override live.
+      assert.equal(versionsOf(again).includes('1.3.0'), cfg.on_unusable_input !== 'BLOCK',
+        `${cfg.on_unusable_input}: the packument follows A1-OV for the overridden version`);
       assert.equal((await self(h.proxyUrl)).unstored_blocks?.count, 1, 'the override ALLOW did not erase the entry');
       h.proxy.witnessDb.deleteOverride('p', '1.3.0');
       assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 403, 'override removed: refused again');
