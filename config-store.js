@@ -10,8 +10,9 @@
 // be read as a complete, consistent configuration is a REFUSAL. A host that was configured to
 // enforce must never be talked out of it by a corrupt file.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { CAPS, FileRefused, readBounded } from './seed/v3/bounded-file.js';
 
 export const CONFIG_VERSION = 1;
 
@@ -116,9 +117,10 @@ export function readConfigStrict(file) {
   if (!existsSync(file)) return null;
   let parsed;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    // one non-blocking descriptor, a regular file of at most CAPS.config bytes (U-05 R2-2 (c))
+    parsed = JSON.parse(readBounded(file, CAPS.config).toString('utf8'));
   } catch (err) {
-    throw new ConfigUnreadable(file, err.message);
+    throw new ConfigUnreadable(file, err instanceof FileRefused ? err.why : err.message);
   }
   validateConfig(parsed, file);
   return parsed;

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { CAPS, FileRefused, readBounded } from '../../seed/v3/bounded-file.js';
 import { fmt, renderTable, colorDisposition } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { readPidRecord, fetchSelf } from '../proxy-control.js';
@@ -31,11 +32,14 @@ export default async function status(args) {
   try {
     const a = resolveActiveBundle(paths.base);
     if (a) {
-      let m = {};
-      try { m = JSON.parse(readFileSync(bundleFiles(a.dir).manifest, 'utf8')); } catch { /* reported below */ }
+      // bounded and non-blocking (U-05 R2-2 (c)): a FIFO or an oversized manifest is reported, never waited on
+      let m = {}; let manifestError = null;
+      try { m = JSON.parse(readBounded(bundleFiles(a.dir).manifest, CAPS.manifest).toString('utf8')); } catch (e) {
+        manifestError = e instanceof FileRefused ? e.why : e.message;
+      }
       seedV3 = { active: true, bundle_id: a.id, sha256: m.sha256 ?? null, trust: m.trust ?? null,
         signed: m.signed ?? null, corpus_snapshot_digest: m.corpus_snapshot_digest ?? null,
-        staged_at: m.staged_at ?? null, verified: false };
+        staged_at: m.staged_at ?? null, verified: false, ...(manifestError ? { manifest_error: manifestError } : {}) };
     }
   } catch (err) {
     if (!(err instanceof ActivationBroken)) throw err;
@@ -91,7 +95,8 @@ export default async function status(args) {
       ? fmt.red(`BROKEN: the activation link ${seedV3.link} does not resolve. Run \`chaingate update-seed --rollback\` or \`chaingate init --seed <bundle>\``)
       : seedV3.active
         ? `bundle ${seedV3.bundle_id}  sha256 ${String(seedV3.sha256 ?? 'unknown').slice(0, 16)}...  trust ${seedV3.trust ?? 'unknown'}`
-          + fmt.dim('  (recorded; `chaingate doctor` verifies it)')
+          + (seedV3.manifest_error ? fmt.red(`  (its bundle.json is unreadable: ${seedV3.manifest_error})`)
+            : fmt.dim('  (recorded; `chaingate doctor` verifies it)'))
         : fmt.dim('none active (run `chaingate init --seed <bundle>`)');
 
     console.log(renderTable([

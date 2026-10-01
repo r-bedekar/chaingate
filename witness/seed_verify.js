@@ -1,5 +1,5 @@
-import { createHash, createPublicKey, verify as cryptoVerify } from 'node:crypto';
-import { createReadStream, readFileSync } from 'node:fs';
+import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
+import { CAPS, FileRefused, readBounded, sha256Regular } from '../seed/v3/bounded-file.js';
 
 // Embedded literal — the only trust anchor in the CLI.
 // Generated from the project signing key on 2026-04-14.
@@ -22,14 +22,23 @@ export class SeedVerificationError extends Error {
   }
 }
 
-export function sha256File(path) {
-  return new Promise((resolve, reject) => {
-    const h = createHash('sha256');
-    const stream = createReadStream(path);
-    stream.on('data', (chunk) => h.update(chunk));
-    stream.on('end', () => resolve(h.digest('hex')));
-    stream.on('error', reject);
-  });
+/**
+ * SHA-256 of a regular file, through one non-blocking descriptor read from explicit positions (U-05 R2-2 (c)): a FIFO
+ * or a device is refused instead of stalling the command. Async for its existing callers.
+ */
+export async function sha256File(path) {
+  try { return sha256Regular(path); } catch (err) {
+    if (err instanceof FileRefused) throw new SeedVerificationError(`refused ${path}: ${err.why}`, { code: 'SEED_FILE_REFUSED' });
+    throw err;
+  }
+}
+
+/** A sidecar, at most CAPS.sidecar bytes through one descriptor; a refusal is SEED_FILE_REFUSED. */
+function readSidecar(path, readFailedCode, what) {
+  try { return readBounded(path, CAPS.sidecar); } catch (err) {
+    if (err instanceof FileRefused) throw new SeedVerificationError(`refused ${path}: ${err.why}`, { code: 'SEED_FILE_REFUSED' });
+    throw new SeedVerificationError(`cannot read ${what}: ${path}: ${err.message}`, { code: readFailedCode });
+  }
 }
 
 /**
@@ -50,15 +59,7 @@ export function sha256File(path) {
 export async function verifyPersistedSignature(sha256Path, sigPath, opts = {}) {
   const pubkey = opts.pubkey ?? PUBKEY;
 
-  let claimedHash;
-  try {
-    claimedHash = readFileSync(sha256Path, 'utf8').trim();
-  } catch (err) {
-    throw new SeedVerificationError(
-      `cannot read sha256 file: ${sha256Path}: ${err.message}`,
-      { code: 'SEED_SHA256_READ_FAILED' },
-    );
-  }
+  const claimedHash = readSidecar(sha256Path, 'SEED_SHA256_READ_FAILED', 'sha256 file').toString('utf8').trim();
   if (!/^[0-9a-f]{64}$/.test(claimedHash)) {
     throw new SeedVerificationError(
       `sha256 file is not a 64-char hex string: ${sha256Path}`,
@@ -66,15 +67,7 @@ export async function verifyPersistedSignature(sha256Path, sigPath, opts = {}) {
     );
   }
 
-  let sig;
-  try {
-    sig = readFileSync(sigPath);
-  } catch (err) {
-    throw new SeedVerificationError(
-      `cannot read signature file: ${sigPath}: ${err.message}`,
-      { code: 'SEED_SIG_READ_FAILED' },
-    );
-  }
+  const sig = readSidecar(sigPath, 'SEED_SIG_READ_FAILED', 'signature file');
   if (sig.length !== 64) {
     throw new SeedVerificationError(
       `signature is ${sig.length} bytes, expected 64 (Ed25519 raw)`,

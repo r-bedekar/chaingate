@@ -9,6 +9,7 @@ import Database from 'better-sqlite3';
 import K from './contract.js';
 import C from './checker.js';
 import { pyStrip } from './normalize.js';
+import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Regular } from './bounded-file.js';
 
 const SUPPORTED_SCHEMA_VERSIONS = [3];
 // 1.1 (U-05, D4): advisory pins are keyed by package NAME, so a pin no longer presumes a represented package.
@@ -63,16 +64,11 @@ class CandidateRejected extends Error {
   constructor(reasons) { super(reasons.join('; ')); this.name = 'CandidateRejected'; this.reasons = reasons; }
 }
 
-function sha256File(p) {
-  const h = crypto.createHash('sha256');
-  const fd = fs.openSync(p, 'r');
-  try {
-    const buf = Buffer.alloc(1 << 22);
-    let n;
-    while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n));
-  } finally { fs.closeSync(fd); }
-  return h.digest('hex');
-}
+// U-05 R2-2 (c): through one non-blocking descriptor that must be a regular file, read from explicit positions.
+function sha256File(p) { return sha256Regular(p); }
+
+/** What a refusal says, without the path the caller already names. */
+const whyOf = (e) => (e instanceof FileRefused ? e.why : `${e.name}: ${e.message}`);
 
 const isHex = (v, n) => v.length === n && /^[0-9a-f]*$/.test(v);
 
@@ -185,7 +181,7 @@ function resolvePubkey({ pubkeyPath = null, pubkey = null }) {
     }
     throw new TypeError('pubkey must be a KeyObject, a PEM/DER buffer, or a base64 SPKI string');
   }
-  if (pubkeyPath) return crypto.createPublicKey(fs.readFileSync(pubkeyPath));
+  if (pubkeyPath) return crypto.createPublicKey(readBounded(pubkeyPath, CAPS.key));
   return null;
 }
 
@@ -198,6 +194,10 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
   const base = { trust_mode: trust, authenticated: false, path: String(dbPath) };
   if (!fs.existsSync(dbPath)) return { ...base, ok: false, checks: { present: `no such file: ${dbPath}` }, meta: {} };
   checks.present = true;
+  // Before SQLite opens it by path: a FIFO or a device there would block that open (R2-2 §3.1).
+  try { fs.closeSync(openRegular(dbPath).fd); } catch (e) {
+    return { ...base, ok: false, checks: { ...checks, openable: whyOf(e) }, meta: {} };
+  }
 
   let db;
   try { db = new Database(dbPath, { readonly: true, fileMustExist: true }); }
@@ -265,15 +265,22 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
   // can carry the same path over different bytes.
   let contentSha256 = null;
   if (verifyDigest) {
-    if (fs.existsSync(shaSide)) {
-      const parts = fs.readFileSync(shaSide, 'utf8').split(/\s+/).filter(Boolean);
+    let side = null;
+    try { side = readBoundedIfPresent(shaSide, CAPS.sidecar); } catch (e) {
+      checks.content_digest = `sidecar ${path.basename(shaSide)}: ${whyOf(e)}`;
+    }
+    if (side !== null) {
+      const parts = side.toString('utf8').split(/\s+/).filter(Boolean);
       if (!parts.length) checks.content_digest = `sidecar ${path.basename(shaSide)} is empty`;
       else {
-        const actual = sha256File(dbPath);
-        contentSha256 = actual;
-        checks.content_digest = actual === parts[0] ? true : `content digest ${actual} != sidecar ${parts[0]}`;
+        let actual = null;
+        try { actual = sha256File(dbPath); } catch (e) { checks.content_digest = `${path.basename(dbPath)}: ${whyOf(e)}`; }
+        if (actual !== null) {
+          contentSha256 = actual;
+          checks.content_digest = actual === parts[0] ? true : `content digest ${actual} != sidecar ${parts[0]}`;
+        }
       }
-    } else checks.content_digest = `no sidecar digest at ${path.basename(shaSide)}`;
+    } else if (checks.content_digest === undefined) checks.content_digest = `no sidecar digest at ${path.basename(shaSide)}`;
   }
 
   const sigPath = `${dbPath}.sig`;
@@ -307,10 +314,12 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
 function verifySignature(dbPath, sigPath, keyOrPath) {
   try {
     const pub = typeof keyOrPath === 'string'
-      ? crypto.createPublicKey(fs.readFileSync(keyOrPath)) : keyOrPath;
-    const ok = crypto.verify(null, Buffer.from(sha256File(dbPath), 'ascii'), pub, fs.readFileSync(sigPath));
+      ? crypto.createPublicKey(readBounded(keyOrPath, CAPS.key)) : keyOrPath;
+    // the signature first: it is bounded, and refusing it must not cost a hash of the whole database
+    const sig = readBounded(sigPath, CAPS.sidecar);
+    const ok = crypto.verify(null, Buffer.from(sha256File(dbPath), 'ascii'), pub, sig);
     return ok ? true : 'signature does not verify against the pinned key';
-  } catch (e) { return `${e.name}: ${e.message}`; }
+  } catch (e) { return whyOf(e); }
 }
 
 class Seed {

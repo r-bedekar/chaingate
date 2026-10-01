@@ -33,7 +33,7 @@
 //    so the switch stays a single atomic step. See docs: U-04 Windows activation pointer design.
 //    Linux and macOS keep the symlinks.
 
-import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, renameSync, rmSync,
+import { existsSync, mkdirSync, copyFileSync, writeFileSync, renameSync, rmSync,
   chmodSync, symlinkSync, readlinkSync, realpathSync, readdirSync, statSync,
   lstatSync, openSync, writeSync, fsyncSync, closeSync, rmdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
@@ -43,6 +43,8 @@ import Database from 'better-sqlite3';
 import { sha256File, openSeed, TRUST_AUTHENTICATED,
   TRUST_UNSIGNED_DEV } from '../seed/v3/reader.js';
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
+import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Bytes }
+  from '../seed/v3/bounded-file.js';
 import { SEED_V3_FILENAME } from './constants.js';
 
 export const SEEDS_DIRNAME = 'seeds';
@@ -72,9 +74,16 @@ export const bundleFiles = (dir) => ({
 });
 
 const trustOf = (name) => (name === 'unsigned-development' ? TRUST_UNSIGNED_DEV : TRUST_AUTHENTICATED);
+/** What a bounded-read refusal says (the caller names the file). */
+const whyOf = (e) => (e instanceof FileRefused ? e.why : e.message);
 
 /** What the seed itself declares, read without trusting a filename. */
 export function inspectSeed(dbPath) {
+  // A FIFO or device would block SQLite's open by path: it is judged on a non-blocking descriptor first (R2-2 §3.1).
+  try { closeSync(openRegular(dbPath).fd); } catch (e) {
+    if (!(e instanceof FileRefused)) throw e;
+    return { schemaVersion: null, corpusSnapshotDigest: null, contractVersion: null, refused: e.why };
+  }
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     const has = db.prepare(
@@ -117,16 +126,23 @@ export function verifyBundleDir(dir, { trust } = {}) {
     if (!existsSync(p)) return { ok: false, why: `missing ${basename(p)}`, identity: null };
   }
   let manifest = null;
-  try { manifest = JSON.parse(readFileSync(f.manifest, 'utf8')); }
-  catch (e) { return { ok: false, why: `unreadable ${BUNDLE_MANIFEST}: ${e.message}`, identity: null }; }
+  try { manifest = JSON.parse(readBounded(f.manifest, CAPS.manifest).toString('utf8')); }
+  catch (e) { return { ok: false, why: `unreadable ${BUNDLE_MANIFEST}: ${whyOf(e)}`, identity: null }; }
 
-  const dbDigest = sha256File(f.db);
+  let dbDigest;
+  try { dbDigest = sha256File(f.db); } catch (e) {
+    if (!(e instanceof FileRefused)) throw e;
+    return { ok: false, why: `${basename(f.db)}: ${e.why}`, identity: null };
+  }
   if (manifest.sha256 !== dbDigest) {
     return { ok: false, identity: null,
       why: `database digest ${dbDigest.slice(0, 16)}... does not match the manifest's `
         + `${String(manifest.sha256).slice(0, 16)}...` };
   }
-  const sigDigest = existsSync(f.sig) ? sha256File(f.sig) : null;
+  // The signature is hashed from at most CAPS.sidecar bytes: this is its first access, before the reader's cap.
+  let sigDigest = null;
+  try { const b = readBoundedIfPresent(f.sig, CAPS.sidecar); sigDigest = b ? sha256Bytes(b) : null; }
+  catch (e) { return { ok: false, why: `${basename(f.sig)}: ${whyOf(e)}`, identity: null }; }
   const id = bundleIdOf(dbDigest, sigDigest);
   if (basename(dir) !== id && manifest.bundle_id !== id) {
     return { ok: false, identity: null,
@@ -180,18 +196,21 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
   const staged = bundleFiles(staging);
 
   try {
+    // The incoming sidecars are read ONCE, bounded; the staged .sig is written from those bytes (R2-2 §3.1).
+    const claimedBytes = sha256Path ? readBoundedIfPresent(sha256Path, CAPS.sidecar) : null;
+    const sigBytes = sigPath ? readBoundedIfPresent(sigPath, CAPS.sidecar) : null;
     copyFileSync(dbPath, staged.db);
     const dbDigest = sha256File(staged.db);
-    if (sha256Path && existsSync(sha256Path)) {
-      const claimed = String(readFileSync(sha256Path, 'utf8')).trim().split(/\s+/)[0];
+    if (claimedBytes !== null) {
+      const claimed = claimedBytes.toString('utf8').trim().split(/\s+/)[0];
       if (claimed !== dbDigest) {
         throw new Error(`bundle digest ${claimed.slice(0, 16)}... does not describe the bytes supplied `
           + `(${dbDigest.slice(0, 16)}...)`);
       }
     }
     writeFileSync(staged.sha256, `${dbDigest}  ${SEED_V3_FILENAME}\n`);
-    if (sigPath && existsSync(sigPath)) copyFileSync(sigPath, staged.sig);
-    const sigDigest = existsSync(staged.sig) ? sha256File(staged.sig) : null;
+    if (sigBytes !== null) writeFileSync(staged.sig, sigBytes);
+    const sigDigest = sigBytes !== null ? sha256Bytes(sigBytes) : null;
     const id = bundleIdOf(dbDigest, sigDigest);
 
     writeFileSync(staged.manifest, `${JSON.stringify({
@@ -335,15 +354,21 @@ function cleanStaleTemporaries(base, keep) {
  * Read and STRICTLY validate activation.json. null when it does not exist. Anything else that is
  * wrong with it throws ActivationBroken: a broken pointer never falls back to an older record.
  */
-export function readActivationPointer(base) {
+export function readActivationPointer(base, opts = {}) {
   const file = activationFile(base);
   const st = lstatOrNull(file);
   if (!st) return null;
   const broken = (why) => new ActivationBroken(file, why);
   if (!st.isFile()) throw broken('it is not a regular file');
   if (st.size > ACTIVATION_MAX_BYTES) throw broken(`it is ${st.size} bytes, more than ${ACTIVATION_MAX_BYTES}`);
+  opts.hooks?.afterLstat?.();                          // test seam (R2-2 C6c); inert otherwise
+  // What lstat saw is not what an open receives: the decision is taken again on the DESCRIPTOR, which must be a regular
+  // file (O_NOFOLLOW on POSIX) of at most ACTIVATION_MAX_BYTES, read through that descriptor only.
+  let bytes;
+  try { bytes = readBounded(file, ACTIVATION_MAX_BYTES, { noFollow: true }); }
+  catch (e) { throw broken(e instanceof FileRefused ? e.why : `unreadable: ${e.message}`); }
   let rec;
-  try { rec = JSON.parse(readFileSync(file, 'utf8')); } catch (e) { throw broken(`unreadable or not JSON: ${e.message}`); }
+  try { rec = JSON.parse(bytes.toString('utf8')); } catch (e) { throw broken(`unreadable or not JSON: ${e.message}`); }
   if (!rec || typeof rec !== 'object' || Array.isArray(rec)) throw broken('not a JSON object');
   if (rec.schema !== ACTIVATION_SCHEMA) throw broken(`unknown schema ${JSON.stringify(rec.schema)}`);
   const ref = (role, name, nullable) => {
