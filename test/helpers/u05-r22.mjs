@@ -140,8 +140,8 @@ export const MUTATOR = path.join(ROOT, 'test', 'helpers', 'u05-r22-mutator.mjs')
  * a named hook. `at(name)` resolves true when the child reached that point, false if it exited first (the point does not
  * exist in the code under test). Output is matched on the ACCUMULATED text, never through a shared cursor.
  */
-export function startMutator(base, command, args, { pauseAt, killAt, nth, timeoutMs = 60000 } = {}) {
-  const env = { ...process.env, CHAINGATE_HOME: base, HOME: path.dirname(base), USERPROFILE: path.dirname(base) };
+export function startMutator(base, command, args, { pauseAt, killAt, nth, timeoutMs = 60000, env: extra = {} } = {}) {
+  const env = { ...process.env, CHAINGATE_HOME: base, HOME: path.dirname(base), USERPROFILE: path.dirname(base), ...extra };
   if (pauseAt) env.U05_PAUSE_AT = pauseAt;
   if (killAt) env.U05_KILL_AT = killAt;
   if (nth) env.U05_AT_NTH = String(nth);
