@@ -239,9 +239,12 @@ async function main() {
   // comes from the same place as the database and proves nothing on its own. Fixtures from before 0.1.3 have no archives.
   let seedA = seed('A');
   if (cases.archives) {
+    // The archive is copied in and extracted by its RELATIVE name: GNU tar (Git Bash on Windows) reads `D:\...` as a
+    // remote host; bsdtar (Windows, macOS) and GNU tar (Linux) both accept this form.
     const unpack = (name) => {
       const d = path.join(proj, `unpacked-${name}`); fs.mkdirSync(d, { recursive: true });
-      const r = spawnSync('tar', ['-xzf', path.join(FIX, cases.archives[name]), '-C', d], { encoding: 'utf8', timeout: 120_000 });
+      fs.copyFileSync(path.join(FIX, cases.archives[name]), path.join(d, cases.archives[name]));
+      const r = spawnSync('tar', ['-xzf', cases.archives[name]], { encoding: 'utf8', timeout: 120_000, cwd: d });
       return { ok: r.status === 0, db: path.join(d, 'chaingate-seed.db'), err: `${r.stderr || r.error || ''}`.trim() };
     };
     const archiveA = path.join(FIX, cases.archives.A);

@@ -35,8 +35,9 @@ const archive = (name, db) => {
   fs.copyFileSync(`${db}.sha256`, path.join(d, 'chaingate-seed.db.sha256'));
   fs.writeFileSync(path.join(d, 'chaingate-seed.db.manifest.json'), `${JSON.stringify({ fixture: `synthetic seed ${name}` })}\n`);
   const out = path.join(F, `seed-${name}.tar.gz`);
-  const r = spawnSync('tar', ['-czf', out, '-C', d, 'chaingate-seed.db', 'chaingate-seed.db.sha256', 'chaingate-seed.db.manifest.json'],
-    { encoding: 'utf8' });
+  // RELATIVE names only, run from the staging folder: GNU tar (Git Bash on Windows) reads `D:\...` as a remote host.
+  const r = spawnSync('tar', ['-czf', `../seed-${name}.tar.gz`, 'chaingate-seed.db', 'chaingate-seed.db.sha256',
+    'chaingate-seed.db.manifest.json'], { encoding: 'utf8', cwd: d });
   if (r.status !== 0) throw new Error(`tar could not build ${out}: ${r.stderr || r.error}`);
   fs.rmSync(d, { recursive: true, force: true });
   return out;
