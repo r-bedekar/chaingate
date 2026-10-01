@@ -5,11 +5,11 @@ import { npmrcPath, readCurrentRegistry, applyChaingateBlock, findScopedRegistri
 import { readPid, readPidRecord, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
   isAlive } from '../proxy-control.js';
 import { fetchSeedBundle } from '../seed-download.js';
-import { verifySeed } from '../../witness/seed_verify.js';
+import { verifySeed, verifyStagedSeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity } from '../integrity-gate.js';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_UPSTREAM, EXIT } from '../constants.js';
-import { isV3Seed, stageBundle, activateBundle, resolveActiveBundle,
+import { stageIncoming, finishStagedBundle, activateBundle, resolveActiveBundle,
   verifyBundleDir } from '../seed-bundle.js';
 import { readConfigStrict, writeConfig, validateConfig, DEFAULT_POLICY,
   POLICY_VALUES } from '../../config-store.js';
@@ -35,7 +35,11 @@ export function restartAllowed(outcome) {
   return outcome === 'stopped' || outcome === 'not_running';
 }
 
-export default async function init(args) {
+/**
+ * @param {string[]} args
+ * @param {{seam?: object, hooks?: object}} [deps]  test seams for staging (space figures, named copy points); inert otherwise
+ */
+export default async function init(args, deps = {}) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
   let v3Installed = false;
@@ -116,7 +120,19 @@ export default async function init(args) {
   //     evidence, it is opened read-only, and the runtime keeps writing its own state elsewhere.
   //     Everything needed to start later is recorded in config.json, so no environment is required.
   let intended = null;                  // the identity a started proxy must report back
-  if (opts.seedPath && isV3Seed(opts.seedPath)) {
+  // PRIVATE STAGING FIRST (U-05 R2-2 (d)): a supplied seed is opened once as a regular file, admitted for space and
+  // copied; it is classified (SQLite opens only the staged copy), verified and installed from that copy.
+  let staged = null;
+  if (opts.seedPath) {
+    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks }); } catch (err) {
+      console.error(fmt.fail(`The seed was not accepted: ${err.message}`));
+      console.error('  Nothing was installed and .npmrc was not touched.');
+      return EXIT.ERROR;
+    }
+    for (const w of staged.warnings) console.log(fmt.warn(w));
+    if (staged.info.schemaVersion !== 3) { staged.discard(); staged = null; }   // legacy: the route below
+  }
+  if (staged) try {                       // the staged copy is discarded on every exit from this branch
     // POLICY FIRST, strictly. A policy the gate cannot act on means the proxy will not start, and
     // discovering that after a bundle is installed and .npmrc redirected is the wrong order.
     let policy;
@@ -130,15 +146,13 @@ export default async function init(args) {
       return EXIT.ERROR;
     }
 
-    // TRUST, decided before anything is staged and recorded in the bundle itself.
-    const sha256Path = `${opts.seedPath}.sha256`;
-    const sigPath = `${opts.seedPath}.sig`;
-    const hasSig = existsSync(sigPath);
+    // TRUST, decided on the STAGED digest before the bundle is finished, and recorded in the bundle itself.
+    const hasSig = staged.sigBytes !== null;
     let trust;
     if (hasSig) {
       console.log('Verifying v3 seed signature...');
       try {
-        await verifySeed(opts.seedPath, sha256Path, sigPath);
+        verifyStagedSeed({ digest: staged.digest, sha256Bytes: staged.sha256Bytes, sigBytes: staged.sigBytes });
         trust = 'authenticated';
         console.log(fmt.ok('v3 seed signature verified'));
       } catch (err) {
@@ -156,14 +170,12 @@ export default async function init(args) {
       return EXIT.ERROR;
     }
 
-    // STAGE: copied, digest-checked, sidecar written from the staged bytes, and OPENED WITH THE
-    // READER — all before anything in use is touched. A retained bundle with the same identity is
+    // FINISH: the staged copy, digest-checked, sidecar written from the staged bytes, and OPENED WITH
+    // THE READER — all before anything in use is touched. A retained bundle with the same identity is
     // re-verified rather than assumed, and reports its own state.
     let installed;
     try {
-      installed = stageBundle({ dbPath: opts.seedPath,
-        sha256Path: existsSync(sha256Path) ? sha256Path : null,
-        sigPath: hasSig ? sigPath : null }, paths.base, { trust });
+      installed = finishStagedBundle(staged, paths.base, { trust });
     } catch (err) {
       console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
       console.error('  Nothing was installed or activated.');
@@ -206,7 +218,7 @@ export default async function init(args) {
     opts.seedPath = null;
     opts.noSeed = true;
     v3Installed = true;
-  }
+  } finally { staged.discard(); }
 
   // 3. Seed handling (v1: the seed IS the witness database)
   //    `--force` must not drag a v3 installation back through this: it downloaded a v1 bundle over

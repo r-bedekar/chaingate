@@ -35,7 +35,7 @@
 
 import { existsSync, mkdirSync, copyFileSync, writeFileSync, renameSync, rmSync,
   chmodSync, symlinkSync, readlinkSync, realpathSync, readdirSync, statSync,
-  lstatSync, openSync, writeSync, fsyncSync, closeSync, rmdirSync } from 'node:fs';
+  lstatSync, openSync, readSync, writeSync, fsyncSync, closeSync, rmdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -43,8 +43,9 @@ import Database from 'better-sqlite3';
 import { sha256File, openSeed, TRUST_AUTHENTICATED,
   TRUST_UNSIGNED_DEV } from '../seed/v3/reader.js';
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
-import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Bytes }
+import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Bytes, hashRange }
   from '../seed/v3/bounded-file.js';
+import { admit, V3_SIDECARS } from './space-admission.js';
 import { SEED_V3_FILENAME } from './constants.js';
 
 export const SEEDS_DIRNAME = 'seeds';
@@ -177,30 +178,115 @@ export function verifyBundleDir(dir, { trust } = {}) {
   };
 }
 
+/** Refused before or while staging: the input itself, the space for it, or the copy. Nothing in use was touched. */
+export class StagingRefused extends Error {
+  constructor(message, kind) { super(message); this.name = 'StagingRefused'; this.kind = kind; }
+}
+
 /**
- * Stage a complete bundle, validate it WITH THE READER, and leave it installed but NOT active.
- * Nothing in use is touched. Returns the identity of the bundle that is now on disk — which, when
- * an equivalent bundle was already retained, is THAT bundle's verified identity rather than the
- * incoming copy's assumed one.
+ * Copy EXACTLY `size` bytes of the open source `fd`, from offset 0 with explicit positions, into the NEW file `dest`
+ * (created exclusively, 0600). Ending before `size` is refused, and so is data at offset `size` (the source grew): the
+ * staged copy is the source as it was when opened, or nothing. fsynced before it returns.
+ * `hooks` (tests only, inert otherwise): beforeStagingWrite(pos), midStagingCopy(pos).
  */
-export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base, { trust } = {}) {
-  const info = inspectSeed(dbPath);
+export function copyFdExact(fd, size, dest, source, hooks = {}) {
+  const out = openSync(dest, 'wx', 0o600);
+  try {
+    const buf = Buffer.alloc(1 << 20);
+    let pos = 0;
+    while (pos < size) {
+      const n = readSync(fd, buf, 0, Math.min(buf.length, size - pos), pos);
+      if (n === 0) {
+        throw new FileRefused(source, 'ECG_TRUNCATED', `it ended at byte ${pos}, before the ${size} bytes it had when opened`);
+      }
+      hooks.beforeStagingWrite?.(pos);
+      let w = 0;
+      while (w < n) w += writeSync(out, buf, w, n - w, pos + w);
+      pos += n;
+      hooks.midStagingCopy?.(pos);
+    }
+    if (readSync(fd, Buffer.alloc(1), 0, 1, size) > 0) {
+      throw new FileRefused(source, 'ECG_GREW', `it grew past the ${size} bytes it had when opened`);
+    }
+    fsyncSync(out);
+  } finally { closeSync(out); }
+}
+
+const removeStaging = (dir) => {
+  try { rmSync(dir, { recursive: true, force: true }); return null; } catch (e) { return `${dir} (${e.code || e.message})`; }
+};
+
+/**
+ * PRIVATE STAGING (U-05 R2-2 (d); Addendum 1 §4). The caller-supplied seed is opened ONCE, as a regular file, without
+ * blocking; its sidecars are read once, bounded; space is admitted; exactly its opened size is copied into a new
+ * `seeds/.staging-<pid>-<ms>/`; and the source is never read again. Everything after this -- the digest, the
+ * classification (SQLite opens only the STAGED copy), the signature -- describes the staged bytes.
+ *
+ * A catchable failure removes the staging directory (or names what remains). The caller calls `discard()` when done;
+ * after `finishStagedBundle` has moved the directory into place there is nothing left to discard.
+ *
+ * @param {{sidecars?: {sha256Path: string|null, sigPath: string|null}, seam?: object, hooks?: object}} [opts]
+ */
+export function stageIncoming(seedPath, base, { sidecars, seam, hooks = {} } = {}) {
+  let src;
+  try { src = openRegular(seedPath); } catch (e) {
+    throw new StagingRefused(e instanceof FileRefused ? `${seedPath}: ${e.why}` : `cannot open ${seedPath}: ${e.code || e.message}`, 'input');
+  }
+  let dir = null;
+  try {
+    const size = src.size;
+    const side = sidecars ?? { sha256Path: `${seedPath}.sha256`, sigPath: `${seedPath}.sig` };
+    let sha256Bytes; let sigBytes;
+    try {
+      sha256Bytes = side.sha256Path ? readBoundedIfPresent(side.sha256Path, CAPS.sidecar) : null;
+      sigBytes = side.sigPath ? readBoundedIfPresent(side.sigPath, CAPS.sidecar) : null;
+    } catch (e) { throw new StagingRefused(e instanceof FileRefused ? `${e.path}: ${e.why}` : e.message, 'input'); }
+
+    mkdirSync(seedsDir(base), { recursive: true });
+    const adm = admit([{ dir: seedsDir(base), bytes: BigInt(size) + V3_SIDECARS, what: 'staging the seed' }], seam);
+    if (!adm.ok) throw new StagingRefused(adm.refusal, 'space');
+
+    dir = join(seedsDir(base), `.staging-${process.pid}-${Date.now()}`);
+    mkdirSync(dir, { mode: 0o700 });
+    const files = bundleFiles(dir);
+    try { copyFdExact(src.fd, size, files.db, seedPath, hooks); } catch (e) {
+      throw new StagingRefused(e instanceof FileRefused ? `${seedPath}: ${e.why}`
+        : `copying ${seedPath} failed (${e.code || e.name}): ${e.message}`, e instanceof FileRefused ? 'input' : 'copy');
+    }
+    closeSync(src.fd); src = null;                      // the source is not read again
+    hooks.afterStagingCopy?.();
+
+    const staged = openRegular(files.db);
+    let digest;
+    try {
+      if (staged.size !== size) throw new StagingRefused(`the staged copy is ${staged.size} bytes, not ${size}`, 'copy');
+      digest = hashRange(staged.fd, 0, size, files.db);
+    } finally { closeSync(staged.fd); }
+    const info = inspectSeed(files.db);
+    const owned = dir;
+    return { dir, files, size, digest, sha256Bytes, sigBytes, info, warnings: adm.warnings, source: seedPath,
+      discard: () => removeStaging(owned) };
+  } catch (e) {
+    if (dir) {
+      const left = removeStaging(dir);
+      if (left) e.message += `; the staging copy could not be removed: ${left}`;
+    }
+    throw e;
+  } finally { if (src) closeSync(src.fd); }
+}
+
+/**
+ * Finish a privately staged v3 seed into a bundle: the runtime writes the digest sidecar and the manifest, the .sig is
+ * written from the bounded bytes, the READER validates it, and it is moved into place -- installed but NOT active.
+ * Nothing in use is touched. Returns the identity of the bundle now on disk, which, when an equivalent bundle was
+ * already retained, is THAT bundle's verified identity rather than the incoming copy's assumed one.
+ */
+export function finishStagedBundle(staged, base, { trust } = {}) {
+  const { dir: staging, files: out, digest: dbDigest, sha256Bytes: claimedBytes, sigBytes, info } = staged;
   if (info.schemaVersion !== 3) {
     throw new Error(`not a v3 seed: schema_version=${JSON.stringify(info.schemaVersion)}`);
   }
-  mkdirSync(seedsDir(base), { recursive: true });
-
-  const staging = join(seedsDir(base), `.staging-${process.pid}-${Date.now()}`);
-  rmSync(staging, { recursive: true, force: true });
-  mkdirSync(staging, { recursive: true });
-  const staged = bundleFiles(staging);
-
   try {
-    // The incoming sidecars are read ONCE, bounded; the staged .sig is written from those bytes (R2-2 §3.1).
-    const claimedBytes = sha256Path ? readBoundedIfPresent(sha256Path, CAPS.sidecar) : null;
-    const sigBytes = sigPath ? readBoundedIfPresent(sigPath, CAPS.sidecar) : null;
-    copyFileSync(dbPath, staged.db);
-    const dbDigest = sha256File(staged.db);
     if (claimedBytes !== null) {
       const claimed = claimedBytes.toString('utf8').trim().split(/\s+/)[0];
       if (claimed !== dbDigest) {
@@ -208,15 +294,15 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
           + `(${dbDigest.slice(0, 16)}...)`);
       }
     }
-    writeFileSync(staged.sha256, `${dbDigest}  ${SEED_V3_FILENAME}\n`);
-    if (sigBytes !== null) writeFileSync(staged.sig, sigBytes);
+    writeFileSync(out.sha256, `${dbDigest}  ${SEED_V3_FILENAME}\n`);
+    if (sigBytes !== null) writeFileSync(out.sig, sigBytes);
     const sigDigest = sigBytes !== null ? sha256Bytes(sigBytes) : null;
     const id = bundleIdOf(dbDigest, sigDigest);
 
-    writeFileSync(staged.manifest, `${JSON.stringify({
+    writeFileSync(out.manifest, `${JSON.stringify({
       bundle_id: id, sha256: dbDigest, signature_sha256: sigDigest, signed: sigDigest !== null,
       trust, schema_version: info.schemaVersion, contract_version: info.contractVersion,
-      corpus_snapshot_digest: info.corpusSnapshotDigest, size_bytes: statSync(staged.db).size,
+      corpus_snapshot_digest: info.corpusSnapshotDigest, size_bytes: staged.size,
       staged_at: new Date().toISOString(),
     }, null, 2)}\n`);
 
@@ -236,7 +322,6 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
       // matched would activate something no one checked.
       const retained = verifyBundleDir(dest, { trust });
       if (retained.ok) {
-        rmSync(staging, { recursive: true, force: true });
         return { ...retained.identity, dir: dest, dir_name: basename(dest),
           path: bundleFiles(dest).db, reused: true };
       }
@@ -253,8 +338,17 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
     return { ...placed.identity, dir: dest, dir_name: basename(dest), path: bundleFiles(dest).db,
       reused: false, ...(replacedDamaged ? { replaced_damaged: replacedDamaged } : {}) };
   } finally {
-    rmSync(staging, { recursive: true, force: true });
+    removeStaging(staging);
   }
+}
+
+/**
+ * Stage a complete bundle from paths, validate it WITH THE READER, and leave it installed but NOT active: private
+ * staging (stageIncoming) followed by finishStagedBundle. Kept for callers that hold paths (tests, the seed tooling).
+ */
+export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base, { trust, seam, hooks } = {}) {
+  const staged = stageIncoming(dbPath, base, { sidecars: { sha256Path, sigPath }, seam, hooks });
+  try { return finishStagedBundle(staged, base, { trust }); } finally { staged.discard(); }
 }
 
 /**

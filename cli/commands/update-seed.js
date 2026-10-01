@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import { fmt } from '../format.js';
 import { resolvePaths as defaultResolvePaths } from '../paths.js';
 import { fetchSeedBundle as defaultFetchSeedBundle } from '../seed-download.js';
-import { verifySeed as defaultVerifySeed } from '../../witness/seed_verify.js';
+import { verifySeed as defaultVerifySeed, verifyStagedSeed } from '../../witness/seed_verify.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity as defaultAssertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
-import { isV3Seed, stageBundle, activateBundle, rollbackActivation, activeBundleId,
+import { stageIncoming, finishStagedBundle, activateBundle, rollbackActivation, activeBundleId,
   previousBundleId, verifyBundleDir, seedsDir } from '../seed-bundle.js';
 import { readConfigStrict } from '../../config-store.js';
 
@@ -37,7 +37,7 @@ function parseArgs(args) {
  *     in a different file on purpose, and replacing evidence must not discard the record of what was
  *     decided under the evidence that came before.
  */
-export async function updateSeedV3(opts, paths, deps) {
+export async function updateSeedV3(opts, paths, deps, staged = null) {
   // Which bundle is active is ONE record — the `seeds/active` link. Nothing here rewrites a second
   // copy of that fact, so an interrupted update leaves the previously active bundle active and a
   // rollback is a swap back rather than a restore of files.
@@ -62,9 +62,8 @@ export async function updateSeedV3(opts, paths, deps) {
     return EXIT.OK;
   }
 
-  const sha256Path = `${opts.seedPath}.sha256`;
-  const sigPath = `${opts.seedPath}.sig`;
-  const hasSig = existsSync(sigPath);
+  // `staged`: the privately staged copy (R2-2 (d)). Trust is decided on ITS digest and the sidecar bytes read once.
+  const hasSig = staged.sigBytes !== null;
   const activeId = activeBundleId(paths.base);
   const activeIdentity = activeId
     ? (verifyBundleDir(join(seedsDir(paths.base), activeId)).identity || {}) : {};
@@ -73,7 +72,8 @@ export async function updateSeedV3(opts, paths, deps) {
   let trust;
   if (hasSig) {
     try {
-      await deps.verifySeed(opts.seedPath, sha256Path, sigPath);
+      (deps.verifyStagedSeed ?? verifyStagedSeed)({ digest: staged.digest, sha256Bytes: staged.sha256Bytes,
+        sigBytes: staged.sigBytes });
     } catch (err) {
       console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
       console.error('  The active bundle is unchanged.');
@@ -98,9 +98,7 @@ export async function updateSeedV3(opts, paths, deps) {
 
   let installed;
   try {
-    installed = stageBundle({ dbPath: opts.seedPath,
-      sha256Path: existsSync(sha256Path) ? sha256Path : null,
-      sigPath: hasSig ? sigPath : null }, paths.base, { trust });
+    installed = finishStagedBundle(staged, paths.base, { trust });
   } catch (err) {
     console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
     console.error('  Nothing was installed or activated; the active bundle is unchanged.');
@@ -141,8 +139,21 @@ export default async function updateSeed(
 
   // The v3 detection seed has its own lifecycle: it is not the witness database, and replacing it
   // must not touch runtime state. `--rollback`, or `--seed <bundle>` naming a v3 seed, take it.
-  if (opts.rollback || (opts.seedPath && isV3Seed(opts.seedPath))) {
-    return updateSeedV3(opts, paths, deps);
+  if (opts.rollback) return updateSeedV3(opts, paths, deps);
+  if (opts.seedPath) {
+    // PRIVATE STAGING FIRST (U-05 R2-2 (d)): the supplied file is opened once as a regular file, admitted for space and
+    // copied; it is classified, verified and installed from the STAGED copy and never read again.
+    let staged;
+    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks }); } catch (err) {
+      console.error(fmt.fail(`The seed was not accepted: ${err.message}`));
+      console.error('  Nothing was installed or activated; the active bundle is unchanged.');
+      return EXIT.ERROR;
+    }
+    for (const w of staged.warnings) console.log(fmt.warn(w));
+    try {
+      if (staged.info.schemaVersion === 3) return await updateSeedV3(opts, paths, deps, staged);
+    } finally { staged.discard(); }
+    // not a v3 seed: the legacy route below (its routing is the legacy part of R2-2)
   }
 
   // AUTOMATIC v3 SEED DOWNLOAD IS NOT AVAILABLE. Without --seed this command downloads the LEGACY
