@@ -80,6 +80,22 @@ export function classify(pathname) {
   return { kind: 'unknown' };
 }
 
+// U-05 Amendment 2 (P4a/P5a): a version of this package is already BLOCKed and the response that removes it could not be
+// built or sent. The original document must not be served instead -- it carries the very version the gates refused -- so
+// this one request fails; other packages and later requests are unaffected. Headers already sent: cut the response.
+function refuseUnenforceable(res, packageName, detail) {
+  if (res.headersSent) {
+    if (!res.writableEnded) res.destroy(new Error(detail));
+    return;
+  }
+  writeJson(res, 502, {
+    error: 'chaingate_enforcement_failed',
+    package: packageName,
+    detail: `a version of ${packageName} is BLOCKed and chaingate could not remove it from the response `
+      + `(${detail}); the document is not served`,
+  });
+}
+
 function writeJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
@@ -120,7 +136,7 @@ async function streamUpstream(res, upstream, statusCode) {
 //
 // Content-encoding is stripped unconditionally because fetchPackument forces
 // `accept-encoding: identity`, so both branches produce the same header shape.
-async function observeAndSendPackument(res, upstream, witness, packageName, log) {
+async function observeAndSendPackument(res, upstream, witness, packageName, log, state = {}) {
   if (upstream.statusCode !== 200) {
     await streamUpstream(res, upstream, upstream.statusCode);
     return;
@@ -165,6 +181,7 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log)
   // Rewriter branch: any BLOCK → re-serialize. Otherwise serve raw bytes.
   const hasBlock = observed && hasBlockDisposition(observed.decisions);
   if (hasBlock) {
+    state.blockComputed = true;
     try {
       const { packument: rewritten, changed, summary } = rewritePackument(parsed, observed.decisions);
       if (changed) {
@@ -189,9 +206,14 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log)
         res.end(body);
         return;
       }
+      // No change means no BLOCKed version is in this document: decisions are keyed by its own version strings
+      // (U-05 Amendment 2, P4b), so serving it as received below is safe.
     } catch (err) {
-      // Fail-open: rewriter bug must never DoS the registry.
-      log?.warn?.(`[rewriter] ${packageName}: rewrite failed, serving original: ${err.message}`);
+      // U-05 Amendment 2 (P4a): this used to serve the original document ("a rewriter bug must never DoS the
+      // registry"), which hands npm the version that was just BLOCKed. Only this package's request fails now.
+      refuseUnenforceable(res, packageName, `the BLOCK could not be applied: ${err.message}`);
+      log?.warn?.(`[rewriter] ${packageName}: rewrite failed, document NOT served (a BLOCK could not be enforced): ${err.message}`);
+      return;
     }
   }
 
@@ -428,6 +450,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     }
 
     const canonicalName = normalizePackageName(route.name);
+    const state = {};            // U-05 Amendment 2 (P5a): set when a BLOCK was computed for this request
 
     try {
       if (route.kind === 'packument') {
@@ -435,7 +458,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           config,
           requestHeaders: req.headers,
         });
-        await observeAndSendPackument(res, upstream, witness, canonicalName, log);
+        await observeAndSendPackument(res, upstream, witness, canonicalName, log, state);
       } else {
         // Tarball BLOCK gate — check BEFORE contacting upstream so we don't
         // waste bandwidth on something we're going to refuse.
@@ -465,10 +488,16 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       // already sent we can't recover — just destroy the socket so the
       // client sees a clean failure instead of a half-written response.
       log?.warn?.(
-        `[proxy] internal error on ${req.method} ${req.url}: ${err.stack || err.message} (falling back to raw upstream)`,
+        `[proxy] internal error on ${req.method} ${req.url}: ${err.stack || err.message} `
+          + (state.blockComputed ? '(a BLOCK was computed: NOT falling back to raw upstream)' : '(falling back to raw upstream)'),
       );
       if (res.headersSent) {
         if (!res.writableEnded) res.destroy(err);
+        return;
+      }
+      if (state.blockComputed) {
+        // U-05 Amendment 2 (P5a): a raw passthrough would serve the version that was just BLOCKed.
+        refuseUnenforceable(res, canonicalName, `internal error after the BLOCK was computed: ${err.message}`);
         return;
       }
       try {
