@@ -196,8 +196,12 @@ make an untrusted registry trustworthy.
 
 - **Pinned HTTP client.** All upstream requests use an Agent from the
   pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments,
-  tarballs, background dependency lookups and the fail-open raw
-  fallback. The Agent is set explicitly because on Node 22 importing
+  tarballs, background dependency lookups and the raw upstream
+  fallback the proxy uses when an unexpected internal error occurs
+  before any decision exists under `on_unusable_input: WARN` or with
+  pilot gates only (under `on_unusable_input: BLOCK`, or while the
+  record of unstored BLOCKs is full, the proxy refuses such requests
+  instead). The Agent is set explicitly because on Node 22 importing
   `node:http` installs Node's own bundled undici as the process-wide
   default. Without that, the pinned version would never handle
   upstream traffic. The process-wide default itself is left

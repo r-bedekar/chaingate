@@ -92,6 +92,25 @@ a pin-based BLOCK if the accepted seed and pin lookup remain available. A direct
 evaluation is not protected by the forgotten record unless a stored BLOCK independently applies. Tarball requests
 for versions the proxy has never evaluated are not covered by this protection.
 
+This in-memory record is bounded: by default 50,000 entries and an estimated 64 MiB of retained data. You can change
+these with `unstored_block_cap_entries` and `unstored_block_cap_bytes` in the configuration, or
+`CHAINGATE_UNSTORED_BLOCK_CAP_ENTRIES` and `CHAINGATE_UNSTORED_BLOCK_CAP_BYTES`. The bound applies to the record, not
+to the proxy's total memory, and the default values are not a measured safe limit for every machine. Nothing is ever
+evicted. When a new BLOCK does not fit, the record becomes **FULL** and stays FULL until the proxy is restarted. While
+FULL, the proxy refuses (HTTP 503 `chaingate_storage_degraded`) every tarball that has no stored or remembered BLOCK and
+no exact-version override, including tarballs whose stored decision is ALLOW or WARN. This happens under every
+`on_unusable_input` setting, and requests whose decision cannot be made are refused too. FULL is a resource-safety
+refusal, not a finding that the package is malicious. An exact override (`chaingate allow`) still lets that one version
+through, but only when the override can be looked up at request time.
+
+`chaingate status` and `chaingate doctor` show the running proxy's storage state (`witness-storage` in doctor):
+- whether decisions are being stored;
+- how many BLOCKs are held only in memory, with some of their names to re-request;
+- whether the record is FULL.
+
+Any BLOCK held only in memory, and FULL, are reported as degraded; doctor exits 1. The proxy's log is rate-limited, and
+lines it suppresses are counted and summarised. It is not a complete record of every decision.
+
 **Seed verification.** Every seed is checked against its `.sha256` file before use. A seed counts as
 **authenticated** only when its Ed25519 signature verifies against a key built into the runtime. An
 unsigned v3 seed can be used only with `--unsigned-development`, and the tool then reports
@@ -252,6 +271,19 @@ $ chaingate stop
 ✓ Proxy stopped
 ✓ .npmrc restored
 ```
+
+`chaingate stop` signals only the process recorded for this scope, and only after that process answers on
+127.0.0.1:6173 as the ChainGate proxy with the same pid. It prints "Proxy stopped" only once the process has exited and
+the port is closed, waiting up to about 8 seconds.
+
+The stop does not succeed when:
+- the process does not exit in time;
+- it is not confirmed to be the proxy;
+- the operating system refuses the check.
+
+In those cases nothing is changed, the `.npmrc` block is left in place, the command says what it found, and it exits
+with code 1. A pid can be reused by another process in the milliseconds between the last check and the signal; signals
+cannot rule that out.
 
 While ChainGate's block is in your `.npmrc`, npm sends every request to the proxy. If the proxy is
 not running, for example after a restart, npm cannot install anything until you either run
