@@ -17,6 +17,13 @@ const VERIFY = path.join(ROOT, 'test', 'helpers', 'u05-r22-verify-bundle.mjs');
 const BLOCK_MS = 10000;             // a refusal returns in well under a second; a blocked open never returns
 const fifoOnly = { skip: canFifo ? false : 'needs mkfifo (POSIX); Windows device and pipe cases are W-C1/W-C2' };
 const bundleNames = (base) => fs.readdirSync(seedsDir(base)).sort();
+/** `doctor --json` prints the array of checks. */
+const doctorChecks = (r) => { try { return JSON.parse(r.stdout); } catch { assert.fail(`doctor --json printed no JSON:\n${r.out}`); } };
+/** Every command's outcome is collected before asserting, so the record shows each one, not only the first. */
+function assertAllPrompt(results) {
+  const blocked = Object.entries(results).filter(([, r]) => r.timedOut).map(([k]) => k);
+  assert.deepEqual(blocked, [], `blocked (still running after ${BLOCK_MS} ms): ${blocked.join(', ')}`);
+}
 
 /** A second synthetic seed that would install as a NEW bundle (different snapshot digest). */
 function otherSource() {
@@ -43,7 +50,7 @@ test('C1b doctor reports the active bundle unusable, naming the manifest limit',
     replaceWith(h.files.manifest, padded(fs.readFileSync(h.files.manifest, 'utf8'), 65537));
     const r = await runCli(h.base, ['doctor', '--json'], { timeoutMs: BLOCK_MS });
     assert.equal(r.timedOut, false);
-    const seed = JSON.parse(r.stdout).checks.find((c) => c.name === 'seed-v3');
+    const seed = doctorChecks(r).find((c) => c.name === 'seed-v3');
     assert.equal(seed.pass, false);
     assert.match(seed.detail, /65536-byte limit/);
   } finally { h.cleanup(); }
@@ -126,7 +133,7 @@ test('C4b doctor reports an oversized persisted .sha256 as SEED_FILE_REFUSED', a
     fs.writeFileSync(path.join(h.base, 'witness.db.sha256'), padded(`${'a'.repeat(64)}\n`, 4097));
     fs.writeFileSync(path.join(h.base, 'witness.db.sig'), Buffer.alloc(64, 1));
     const r = await runCli(h.base, ['doctor', '--json'], { timeoutMs: BLOCK_MS });
-    const c = JSON.parse(r.stdout).checks.find((x) => x.name === 'seed-signature');
+    const c = doctorChecks(r).find((x) => x.name === 'seed-signature');
     assert.equal(c.pass, false);
     assert.match(c.detail, /SEED_FILE_REFUSED/);
   } finally { h.cleanup(); }
@@ -169,14 +176,15 @@ test('C6 incoming seed database is a FIFO: update-seed --seed and init --seed re
   try {
     replaceWithFifo(s.db);
     const before = bundleNames(h.base);
-    promptRefusal(await runCli(h.base, ['update-seed', '--seed', s.db, '--unsigned-development'], { timeoutMs: BLOCK_MS }), 'update-seed');
-    assert.deepEqual(bundleNames(h.base), before);
     // init on a fresh host (no witness database, nothing active): the FIFO is the first thing it would read
     const f = freshHome();
     try {
+      const u = await runCli(h.base, ['update-seed', '--seed', s.db, '--unsigned-development'], { timeoutMs: BLOCK_MS });
       const i = await runCli(f.base, ['init', '--seed', s.db, '--unsigned-development'], { timeoutMs: BLOCK_MS });
-      promptRefusal(i, 'init');
+      assertAllPrompt({ 'update-seed': u, init: i });
+      promptRefusal(u, 'update-seed'); promptRefusal(i, 'init');
       assert.equal(i.spawnedProxy, undefined, 'no proxy was started');
+      assert.deepEqual(bundleNames(h.base), before);
     } finally { fs.rmSync(f.home, { recursive: true, force: true }); }
   } finally { s.cleanup(); h.cleanup(); }
 });
@@ -204,10 +212,11 @@ for (const [label, pick] of [['bundle.json', (h) => h.files.manifest], ['bundle 
     const h = await v3Host();
     try {
       replaceWithFifo(pick(h));
-      promptRefusal(await runProxyEntry(h.base, { timeoutMs: BLOCK_MS }), `proxy start (${label})`);
+      const p = await runProxyEntry(h.base, { timeoutMs: BLOCK_MS });
       const d = await runCli(h.base, ['doctor', '--json'], { timeoutMs: BLOCK_MS });
-      assert.equal(d.timedOut, false, `doctor (${label}) blocked`);
-      const seed = JSON.parse(d.stdout).checks.find((c) => c.name === 'seed-v3');
+      assertAllPrompt({ [`proxy start (${label})`]: p, [`doctor (${label})`]: d });
+      promptRefusal(p, `proxy start (${label})`);
+      const seed = doctorChecks(d).find((c) => c.name === 'seed-v3');
       assert.equal(seed.pass, false, `doctor must report the bundle unusable (${label})`);
     } finally { h.cleanup(); }
   });
@@ -228,10 +237,11 @@ test('C6 config.json is a FIFO: doctor and the proxy entry return promptly', fif
   const h = await v3Host();
   try {
     replaceWithFifo(path.join(h.base, 'config.json'));
-    promptRefusal(await runProxyEntry(h.base, { timeoutMs: BLOCK_MS }), 'proxy start (config.json)');
+    const p = await runProxyEntry(h.base, { timeoutMs: BLOCK_MS });
     const d = await runCli(h.base, ['doctor', '--json'], { timeoutMs: BLOCK_MS });
-    assert.equal(d.timedOut, false, 'doctor blocked on config.json');
-    const c = JSON.parse(d.stdout).checks.find((x) => x.name === 'config');
+    assertAllPrompt({ 'proxy start (config.json)': p, 'doctor (config.json)': d });
+    promptRefusal(p, 'proxy start (config.json)');
+    const c = doctorChecks(d).find((x) => x.name === 'config');
     assert.equal(c.pass, false);
   } finally { h.cleanup(); }
 });
@@ -243,7 +253,7 @@ test('C6 the persisted legacy witness.db.sha256 is a FIFO: doctor returns prompt
     replaceWithFifo(path.join(h.base, 'witness.db.sha256'));
     const d = await runCli(h.base, ['doctor', '--json'], { timeoutMs: BLOCK_MS });
     assert.equal(d.timedOut, false, 'doctor blocked on the persisted .sha256');
-    const c = JSON.parse(d.stdout).checks.find((x) => x.name === 'seed-signature');
+    const c = doctorChecks(d).find((x) => x.name === 'seed-signature');
     assert.equal(c.pass, false); assert.match(c.detail, /SEED_FILE_REFUSED/);
   } finally { h.cleanup(); }
 });
