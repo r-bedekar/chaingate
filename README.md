@@ -86,6 +86,12 @@ overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = too
 emits a versioned `chaingate.check/2` record (0.1.2 and earlier wrote `chaingate.check/1`, which is still
 read); `examples/ci/` has an offline CI consumer for both.
 
+**When a BLOCK cannot be stored.** If a BLOCK decision cannot be stored, the running proxy remembers and
+enforces it in memory. Restarting the proxy clears that memory. A subsequent packument evaluation can reconstruct
+a pin-based BLOCK if the accepted seed and pin lookup remain available. A direct tarball request before that
+evaluation is not protected by the forgotten record unless a stored BLOCK independently applies. Tarball requests
+for versions the proxy has never evaluated are not covered by this protection.
+
 **Seed verification.** Every seed is checked against its `.sha256` file before use. A seed counts as
 **authenticated** only when its Ed25519 signature verifies against a key built into the runtime. An
 unsigned v3 seed can be used only with `--unsigned-development`, and the tool then reports
