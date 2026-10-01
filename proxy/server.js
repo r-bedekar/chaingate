@@ -12,7 +12,7 @@ import {
   UpstreamTimeoutError,
   UpstreamError,
 } from './registry.js';
-import { openWitnessDB } from '../witness/db.js';
+import { openWitnessDB, isOverrideRow } from '../witness/db.js';
 import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
@@ -312,7 +312,7 @@ function hasBlockDisposition(decisions) {
 // U-05 Amendment 3: a BLOCK this process computed but could not store (P6b) is checked FIRST -- a stored decision
 // would have replaced it, so it is always the newer one -- and a failed stored-decision lookup follows the configured
 // failure policy (P6a). `state.tarballDecided` marks that the gate reached a decision (P5b).
-function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = {}) {
+export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = {}) {
   if (!db) return null;
   const version = parseTarballVersion(canonicalName, filename);
   if (version == null) return null;
@@ -334,10 +334,7 @@ function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = 
       how_to_override: `chaingate allow ${canonicalName}@${version} --reason "<reason>"`,
     };
   }
-  let decision;
-  try {
-    decision = db.getLatestDecision(canonicalName, version);
-  } catch (err) {
+  const lookupFailed = (err) => {
     log?.warn?.(`[tarball-gate] decision lookup failed: ${err.message}`);
     if (ctx.failuresBlock) {
       return { refuse: { status: 503, error: 'chaingate_decision_lookup_failed',
@@ -347,6 +344,26 @@ function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = 
     log?.warn?.(`[tarball-gate] ${canonicalName}@${version}: served without a decision (configured failure policy)`);
     state.tarballDecided = true;
     return null;
+  };
+  let decision;
+  try {
+    decision = db.getLatestDecision(canonicalName, version);
+  } catch (err) {
+    return lookupFailed(err);
+  }
+  // U-05 gap-closure r2, N3: a stored override ALLOW applies only while that exact override still exists. The store
+  // compares new decisions with the same rows (witness/store.js effectivePrior), so the two never disagree.
+  if (decision && isOverrideRow(decision.gates_fired)) {
+    if (ctx.overriddenLive?.(canonicalName, version)) {
+      log?.info?.(`[override] ${canonicalName}@${version}: allowing (stored override, still present)`);
+      state.tarballDecided = true;
+      return null;
+    }
+    try {
+      decision = db.getLatestNonOverrideDecision(canonicalName, version);
+    } catch (err) {
+      return lookupFailed(err);
+    }
   }
   if (!decision || decision.disposition !== 'BLOCK') { state.tarballDecided = true; return null; }
   let override = null;

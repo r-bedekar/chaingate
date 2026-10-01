@@ -43,6 +43,7 @@
 // gates/rewriter.js and is driven from proxy/server.js.
 
 import { parseVersionsFromPackument } from './baseline.js';
+import { isOverrideRow } from './db.js';
 
 const ECOSYSTEM = 'npm';
 
@@ -107,6 +108,65 @@ export function createWitness({ db, runGates, config, logger }) {
     };
   }
 
+  /**
+   * THE prior decision for (pkg, version), read with the one rule the tarball gate also uses (U-05 gap-closure r2, N3):
+   * a stored override ALLOW counts only while the override exists. `live` says whether it does -- for a decision the
+   * runner made BECAUSE of an override it is true by construction; for any other decision the override rows are skipped.
+   */
+  function effectivePrior(packageName, version, live) {
+    const latest = db.getLatestDecision(packageName, version);
+    if (!latest || live || !isOverrideRow(latest.gates_fired)) return latest;
+    return db.getLatestNonOverrideDecision(packageName, version);
+  }
+
+  /** The underlying stored BLOCK (override rows skipped), or null -- also when it cannot be read (today's behaviour). */
+  function underlyingStoredBlock(packageName, version) {
+    try {
+      const row = effectivePrior(packageName, version, false);
+      return row && row.disposition === 'BLOCK' ? row : null;
+    } catch { return null; }
+  }
+
+  function overrideEstablished(packageName, version) {
+    try { return Boolean(db.getOverride(packageName, version)); } catch { return false; }
+  }
+
+  /**
+   * U-05 gap-closure r2, N1 (W2): a decision made because the gates could not run never downgrades the stored BLOCK that
+   * applies to this exact version. Nothing is inserted; the stored BLOCK is returned -- it IS stored -- with the failure's
+   * own rows after it. (Rule K's wording, for the stored case.)
+   */
+  function preservedStoredBlock(packageName, version, row, failed) {
+    return {
+      disposition: 'BLOCK',
+      results: [{ gate: 'chaingate', result: 'BLOCK',
+        detail: `stored BLOCK preserved: the applicable stored decision for ${packageName}@${version} is BLOCK (decided `
+          + `${row.decided_at ?? 'at an unknown time'}); a failure decision cannot make it servable` },
+      ...(Array.isArray(failed?.results) ? failed.results : [])],
+      evaluated: false,
+    };
+  }
+
+  // Storage health (U-05 gap-closure r2, Addendum 1 §B): one outcome per observation, from the store's own database
+  // steps only. `failure` if any storage step failed (failure dominates), else `ok` if the transaction committed with at
+  // least one decision row inserted, else nothing. Input refusals (unreadable manifests, a runner that threw) are not
+  // storage evidence.
+  const health = { ok_count: 0, failure_count: 0, last_outcome: null, last_ok_at: null, last_failure_at: null,
+    last_failure: null };
+  function recordOutcome(failures, inserted) {
+    const at = new Date().toISOString();
+    if (failures.length) {
+      const f = failures[0];
+      health.failure_count += 1; health.last_outcome = 'failure'; health.last_failure_at = at;
+      health.last_failure = { stage: f.stage, message: String(f.message).slice(0, 256), versions: failures.length };
+      log.transition?.('storage', 'failing', `[witness] decision storage failing (stage ${f.stage}): ${f.message}`);
+    } else if (inserted > 0) {
+      const was = health.last_outcome;
+      health.ok_count += 1; health.last_outcome = 'ok'; health.last_ok_at = at;
+      if (was === 'failure') log.transition?.('storage', 'ok', '[witness] decision writes are committing again');
+    }
+  }
+
   function observePackument(packageName, packument) {
     if (typeof packageName !== 'string' || !packageName) {
       throw new Error('observePackument: packageName required');
@@ -140,6 +200,8 @@ export function createWitness({ db, runGates, config, logger }) {
     // throw is now inside one guard.
     // Decisions computed inside the transaction, kept OUTSIDE it: a rolled-back transaction must not take them along.
     const evaluated = new Map();
+    const storageFailures = [];
+    let inserted = 0;
     let txn;
     try {
       txn = db.db.transaction((versions) => {
@@ -150,8 +212,10 @@ export function createWitness({ db, runGates, config, logger }) {
       for (const incoming of versions) {
         const identity = { packageName, version: incoming.version };
         let computed = null;
+        let stage = 'read';                       // read: before evaluation; evaluate: the gates; write: storing it
         try {
           const existing = db.getBaseline(packageName, incoming.version);
+          stage = 'evaluate';
           const input = {
             ecosystem: ECOSYSTEM,
             packageName,
@@ -186,33 +250,56 @@ export function createWitness({ db, runGates, config, logger }) {
           const gateResults = Array.isArray(result?.results) ? result.results : [];
           // A failure decision made here IS stored below; it stays marked as a failure decision (Amendment 3).
           computed = { disposition, results: gateResults, ...(result?.evaluated === false ? { evaluated: false } : {}) };
-          evaluated.set(incoming.version, computed);
+          stage = 'write';
+
+          // N1 (W2): a failure-derived non-BLOCK never downgrades the underlying stored BLOCK. With an exact override
+          // established the failure decision is returned as before (A1-OV); either way nothing is inserted over it.
+          let returned = computed;
+          let skipInsert = false;
+          if (computed.evaluated === false && disposition !== 'BLOCK') {
+            const kept = underlyingStoredBlock(packageName, incoming.version);
+            if (kept) {
+              skipInsert = true;
+              if (!overrideEstablished(packageName, incoming.version)) {
+                returned = preservedStoredBlock(packageName, incoming.version, kept, computed);
+              }
+            }
+          }
+          evaluated.set(incoming.version, returned);
 
           if (!existing) {
             db.recordBaseline(packageName, incoming.version, incoming);
             newBaselines += 1;
-            const firstSeen = [FIRST_SEEN_GATE_RESULT, ...gateResults];
-            db.insertGateDecision(packageName, incoming.version, disposition, firstSeen);
+            if (!skipInsert) {
+              const firstSeen = [FIRST_SEEN_GATE_RESULT, ...gateResults];
+              db.insertGateDecision(packageName, incoming.version, disposition, firstSeen);
+              inserted += 1;
+            }
           } else {
             // Idempotent re-observe: bumpLastSeen fires inside recordBaseline's write path.
             db.recordBaseline(packageName, incoming.version, incoming);
-            const prior = db.getLatestDecision(packageName, incoming.version);
-            if (!prior || prior.disposition !== disposition) {
+            // W1: state-change logging against the EFFECTIVE prior decision -- the same rows the tarball gate applies --
+            // so a new evaluation after a revoked override is recorded even when it repeats the override's ALLOW.
+            const prior = skipInsert ? null
+              : effectivePrior(packageName, incoming.version, isOverrideRow(gateResults));
+            if (!skipInsert && (!prior || prior.disposition !== disposition)) {
               db.insertGateDecision(packageName, incoming.version, disposition, gateResults);
+              inserted += 1;
             }
           }
 
-          decisions.set(incoming.version, computed);
+          decisions.set(incoming.version, returned);
         } catch (err) {
           log.warn(
             `[witness] version ${packageName}@${incoming.version} failed: ${err.message}`,
           );
+          if (stage !== 'evaluate') storageFailures.push({ stage, message: err.message });
           // Swallowed to keep per-version isolation -- better-sqlite3 wraps this whole block, so a
           // THROW here would roll back EVERY version. But the swallowed version no longer becomes a
           // bare ALLOW: what the failure means is whatever the configured gates declare it means. A decision computed
           // BEFORE the failure (a witness write after evaluation) is kept, not replaced.
           decisions.set(incoming.version, computed
-            ? computedDespiteFailure(computed, err, 'witness write failed', identity)
+            ? computedDespiteFailure(evaluated.get(incoming.version) ?? computed, err, 'witness write failed', identity)
             : failureDecision(err, `version failed: ${err.message}`, identity));
         }
       }
@@ -229,13 +316,16 @@ export function createWitness({ db, runGates, config, logger }) {
 
         return { decisions, newBaselines, versionsSeen: versions.length };
       });
-      return txn(parsedVersions);
+      const out = txn(parsedVersions);
+      recordOutcome(storageFailures, inserted);          // committed: the rows inserted above are durable
+      return out;
     } catch (err) {
       // Transaction-level failure (DB error, schema drift). Previously this threw, the proxy caught
       // it, and the packument was served RAW -- every BLOCK in it lost, silently. The failure is
       // still reported, but it now carries a decision for every version the document contains, so a
       // fail-closed gate's declaration survives a database error.
       log.error(`[witness] ${packageName}: observation transaction failed: ${err.message}`);
+      recordOutcome([{ stage: 'transaction', message: err.message }], 0);
       const decisions = new Map();
       for (const versionStr of Object.keys(rawVersions)) {
         const identity = { packageName, version: versionStr };
@@ -284,6 +374,7 @@ export function createWitness({ db, runGates, config, logger }) {
     observePackument,
     observeTarball,
     failureDecisionsFor,
+    storageHealth: () => ({ ...health, last_failure: health.last_failure ? { ...health.last_failure } : null }),
     close,
     get config() { return witnessConfig; },
   };

@@ -1,5 +1,14 @@
 import Database from 'better-sqlite3';
 
+/**
+ * A stored decision row that recorded an exact-version override ALLOW: the runner's synthetic `override` result
+ * (gates/index.js). Structural, never inferred from text. U-05 gap-closure r2 (N3): such a row applies only while the
+ * override it recorded still exists.
+ */
+export function isOverrideRow(gatesFired) {
+  return Array.isArray(gatesFired) && gatesFired.some((r) => r && r.gate === 'override');
+}
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS packages (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,6 +270,13 @@ export class WitnessDB {
          ORDER BY decided_at DESC, id DESC
          LIMIT 1`,
       ),
+      // Same order as getLatestDecision, every row: read lazily (iterate) and stopped at the first match.
+      decisionsNewestFirst: this.db.prepare(
+        `SELECT id, disposition, gates_fired, decided_at
+         FROM gate_decisions
+         WHERE package_name = ? AND version = ?
+         ORDER BY decided_at DESC, id DESC`,
+      ),
     };
   }
 
@@ -342,6 +358,22 @@ export class WitnessDB {
       gates_fired: parsed,
       decided_at: row.decided_at,
     };
+  }
+
+  /**
+   * The newest decision for (pkg, version) that is NOT a stored override ALLOW (U-05 gap-closure r2, N3): the decision
+   * that applies once the override it recorded no longer exists. A row whose gates_fired does not parse is not an
+   * override row; it is returned and read by its disposition, as getLatestDecision's callers read it. Read-only.
+   */
+  getLatestNonOverrideDecision(packageName, version) {
+    this._prepare();
+    for (const row of this._stmts.decisionsNewestFirst.iterate(packageName, version)) {
+      let parsed;
+      try { parsed = JSON.parse(row.gates_fired); } catch { parsed = []; }
+      if (isOverrideRow(parsed)) continue;
+      return { id: row.id, disposition: row.disposition, gates_fired: parsed, decided_at: row.decided_at };
+    }
+    return null;
   }
 
   getOverride(packageName, version) {
