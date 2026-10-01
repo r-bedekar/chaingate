@@ -2,8 +2,12 @@
 // proxy builds its response. Expected results come from the Amendment 2 table (P4a, P4b, P5a, isolation), written
 // before this file; the tests were run failing-first on 41886e5.
 //
-// Fault injection: the proxy's default logger writes warnings through console.error. Making console.error throw on
-// chosen prefixes reaches the real P4 (rewriter branch) and P5 (handler fallback) code without a test-only seam.
+// Fault injection: `ServerResponse.prototype.writeHead` throws for the first call(s) of the targeted response, which
+// reaches the real P4 (rewriter branch) and P5 (handler fallback) code without a test-only seam.
+// Recorded vehicle change (gap-closure r2 Addendum 1 §E, owner decision 6): these tests first made console.error throw.
+// The approved logging boundary (A1) absorbs logging failures, so that vehicle no longer reaches P4a/P5a; with logging
+// failing, enforcement simply continues (200, BLOCKed version removed), which A2-1L/A2-2L/A2-3L now pin. The invariant
+// is unchanged: the original document is never served.
 // Fixture: the U-05 synthetic seed; p@1.3.0 pinned (ADV-P-130), p@1.4.0 and q@1.3.0 unpinned. Loopback only.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,6 +28,18 @@ const get = (url) => new Promise((resolve, reject) => {
     res.on('end', () => { let json = null; try { json = JSON.parse(b); } catch { /* not JSON */ } resolve({ status: res.statusCode, json }); });
   }).on('error', reject);
 });
+
+/** The first `times` writeHead calls of the PROXY (not the fixture registry) for `url` throw. Returns restore(). */
+function failWriteHead(proxyUrl, url, times) {
+  const real = http.ServerResponse.prototype.writeHead;
+  const port = Number(new URL(proxyUrl).port);
+  let n = 0;
+  http.ServerResponse.prototype.writeHead = function patched(...args) {
+    if (this.req?.url === url && this.socket?.localPort === port && n < times) { n += 1; throw new Error(`injected writeHead failure ${n}`); }
+    return real.apply(this, args);
+  };
+  return () => { http.ServerResponse.prototype.writeHead = real; };
+}
 
 /** console.error throws on lines starting with any of `prefixes`; every other line is swallowed. Returns restore(). */
 function failLogging(prefixes) {
@@ -79,10 +95,10 @@ test('A2 control: without a fault the pinned version is removed and the rest is 
   }
 });
 
-test('A2-1 (P4a) logging fails inside the rewriter branch: the original document is never served', async () => {
+test('A2-1 (P4a) the response cannot be written inside the rewriter branch: the original document is never served', async () => {
   for (const [name, cfg] of Object.entries(CONFIGS)) {
     await withProxy(cfg, async ({ proxyUrl, fetches }) => {
-      const restore = failLogging(['[gate]']);
+      const restore = failWriteHead(proxyUrl, '/p', 1);
       let r;
       try { r = await get(`${proxyUrl}/p`); } finally { restore(); }
       refusedNotServed(r, `A2-1 ${name}`);
@@ -95,7 +111,7 @@ test('A2-1 (P4a) logging fails inside the rewriter branch: the original document
 test('A2-2 (P5a) the failure escapes the packument handler after a BLOCK: no raw passthrough', async () => {
   for (const [name, cfg] of Object.entries(CONFIGS)) {
     await withProxy(cfg, async ({ proxyUrl, fetches }) => {
-      const restore = failLogging(['[gate]', '[rewriter]']);
+      const restore = failWriteHead(proxyUrl, '/p', 2);
       let r;
       try { r = await get(`${proxyUrl}/p`); } finally { restore(); }
       refusedNotServed(r, `A2-2 ${name}`);
@@ -107,7 +123,7 @@ test('A2-2 (P5a) the failure escapes the packument handler after a BLOCK: no raw
 test('A2-3 isolation: only the failing package is refused; others and later requests are served', async () => {
   for (const [name, cfg] of Object.entries(CONFIGS)) {
     await withProxy(cfg, async ({ proxyUrl }) => {
-      const restore = failLogging(['[gate]']);
+      const restore = failWriteHead(proxyUrl, '/p', 1);
       let before; let p; let afterQ;
       try {
         before = await get(`${proxyUrl}/q`);
@@ -120,11 +136,29 @@ test('A2-3 isolation: only the failing package is refused; others and later requ
       }
       refusedNotServed(p, `A2-3 ${name} p`);
       const ok = await get(`${proxyUrl}/p`);                 // the fault is gone: normal enforcement again
-      assert.equal(ok.status, 200, `A2-3 ${name}: p served again once logging works`);
+      assert.equal(ok.status, 200, `A2-3 ${name}: p served again once the response can be written`);
       assert.ok(!versionsOf(ok).includes('1.3.0') && versionsOf(ok).includes('1.4.0'), `A2-3 ${name}: and still enforced`);
     });
   }
 });
+
+// A1 (logging boundary): logging that fails on the same lines no longer reaches P4a/P5a. Enforcement continues and the
+// original document is still never served. Failing-first on 3ee5aba (which answered 502).
+for (const [label, prefixes] of [['A2-1L', ['[gate]']], ['A2-2L', ['[gate]', '[rewriter]']]]) {
+  test(`${label} logging fails on ${prefixes.join(' and ')} lines: the BLOCK is still applied and the response is served`, async () => {
+    for (const [name, cfg] of Object.entries(CONFIGS)) {
+      await withProxy(cfg, async ({ proxyUrl, fetches }) => {
+        const restore = failLogging(prefixes);
+        let r;
+        try { r = await get(`${proxyUrl}/p`); } finally { restore(); }
+        assert.equal(r.status, 200, `${label} ${name}: served`);
+        assert.ok(!versionsOf(r).includes('1.3.0'), `${label} ${name}: the BLOCKed version is removed`);
+        assert.ok(versionsOf(r).includes('1.4.0'), `${label} ${name}: the rest is served`);
+        assert.deepEqual(fetches, ['p'], `${label} ${name}: one upstream fetch`);
+      });
+    }
+  });
+}
 
 test('A2-4 (P4b, pins existing behaviour) no change is reported only when no BLOCKed version is in the document', () => {
   const doc = DOCS().p;
