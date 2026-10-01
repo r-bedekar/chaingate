@@ -58,7 +58,7 @@ test('DL-C a write error mid-stream (RLIMIT_FSIZE) is HANDLED: a refusal, no cra
 });
 
 test('DL-D an idle stall (no bytes) is refused at the idle deadline; nothing left', async () => {
-  const srv = await server((res) => { res.setHeader('content-length', 10_000_000); res.write(Buffer.alloc(1024)); /* then nothing */ });
+  const srv = await server((res) => { res.setHeader('content-length', 500_000); res.write(Buffer.alloc(1024)); /* then nothing */ });
   try {
     const c = await child(srv, { opts: SMALL, timeoutMs: 12000 });
     try {
@@ -70,7 +70,7 @@ test('DL-D an idle stall (no bytes) is refused at the idle deadline; nothing lef
 });
 
 test('DL-E a trickle that never ends is refused at the total deadline; nothing left', async () => {
-  const srv = await server((res) => { res.setHeader('content-length', 10_000_000);
+  const srv = await server((res) => { res.setHeader('content-length', 500_000);
     const t = setInterval(() => { if (!res.write(Buffer.alloc(1))) { /* ignore */ } }, 100); res.on('close', () => clearInterval(t)); });
   try {
     const c = await child(srv, { opts: SMALL, timeoutMs: 12000 });

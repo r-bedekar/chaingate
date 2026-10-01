@@ -48,6 +48,7 @@ import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha2
 import { admit, V3_SIDECARS } from './space-admission.js';
 import { acquireSeedMutationLock, releaseSeedMutationLock, assertHeld } from './seed-mutation-lock.js';
 import { probePid } from './proxy-control.js';
+import { validateDownloadRecord, removeDownload } from './seed-download.js';
 import { SEED_V3_FILENAME } from './constants.js';
 
 export const SEEDS_DIRNAME = 'seeds';
@@ -580,6 +581,7 @@ const OWNED = {
     { re: /^witness\.db\.staging-(\d+)$/, kind: 'file' },
     { re: /^witness\.db\.(?:sha256|sig)\.staging-(\d+)$/, kind: 'file' },
     { re: /^witness\.db\.install-pending\.json\.tmp-(\d+)$/, kind: 'file' },
+    { re: /^\.download-(\d+)\.json$/, kind: 'download' },
   ],
 };
 /** A conservative DELAY, not proof against PID reuse: young leftovers may survive and are reported (Addendum 2 §3.4). */
@@ -601,6 +603,7 @@ function classifyLeftovers(base, { now = Date.now(), probe = probePid } = {}) {
       const st = lstatOrNull(full);
       if (!st) continue;
       const typeOk = p.kind === 'dir' ? st.isDirectory() : p.kind === 'link' ? st.isSymbolicLink() : st.isFile();
+      let record = null;
       let keep = null;
       if (!typeOk) keep = 'not the kind of entry that name belongs to';
       else if (pid === process.pid) keep = 'this process';
@@ -609,8 +612,13 @@ function classifyLeftovers(base, { now = Date.now(), probe = probePid } = {}) {
         if (live.state === 'alive') keep = `process ${pid} is alive`;
         else if (live.state !== 'dead') keep = `process ${pid} could not be checked (${live.code})`;
         else if (now - st.mtimeMs < LEFTOVER_MIN_AGE_MS) keep = 'younger than 15 minutes';
+        else if (p.kind === 'download') {
+          // a download record names a directory outside the base: it is validated before anything is removed
+          record = validateDownloadRecord(full);
+          if (record.keep) keep = `its record is not usable (${record.keep})`;
+        }
       }
-      owned.push({ path: full, kind: p.kind, keep });
+      owned.push({ path: full, kind: p.kind, keep, pid, record });
     }
   }
   return { owned, unrecognised };
@@ -628,6 +636,13 @@ export function cleanLeftovers(base, opts = {}) {
   for (const e of owned) {
     if (e.keep) { out.kept.push({ path: e.path, why: e.keep }); continue; }
     try {
+      if (e.kind === 'download') {
+        // the recorded directory FIRST; the record only once that removal succeeded (Addendum 2 §3.4)
+        const left = removeDownload(base, e.record.dir, e.pid);
+        if (left) { out.failed.push({ path: e.path, why: `could not remove ${left}` }); continue; }
+        out.removed.push(e.record.dir, e.path);
+        continue;
+      }
       if (e.kind === 'dir') rmSync(e.path, { recursive: true });
       else if (e.kind === 'link') removeLink(e.path);
       else unlinkSync(e.path);
