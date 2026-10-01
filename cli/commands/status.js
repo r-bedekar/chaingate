@@ -5,7 +5,7 @@ import { resolvePaths } from '../paths.js';
 import { readPidRecord, fetchSelf } from '../proxy-control.js';
 import { describeStorage } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
-import { resolveActiveBundle, bundleFiles, ActivationBroken } from '../seed-bundle.js';
+import { resolveActiveBundle, bundleFiles, ActivationBroken, readActivationIntent } from '../seed-bundle.js';
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -44,6 +44,13 @@ export default async function status(args) {
   } catch (err) {
     if (!(err instanceof ActivationBroken)) throw err;
     seedV3 = { active: false, broken: true, link: err.link };
+  }
+
+  // An interrupted activation (U-05 R2-2 (b)): reported, never recovered here.
+  const intent = readActivationIntent(paths.base);
+  if (intent.state !== 'none') {
+    seedV3.pending_intent = intent.state === 'pending';
+    if (intent.state === 'invalid') seedV3.intent_invalid = intent.why;
   }
 
   const db = openWitnessDB(paths.witnessDb, { readonly: true });
@@ -102,6 +109,8 @@ export default async function status(args) {
     console.log(renderTable([
       ['Witness store:', `${counts.packages} packages, ${counts.versions} versions, ${counts.files} files`],
       ['Detection seed (v3):', v3Line],
+      ...(intent.state === 'pending' ? [['', fmt.yellow('an interrupted activation is pending; the next seed command recovers it')]] : []),
+      ...(intent.state === 'invalid' ? [['', fmt.red(`the activation intent is not valid (${intent.why}); see \`chaingate doctor\``)]] : []),
       ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
       ...(storageText && storageState !== 'healthy' && storageState !== 'no_evidence'

@@ -10,7 +10,9 @@ import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity } from '../integrity-gate.js';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_UPSTREAM, EXIT } from '../constants.js';
 import { stageIncoming, finishStagedBundle, activateBundle, resolveActiveBundle,
-  verifyBundleDir } from '../seed-bundle.js';
+  verifyBundleDir, withSeedMutation, ActivationRecoveryRefused } from '../seed-bundle.js';
+import { LockUnavailable } from '../seed-mutation-lock.js';
+import { reportSeedPrologue } from './update-seed.js';
 import { readConfigStrict, writeConfig, validateConfig, DEFAULT_POLICY,
   POLICY_VALUES } from '../../config-store.js';
 
@@ -36,13 +38,190 @@ export function restartAllowed(outcome) {
 }
 
 /**
+ * Seeds and the witness database: everything `init` writes that a seed command also writes. It runs under the
+ * seed-mutation lock (U-05 R2-2 (b)), after recovery and cleanup, and returns `{ exit }` to stop init, or what a
+ * started proxy must report back.
+ */
+async function installSeeds(opts, paths, deps, lock) {
+  // 3a. A v3 detection seed is installed BESIDE the witness database, never over it: it is
+  //     evidence, it is opened read-only, and the runtime keeps writing its own state elsewhere.
+  //     Everything needed to start later is recorded in config.json, so no environment is required.
+  let intended = null;                  // the identity a started proxy must report back
+  let v3Installed = false;
+  // PRIVATE STAGING FIRST (U-05 R2-2 (d)): a supplied seed is opened once as a regular file, admitted for space and
+  // copied; it is classified (SQLite opens only the staged copy), verified and installed from that copy.
+  let staged = null;
+  if (opts.seedPath) {
+    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks, lock }); } catch (err) {
+      console.error(fmt.fail(`The seed was not accepted: ${err.message}`));
+      console.error('  Nothing was installed and .npmrc was not touched.');
+      return { exit: EXIT.ERROR };
+    }
+    for (const w of staged.warnings) console.log(fmt.warn(w));
+    if (staged.info.schemaVersion !== 3) { staged.discard(); staged = null; }   // legacy: the route below
+  }
+  if (staged) try {                       // the staged copy is discarded on every exit from this branch
+    // POLICY FIRST, strictly. A policy the gate cannot act on means the proxy will not start, and
+    // discovering that after a bundle is installed and .npmrc redirected is the wrong order.
+    let policy;
+    try {
+      const existing = readConfigStrict(paths.configFile) || {};
+      policy = { ...DEFAULT_POLICY, ...(existing.policy || {}) };
+      validateConfig({ ...existing, policy }, paths.configFile);
+    } catch (err) {
+      console.error(fmt.fail(err.message));
+      console.error('  Nothing was installed and .npmrc was not touched.');
+      return { exit: EXIT.ERROR };
+    }
+
+    // TRUST, decided on the STAGED digest before the bundle is finished, and recorded in the bundle itself.
+    const hasSig = staged.sigBytes !== null;
+    let trust;
+    if (hasSig) {
+      console.log('Verifying v3 seed signature...');
+      try {
+        verifyStagedSeed({ digest: staged.digest, sha256Bytes: staged.sha256Bytes, sigBytes: staged.sigBytes });
+        trust = 'authenticated';
+        console.log(fmt.ok('v3 seed signature verified'));
+      } catch (err) {
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
+        return { exit: EXIT.ERROR };
+      }
+    } else if (opts.unsignedDev) {
+      trust = 'unsigned-development';
+      console.log(fmt.warn('v3 seed has no signature; installing as unsigned-development'));
+    } else {
+      console.error(fmt.fail('v3 seed has no .sig and --unsigned-development was not given.'));
+      console.error('  A seed is authenticated by default; asking for the development mode is');
+      console.error('  how you say out loud that this one is not.');
+      return { exit: EXIT.ERROR };
+    }
+
+    // FINISH: the staged copy, digest-checked, sidecar written from the staged bytes, and OPENED WITH
+    // THE READER — all before anything in use is touched. A retained bundle with the same identity is
+    // re-verified rather than assumed, and reports its own state.
+    let installed;
+    try {
+      installed = finishStagedBundle(staged, paths.base, { trust, lock });
+    } catch (err) {
+      console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
+      console.error('  Nothing was installed or activated.');
+      return { exit: EXIT.ERROR };
+    }
+
+    // The operator's policy is host state and is written before activation; which bundle is active
+    // is recorded ONLY by the link the next step swaps.
+    writeConfig(paths.configFile, { policy });
+    let identity;
+    try {
+      identity = activateBundle(paths.base, installed.dir_name, { lock, hooks: deps.hooks });
+    } catch (err) {
+      console.error(fmt.fail(`activation refused: ${err.message}`));
+      console.error('  The previously active bundle, if any, is still active.');
+      return { exit: EXIT.ERROR };
+    }
+
+    console.log(fmt.ok(`v3 seed bundle ${identity.bundle_id} active`
+      + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
+    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}...  `
+      + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}...  `
+      + `trust ${identity.trust}${identity.authenticated ? ' (authenticated)' : ''}`));
+    console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
+      + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
+    if (installed.replaced_damaged) {
+      console.log(fmt.warn(`  replaced a damaged retained bundle: ${installed.replaced_damaged}`));
+    }
+    intended = { bundle_id: identity.bundle_id, sha256: identity.sha256, trust: identity.trust,
+      policy };
+
+    if (!existsSync(paths.witnessDb)) {
+      const db = openWitnessDB(paths.witnessDb);
+      db.applySchema();
+      db.close();
+      console.log(fmt.ok('Witness database created (writable, separate from the seed)'));
+    } else {
+      console.log(fmt.ok('Using the existing witness database (writable, separate from the seed)'));
+    }
+    opts.seedPath = null;
+    opts.noSeed = true;
+    v3Installed = true;
+  } finally { staged.discard(); }
+
+  // 3. Seed handling (v1: the seed IS the witness database)
+  //    `--force` must not drag a v3 installation back through this: it downloaded a v1 bundle over
+  //    the witness database that had just been created beside the v3 seed.
+  if (!v3Installed && ((!opts.noSeed && !existsSync(paths.witnessDb)) || opts.force)) {
+    if (opts.seedPath) {
+      // Local seed
+      const sha256Path = opts.seedPath + '.sha256';
+      const sigPath = opts.seedPath + '.sig';
+      console.log('Verifying local seed...');
+      try {
+        await verifySeed(opts.seedPath, sha256Path, sigPath);
+      } catch (err) {
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
+        return { exit: EXIT.ERROR };
+      }
+      copyFileSync(opts.seedPath, paths.witnessDb);
+      // Persist sig artifacts so `chaingate doctor` can re-verify on every run.
+      copyFileSync(sha256Path, paths.witnessDbSha256);
+      copyFileSync(sigPath, paths.witnessDbSig);
+      console.log(fmt.ok('Local seed verified and copied'));
+    } else {
+      // Download from GH Release
+      console.log('Downloading seed database...');
+      let bundle;
+      try {
+        bundle = await fetchSeedBundle();
+      } catch (err) {
+        console.error(fmt.fail(`Seed download failed: ${err.message}`));
+        console.error('  Use --no-seed to skip, or --seed <path> for a local copy.');
+        return { exit: EXIT.ERROR };
+      }
+      console.log('Verifying Ed25519 signature...');
+      try {
+        const result = await verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
+        console.log(fmt.ok(`Seed verified (${result.fingerprint})`));
+      } catch (err) {
+        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
+        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
+        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
+        return { exit: EXIT.ERROR };
+      }
+      copyFileSync(bundle.dbPath, paths.witnessDb);
+      copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
+      copyFileSync(bundle.sigPath, paths.witnessDbSig);
+      // Say what was, and was not, installed: this is the LEGACY witness seed. The v3 detection seed
+      // is never downloaded automatically; it must be supplied.
+      console.log(fmt.warn('Installed the LEGACY witness seed only. The v3 detection seed is not downloaded '
+        + 'automatically; install it with `chaingate init --seed <bundle>/chaingate-seed.db` '
+        + '(add --unsigned-development for an unsigned bundle).'));
+    }
+  } else if (v3Installed) {
+    // the witness database was created or reused beside the v3 seed above, and reported there
+  } else if (existsSync(paths.witnessDb)) {
+    console.log(fmt.ok('Existing witness database found'));
+  } else if (opts.noSeed) {
+    // Create empty DB with schema
+    const db = openWitnessDB(paths.witnessDb);
+    db.applySchema();
+    db.close();
+    console.log(fmt.ok('Empty witness database created'));
+  }
+
+  return { intended, v3Installed };
+}
+
+/**
  * @param {string[]} args
  * @param {{seam?: object, hooks?: object}} [deps]  test seams for staging (space figures, named copy points); inert otherwise
  */
 export default async function init(args, deps = {}) {
   const opts = parseArgs(args);
   const paths = resolvePaths(opts.scope);
-  let v3Installed = false;
 
   if (opts.dryRun) {
     const rc = npmrcPath(opts.scope);
@@ -116,173 +295,20 @@ export default async function init(args, deps = {}) {
     return EXIT.OK;
   }
 
-  // 3a. A v3 detection seed is installed BESIDE the witness database, never over it: it is
-  //     evidence, it is opened read-only, and the runtime keeps writing its own state elsewhere.
-  //     Everything needed to start later is recorded in config.json, so no environment is required.
-  let intended = null;                  // the identity a started proxy must report back
-  // PRIVATE STAGING FIRST (U-05 R2-2 (d)): a supplied seed is opened once as a regular file, admitted for space and
-  // copied; it is classified (SQLite opens only the staged copy), verified and installed from that copy.
-  let staged = null;
-  if (opts.seedPath) {
-    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks }); } catch (err) {
-      console.error(fmt.fail(`The seed was not accepted: ${err.message}`));
-      console.error('  Nothing was installed and .npmrc was not touched.');
-      return EXIT.ERROR;
-    }
-    for (const w of staged.warnings) console.log(fmt.warn(w));
-    if (staged.info.schemaVersion !== 3) { staged.discard(); staged = null; }   // legacy: the route below
+  // 3. Seeds and the witness database, under the seed-mutation lock (U-05 R2-2 (b)): taken after the proxy checks
+  //    above and released before a proxy is started below; readers never wait on it.
+  let seeded;
+  try {
+    seeded = await withSeedMutation(paths.base, (lock) => installSeeds(opts, paths, deps, lock),
+      { hooks: deps.hooks, report: reportSeedPrologue });
+  } catch (err) {
+    if (!(err instanceof LockUnavailable || err instanceof ActivationRecoveryRefused)) throw err;
+    console.error(fmt.fail(err.message));
+    console.error('  .npmrc was not touched.');
+    return EXIT.ERROR;
   }
-  if (staged) try {                       // the staged copy is discarded on every exit from this branch
-    // POLICY FIRST, strictly. A policy the gate cannot act on means the proxy will not start, and
-    // discovering that after a bundle is installed and .npmrc redirected is the wrong order.
-    let policy;
-    try {
-      const existing = readConfigStrict(paths.configFile) || {};
-      policy = { ...DEFAULT_POLICY, ...(existing.policy || {}) };
-      validateConfig({ ...existing, policy }, paths.configFile);
-    } catch (err) {
-      console.error(fmt.fail(err.message));
-      console.error('  Nothing was installed and .npmrc was not touched.');
-      return EXIT.ERROR;
-    }
-
-    // TRUST, decided on the STAGED digest before the bundle is finished, and recorded in the bundle itself.
-    const hasSig = staged.sigBytes !== null;
-    let trust;
-    if (hasSig) {
-      console.log('Verifying v3 seed signature...');
-      try {
-        verifyStagedSeed({ digest: staged.digest, sha256Bytes: staged.sha256Bytes, sigBytes: staged.sigBytes });
-        trust = 'authenticated';
-        console.log(fmt.ok('v3 seed signature verified'));
-      } catch (err) {
-        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
-        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
-        return EXIT.ERROR;
-      }
-    } else if (opts.unsignedDev) {
-      trust = 'unsigned-development';
-      console.log(fmt.warn('v3 seed has no signature; installing as unsigned-development'));
-    } else {
-      console.error(fmt.fail('v3 seed has no .sig and --unsigned-development was not given.'));
-      console.error('  A seed is authenticated by default; asking for the development mode is');
-      console.error('  how you say out loud that this one is not.');
-      return EXIT.ERROR;
-    }
-
-    // FINISH: the staged copy, digest-checked, sidecar written from the staged bytes, and OPENED WITH
-    // THE READER — all before anything in use is touched. A retained bundle with the same identity is
-    // re-verified rather than assumed, and reports its own state.
-    let installed;
-    try {
-      installed = finishStagedBundle(staged, paths.base, { trust });
-    } catch (err) {
-      console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
-      console.error('  Nothing was installed or activated.');
-      return EXIT.ERROR;
-    }
-
-    // The operator's policy is host state and is written before activation; which bundle is active
-    // is recorded ONLY by the link the next step swaps.
-    writeConfig(paths.configFile, { policy });
-    let identity;
-    try {
-      identity = activateBundle(paths.base, installed.dir_name);
-    } catch (err) {
-      console.error(fmt.fail(`activation refused: ${err.message}`));
-      console.error('  The previously active bundle, if any, is still active.');
-      return EXIT.ERROR;
-    }
-
-    console.log(fmt.ok(`v3 seed bundle ${identity.bundle_id} active`
-      + `${installed.reused ? ' (already installed; re-verified)' : ''}`));
-    console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}...  `
-      + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}...  `
-      + `trust ${identity.trust}${identity.authenticated ? ' (authenticated)' : ''}`));
-    console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
-      + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
-    if (installed.replaced_damaged) {
-      console.log(fmt.warn(`  replaced a damaged retained bundle: ${installed.replaced_damaged}`));
-    }
-    intended = { bundle_id: identity.bundle_id, sha256: identity.sha256, trust: identity.trust,
-      policy };
-
-    if (!existsSync(paths.witnessDb)) {
-      const db = openWitnessDB(paths.witnessDb);
-      db.applySchema();
-      db.close();
-      console.log(fmt.ok('Witness database created (writable, separate from the seed)'));
-    } else {
-      console.log(fmt.ok('Using the existing witness database (writable, separate from the seed)'));
-    }
-    opts.seedPath = null;
-    opts.noSeed = true;
-    v3Installed = true;
-  } finally { staged.discard(); }
-
-  // 3. Seed handling (v1: the seed IS the witness database)
-  //    `--force` must not drag a v3 installation back through this: it downloaded a v1 bundle over
-  //    the witness database that had just been created beside the v3 seed.
-  if (!v3Installed && ((!opts.noSeed && !existsSync(paths.witnessDb)) || opts.force)) {
-    if (opts.seedPath) {
-      // Local seed
-      const sha256Path = opts.seedPath + '.sha256';
-      const sigPath = opts.seedPath + '.sig';
-      console.log('Verifying local seed...');
-      try {
-        await verifySeed(opts.seedPath, sha256Path, sigPath);
-      } catch (err) {
-        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
-        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
-        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
-        return EXIT.ERROR;
-      }
-      copyFileSync(opts.seedPath, paths.witnessDb);
-      // Persist sig artifacts so `chaingate doctor` can re-verify on every run.
-      copyFileSync(sha256Path, paths.witnessDbSha256);
-      copyFileSync(sigPath, paths.witnessDbSig);
-      console.log(fmt.ok('Local seed verified and copied'));
-    } else {
-      // Download from GH Release
-      console.log('Downloading seed database...');
-      let bundle;
-      try {
-        bundle = await fetchSeedBundle();
-      } catch (err) {
-        console.error(fmt.fail(`Seed download failed: ${err.message}`));
-        console.error('  Use --no-seed to skip, or --seed <path> for a local copy.');
-        return EXIT.ERROR;
-      }
-      console.log('Verifying Ed25519 signature...');
-      try {
-        const result = await verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
-        console.log(fmt.ok(`Seed verified (${result.fingerprint})`));
-      } catch (err) {
-        console.error(fmt.fail(`Seed signature verification FAILED: ${err.message}`));
-        console.error('  This seed bundle cannot be trusted: it may be tampered with or corrupted.');
-        console.error('  ChainGate refuses to import an unverified seed. Aborting.');
-        return EXIT.ERROR;
-      }
-      copyFileSync(bundle.dbPath, paths.witnessDb);
-      copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
-      copyFileSync(bundle.sigPath, paths.witnessDbSig);
-      // Say what was, and was not, installed: this is the LEGACY witness seed. The v3 detection seed
-      // is never downloaded automatically; it must be supplied.
-      console.log(fmt.warn('Installed the LEGACY witness seed only. The v3 detection seed is not downloaded '
-        + 'automatically; install it with `chaingate init --seed <bundle>/chaingate-seed.db` '
-        + '(add --unsigned-development for an unsigned bundle).'));
-    }
-  } else if (v3Installed) {
-    // the witness database was created or reused beside the v3 seed above, and reported there
-  } else if (existsSync(paths.witnessDb)) {
-    console.log(fmt.ok('Existing witness database found'));
-  } else if (opts.noSeed) {
-    // Create empty DB with schema
-    const db = openWitnessDB(paths.witnessDb);
-    db.applySchema();
-    db.close();
-    console.log(fmt.ok('Empty witness database created'));
-  }
+  if (seeded.exit !== undefined) return seeded.exit;
+  const { intended } = seeded;
 
   // Load DB to get counts
   let storeCounts = { packages: 0, versions: 0, files: 0 };

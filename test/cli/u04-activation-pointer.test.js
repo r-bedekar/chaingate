@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 
 import {
@@ -92,8 +93,12 @@ test('an interrupted write (leftover temporary file) is ignored by readers and c
   const h = host();
   try {
     activateBundle(h.base, h.ids.A, PTR);
-    const leftover = `${activationFile(h.base)}.tmp-424242`;
+    // U-05 R2-2 (b), Addendum 1 §3.3 / Addendum 2 §3.4: the next mutator removes a leftover only when its pid is DEAD and it
+    // is older than 15 minutes (a young one, or a live writer's, is kept and reported). Was: any pid, at any age.
+    const deadPid = Number(String(spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']).stdout));
+    const leftover = `${activationFile(h.base)}.tmp-${deadPid}`;
     fs.writeFileSync(leftover, '{"schema":"chaingate-activation/1","active":"half-writ');
+    const old = new Date(Date.now() - 20 * 60000); fs.utimesSync(leftover, old, old);
     assert.equal(resolveActiveBundle(h.base, PTR).id, h.ids.A);
     activateBundle(h.base, h.ids.B, PTR);
     assert.equal(exists(leftover), false, 'stale temporary removed after the successful switch');

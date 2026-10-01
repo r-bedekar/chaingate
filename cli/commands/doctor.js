@@ -11,7 +11,7 @@ import { verifyPersistedSignature } from '../../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
 import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken, staleLegacyLink,
-  previousBundleId } from '../seed-bundle.js';
+  previousBundleId, readActivationIntent, intentFile, surveyLeftovers, INTENT_FILE } from '../seed-bundle.js';
 import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
 import { probeNativeSqlite, nativeSqliteHelp } from '../native-sqlite.js';
 
@@ -172,6 +172,30 @@ export default async function doctor(args) {
   });
   checks.push({ name: 'domain-version-count', pass: true,
     detail: 'from-packument (internal: package-scoped, derived per document; not an operator setting)' });
+
+  // U-05 R2-2 (b): an interrupted activation, and leftovers of interrupted seed commands. Read-only: doctor takes no
+  // lock and repairs nothing; the next seed command recovers and cleans under the lock. Shown only when present.
+  {
+    const ri = readActivationIntent(paths.base);
+    if (ri.state === 'pending') {
+      checks.push({ name: 'seed-activation-intent', pass: false, severity: 'unverifiable',
+        detail: `an interrupted activation is pending (${intentFile(paths.base)}); the next \`chaingate init --seed\`, `
+          + '`chaingate update-seed --seed` or `chaingate update-seed --rollback` recovers it. Until then the rollback '
+          + 'target may not be the one recorded.' });
+    } else if (ri.state === 'invalid') {
+      checks.push({ name: 'seed-activation-intent', pass: false, severity: 'unverifiable',
+        detail: `the activation intent ${intentFile(paths.base)} is not valid (${ri.why}); seed commands refuse until `
+          + `it is inspected and archived by renaming it to ${INTENT_FILE}.held-<UTC timestamp>` });
+    }
+    const sv = surveyLeftovers(paths.base);
+    if (sv.owned.length || sv.unrecognised.length) {
+      const parts = [
+        ...sv.owned.map((e) => `${e.path} (${e.why})`),
+        ...sv.unrecognised.map((p) => `${p} (unrecognised entry; kept)`),
+      ];
+      checks.push({ name: 'seed-leftovers', pass: false, severity: 'notice', detail: parts.join('; ') });
+    }
+  }
 
   // 1. Chaingate directory exists and is writable
   {
@@ -397,6 +421,7 @@ export default async function doctor(args) {
     else if (c.pass) icon = fmt.ok(c.name);
     else if (c.severity === 'tamper') icon = fmt.fail(`${c.name} [TAMPER]`);
     else if (c.severity === 'unverifiable') icon = fmt.warn(`${c.name} [unverifiable]`);
+    else if (c.severity === 'notice') icon = fmt.warn(`${c.name} [notice]`);
     else icon = fmt.fail(c.name);
     console.log(`  ${icon}  ${fmt.dim(c.detail)}`);
   }

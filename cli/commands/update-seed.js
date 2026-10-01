@@ -8,7 +8,8 @@ import { openWitnessDB } from '../../witness/db.js';
 import { assertIntegrity as defaultAssertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
 import { stageIncoming, finishStagedBundle, activateBundle, rollbackActivation, activeBundleId,
-  previousBundleId, verifyBundleDir, seedsDir } from '../seed-bundle.js';
+  previousBundleId, verifyBundleDir, seedsDir, withSeedMutation, ActivationRecoveryRefused } from '../seed-bundle.js';
+import { LockUnavailable } from '../seed-mutation-lock.js';
 import { readConfigStrict } from '../../config-store.js';
 
 function parseArgs(args) {
@@ -37,7 +38,7 @@ function parseArgs(args) {
  *     in a different file on purpose, and replacing evidence must not discard the record of what was
  *     decided under the evidence that came before.
  */
-export async function updateSeedV3(opts, paths, deps, staged = null) {
+export async function updateSeedV3(opts, paths, deps, staged = null, lock = null) {
   // Which bundle is active is ONE record — the `seeds/active` link. Nothing here rewrites a second
   // copy of that fact, so an interrupted update leaves the previously active bundle active and a
   // rollback is a swap back rather than a restore of files.
@@ -49,7 +50,7 @@ export async function updateSeedV3(opts, paths, deps, staged = null) {
     }
     let identity;
     try {
-      identity = rollbackActivation(paths.base);
+      identity = rollbackActivation(paths.base, { lock, hooks: deps.hooks });
     } catch (err) {
       console.error(fmt.fail(err.message));
       console.error('  The currently active bundle is unchanged.');
@@ -98,7 +99,7 @@ export async function updateSeedV3(opts, paths, deps, staged = null) {
 
   let installed;
   try {
-    installed = finishStagedBundle(staged, paths.base, { trust });
+    installed = finishStagedBundle(staged, paths.base, { trust, lock });
   } catch (err) {
     console.error(fmt.fail(`v3 seed bundle rejected: ${err.message}`));
     console.error('  Nothing was installed or activated; the active bundle is unchanged.');
@@ -107,7 +108,7 @@ export async function updateSeedV3(opts, paths, deps, staged = null) {
 
   let identity;
   try {
-    identity = activateBundle(paths.base, installed.dir_name);
+    identity = activateBundle(paths.base, installed.dir_name, { lock, hooks: deps.hooks });
   } catch (err) {
     console.error(fmt.fail(`activation refused: ${err.message}`));
     console.error('  The previously active bundle is still active.');
@@ -136,22 +137,50 @@ export default async function updateSeed(
 ) {
   const opts = parseArgs(args);
   const paths = deps.resolvePaths(opts.scope);
+  // A host that has never been set up has nothing to change: say so without creating anything.
+  if (!opts.seedPath && !existsSync(paths.base)) {
+    console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));
+    return EXIT.ERROR;
+  }
+  // U-05 R2-2 (b): every seed mutation runs under the per-base lock, after recovering an interrupted activation and
+  // removing the leftovers of dead seed commands. A second seed command is refused, not interleaved.
+  try {
+    return await withSeedMutation(paths.base, (lock) => updateSeedLocked(opts, paths, deps, lock),
+      { hooks: deps.hooks, report: reportSeedPrologue });
+  } catch (err) {
+    if (!(err instanceof LockUnavailable || err instanceof ActivationRecoveryRefused)) throw err;
+    console.error(fmt.fail(err.message));
+    return EXIT.ERROR;
+  }
+}
+
+/** What the lock prologue did, said once (shared with init). */
+export function reportSeedPrologue({ recovery, cleanup }) {
+  if (recovery.state === 'recovered') {
+    console.log(fmt.warn(`Recovered an interrupted activation: active ${recovery.active ?? '(none)'}, `
+      + `previous ${recovery.previous ?? '(none)'}`));
+  }
+  for (const p of cleanup.removed) console.log(fmt.dim(`  removed ${p}, left by an earlier interrupted seed command`));
+  for (const f of cleanup.failed) console.log(fmt.warn(`  could not remove ${f.path} (${f.why}); it remains`));
+}
+
+async function updateSeedLocked(opts, paths, deps, lock) {
 
   // The v3 detection seed has its own lifecycle: it is not the witness database, and replacing it
   // must not touch runtime state. `--rollback`, or `--seed <bundle>` naming a v3 seed, take it.
-  if (opts.rollback) return updateSeedV3(opts, paths, deps);
+  if (opts.rollback) return updateSeedV3(opts, paths, deps, null, lock);
   if (opts.seedPath) {
     // PRIVATE STAGING FIRST (U-05 R2-2 (d)): the supplied file is opened once as a regular file, admitted for space and
     // copied; it is classified, verified and installed from the STAGED copy and never read again.
     let staged;
-    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks }); } catch (err) {
+    try { staged = stageIncoming(opts.seedPath, paths.base, { seam: deps.seam, hooks: deps.hooks, lock }); } catch (err) {
       console.error(fmt.fail(`The seed was not accepted: ${err.message}`));
       console.error('  Nothing was installed or activated; the active bundle is unchanged.');
       return EXIT.ERROR;
     }
     for (const w of staged.warnings) console.log(fmt.warn(w));
     try {
-      if (staged.info.schemaVersion === 3) return await updateSeedV3(opts, paths, deps, staged);
+      if (staged.info.schemaVersion === 3) return await updateSeedV3(opts, paths, deps, staged, lock);
     } finally { staged.discard(); }
     // not a v3 seed: the legacy route below (its routing is the legacy part of R2-2)
   }

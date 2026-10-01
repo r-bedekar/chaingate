@@ -35,7 +35,7 @@
 
 import { existsSync, mkdirSync, copyFileSync, writeFileSync, renameSync, rmSync,
   chmodSync, symlinkSync, readlinkSync, realpathSync, readdirSync, statSync,
-  lstatSync, openSync, readSync, writeSync, fsyncSync, closeSync, rmdirSync } from 'node:fs';
+  lstatSync, openSync, readSync, writeSync, fsyncSync, closeSync, rmdirSync, unlinkSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -46,6 +46,8 @@ import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
 import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Bytes, hashRange }
   from '../seed/v3/bounded-file.js';
 import { admit, V3_SIDECARS } from './space-admission.js';
+import { acquireSeedMutationLock, releaseSeedMutationLock, assertHeld } from './seed-mutation-lock.js';
+import { probePid } from './proxy-control.js';
 import { SEED_V3_FILENAME } from './constants.js';
 
 export const SEEDS_DIRNAME = 'seeds';
@@ -225,9 +227,11 @@ const removeStaging = (dir) => {
  * A catchable failure removes the staging directory (or names what remains). The caller calls `discard()` when done;
  * after `finishStagedBundle` has moved the directory into place there is nothing left to discard.
  *
- * @param {{sidecars?: {sha256Path: string|null, sigPath: string|null}, seam?: object, hooks?: object}} [opts]
+ * @param {{sidecars?: {sha256Path: string|null, sigPath: string|null}, seam?: object, hooks?: object, lock: object}} opts
+ *   `lock`: the live seed-mutation token for `base` (required).
  */
-export function stageIncoming(seedPath, base, { sidecars, seam, hooks = {} } = {}) {
+export function stageIncoming(seedPath, base, { sidecars, seam, hooks = {}, lock } = {}) {
+  assertHeld(lock, base);                                  // R2-2 (b): staging happens under the seed-mutation lock
   let src;
   try { src = openRegular(seedPath); } catch (e) {
     throw new StagingRefused(e instanceof FileRefused ? `${seedPath}: ${e.why}` : `cannot open ${seedPath}: ${e.code || e.message}`, 'input');
@@ -281,7 +285,8 @@ export function stageIncoming(seedPath, base, { sidecars, seam, hooks = {} } = {
  * Nothing in use is touched. Returns the identity of the bundle now on disk, which, when an equivalent bundle was
  * already retained, is THAT bundle's verified identity rather than the incoming copy's assumed one.
  */
-export function finishStagedBundle(staged, base, { trust } = {}) {
+export function finishStagedBundle(staged, base, { trust, lock } = {}) {
+  assertHeld(lock, base);
   const { dir: staging, files: out, digest: dbDigest, sha256Bytes: claimedBytes, sigBytes, info } = staged;
   if (info.schemaVersion !== 3) {
     throw new Error(`not a v3 seed: schema_version=${JSON.stringify(info.schemaVersion)}`);
@@ -346,9 +351,11 @@ export function finishStagedBundle(staged, base, { trust } = {}) {
  * Stage a complete bundle from paths, validate it WITH THE READER, and leave it installed but NOT active: private
  * staging (stageIncoming) followed by finishStagedBundle. Kept for callers that hold paths (tests, the seed tooling).
  */
-export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base, { trust, seam, hooks } = {}) {
-  const staged = stageIncoming(dbPath, base, { sidecars: { sha256Path, sigPath }, seam, hooks });
-  try { return finishStagedBundle(staged, base, { trust }); } finally { staged.discard(); }
+export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base, { trust, seam, hooks, lock } = {}) {
+  return underLock(base, { hooks, lock }, (token) => {
+    const staged = stageIncoming(dbPath, base, { sidecars: { sha256Path, sigPath }, seam, hooks, lock: token });
+    try { return finishStagedBundle(staged, base, { trust, lock: token }); } finally { staged.discard(); }
+  });
 }
 
 /**
@@ -357,26 +364,40 @@ export function stageBundle({ dbPath, sha256Path = null, sigPath = null }, base,
  * replace (see activatePointer).
  */
 export function activateBundle(base, dirName, opts = {}) {
-  const dir = join(seedsDir(base), dirName);
-  const verdict = verifyBundleDir(dir);
-  if (!verdict.ok) throw new Error(`refusing to activate ${dirName}: ${verdict.why}`);
-  if (isPointer(opts)) return { ...verdict.identity, dir_name: dirName, ...activatePointer(base, dirName, opts) };
+  return underLock(base, opts, (lock) => {
+    const dir = join(seedsDir(base), dirName);
+    const verdict = verifyBundleDir(dir);
+    if (!verdict.ok) throw new Error(`refusing to activate ${dirName}: ${verdict.why}`);
+    if (isPointer(opts)) return { ...verdict.identity, dir_name: dirName, ...activatePointer(base, dirName, opts) };
 
-  refuseForeignPointer(base);
-  const current = activeBundleId(base, opts);
-  if (current && current !== dirName) {
-    // remember what to roll back TO, before the swap rather than after it
-    const tmpPrev = `${previousLink(base)}.switching-${process.pid}`;
-    rmSync(tmpPrev, { force: true });
-    symlinkSync(current, tmpPrev);
-    renameSync(tmpPrev, previousLink(base));
-  }
-  const link = activeLink(base);
-  const tmp = `${link}.switching-${process.pid}`;
-  rmSync(tmp, { force: true });
-  symlinkSync(dirName, tmp);             // relative: the tree can be moved or mounted elsewhere
-  renameSync(tmp, link);                 // ATOMIC replace
-  return { ...verdict.identity, dir_name: dirName };
+    refuseForeignPointer(base);
+    const current = activeBundleId(base, opts);
+    opts.hooks?.afterActiveRead?.();
+    const previousNow = previousBundleId(base, opts);
+    // POSIX: two renames, so the intent is published FIRST (R2-2 §2.2 option B; Addendum 1 §2.1). After any kill the
+    // next mutator recovers (active, previous) to exactly this before or after state.
+    const after = { active: dirName, previous: current && current !== dirName ? current : previousNow };
+    writeIntent(base, { schema: INTENT_SCHEMA, op: opts.op ?? 'activate',
+      before: { active: current, previous: previousNow }, after, pid: process.pid, at: new Date().toISOString() });
+    opts.hooks?.afterIntentPublish?.();                                           // K0
+    if (current && current !== dirName) {
+      // remember what to roll back TO, before the swap rather than after it
+      const tmpPrev = `${previousLink(base)}.switching-${process.pid}`;
+      rmSync(tmpPrev, { force: true });
+      symlinkSync(current, tmpPrev);
+      renameSync(tmpPrev, previousLink(base));
+    }
+    opts.hooks?.betweenRenames?.();                                               // K1
+    const link = activeLink(base);
+    const tmp = `${link}.switching-${process.pid}`;
+    rmSync(tmp, { force: true });
+    symlinkSync(dirName, tmp);             // relative: the tree can be moved or mounted elsewhere
+    renameSync(tmp, link);                 // ATOMIC replace
+    opts.hooks?.afterActiveSwap?.();                                              // K2
+    fsyncDir(seedsDir(base));
+    removeIntent(base);
+    return { ...verdict.identity, dir_name: dirName };
+  });
 }
 
 /**
@@ -388,6 +409,7 @@ export function activateBundle(base, dirName, opts = {}) {
 function activatePointer(base, dirName, opts) {
   const fsx = { renameSync, ...(opts.fsImpl || {}) };
   const state = currentPointerState(base);            // activation.json, or the legacy links (migration)
+  opts.hooks?.afterActiveRead?.();
   const next = {
     schema: ACTIVATION_SCHEMA,
     active: dirName,
@@ -399,6 +421,7 @@ function activatePointer(base, dirName, opts) {
   try {
     const fd = openSync(tmp, 'w');
     try { writeSync(fd, `${JSON.stringify(next, null, 2)}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+    opts.hooks?.afterPointerTempWrite?.();
     fsx.renameSync(tmp, file);                         // ONE step: the old record until it succeeds
   } catch (err) {
     rmSync(tmp, { force: true });
@@ -412,17 +435,21 @@ function activatePointer(base, dirName, opts) {
         + `${ACTIVATION_FILE} is authoritative, but older ChainGate versions would still read the link`);
     }
   }
-  cleanStaleTemporaries(base, tmp);
+  // Leftover temporaries of OTHER processes are not removed here: under the lock, at the start of the next mutator,
+  // only those of dead processes older than 15 minutes are (cleanLeftovers).
   return { previous: next.previous, record: ACTIVATION_FILE, ...(warnings.length ? { warnings } : {}) };
 }
 
 /** Roll the one activation record back to the bundle it pointed at before. */
 export function rollbackActivation(base, opts = {}) {
-  const prev = previousBundleId(base, opts);
-  if (!prev) return null;
-  const verdict = verifyBundleDir(join(seedsDir(base), prev));
-  if (!verdict.ok) throw new Error(`refusing to roll back to ${prev}: ${verdict.why}`);
-  return activateBundle(base, prev, opts);
+  return underLock(base, opts, (lock) => {
+    const prev = previousBundleId(base, opts);
+    opts.hooks?.afterPreviousRead?.();
+    if (!prev) return null;
+    const verdict = verifyBundleDir(join(seedsDir(base), prev));
+    if (!verdict.ok) throw new Error(`refusing to roll back to ${prev}: ${verdict.why}`);
+    return activateBundle(base, prev, { ...opts, lock, op: 'rollback' });
+  });
 }
 
 const lstatOrNull = (p) => { try { return lstatSync(p); } catch { return null; } };
@@ -433,15 +460,218 @@ function removeLink(p) {
   }
   if (lstatOrNull(p)) rmdirSync(p);                    // a Windows directory link some APIs leave behind
 }
-function cleanStaleTemporaries(base, keep) {
-  let names = [];
-  try { names = readdirSync(seedsDir(base)); } catch { return; }
-  for (const n of names) {
-    const p = join(seedsDir(base), n);
-    if (p === keep) continue;
-    if (n.startsWith(`${ACTIVATION_FILE}.tmp-`)) rmSync(p, { force: true });
-    else if (/^(active|previous)\.switching-\d+$/.test(n)) { try { removeLink(p); } catch { /* left for doctor */ } }
+// ---- U-05 R2-2 (b): the intent journal, its recovery, and conservative cleanup, all under the seed-mutation lock ----
+
+export const INTENT_FILE = '.activation-intent.json';
+const INTENT_SCHEMA = 'chaingate-activation-intent/1';
+export const intentFile = (base) => join(seedsDir(base), INTENT_FILE);
+
+/** fsync a directory so a rename or unlink in it is durable (best effort; Windows cannot fsync a directory). */
+function fsyncDir(dir) {
+  if (process.platform === 'win32') return;
+  const fd = openSync(dir, 'r');
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function writeIntent(base, rec) {
+  const tmp = `${intentFile(base)}.tmp-${process.pid}`;
+  rmSync(tmp, { force: true });
+  const fd = openSync(tmp, 'wx', 0o600);
+  try { writeSync(fd, `${JSON.stringify(rec)}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+  renameSync(tmp, intentFile(base));
+  fsyncDir(seedsDir(base));
+}
+
+function removeIntent(base) {
+  try { unlinkSync(intentFile(base)); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  fsyncDir(seedsDir(base));
+}
+
+/**
+ * The activation intent, read-only and bounded (doctor and status may call this without the lock; it repairs nothing).
+ * @returns {{state: 'none'} | {state: 'pending', intent: object} | {state: 'invalid', why: string}}
+ */
+export function readActivationIntent(base) {
+  const file = intentFile(base);
+  const st = lstatOrNull(file);
+  if (!st) return { state: 'none' };
+  const invalid = (why) => ({ state: 'invalid', why });
+  if (!st.isFile()) return invalid('it is not a regular file');
+  let rec;
+  try { rec = JSON.parse(readBounded(file, CAPS.intent, { noFollow: true }).toString('utf8')); }
+  catch (e) { return invalid(e instanceof FileRefused ? e.why : `unreadable or not JSON: ${e.message}`); }
+  if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return invalid('not a JSON object');
+  if (rec.schema !== INTENT_SCHEMA) return invalid(`unknown schema ${JSON.stringify(rec.schema)}`);
+  const name = (v, nullable) => (v === null && nullable) || (typeof v === 'string' && BUNDLE_NAME.test(v));
+  for (const side of ['before', 'after']) {
+    const r = rec[side];
+    if (!r || typeof r !== 'object') return invalid(`${side} is missing`);
+    if (!name(r.active, side === 'before')) return invalid(`${side}.active ${JSON.stringify(r.active)} is not a bundle name`);
+    if (!name(r.previous, true)) return invalid(`${side}.previous ${JSON.stringify(r.previous)} is not a bundle name`);
   }
+  return { state: 'pending', intent: rec };
+}
+
+/** Recovery refused: nothing was changed, and the intent is kept (Addendum 1 §2.2, Addendum 2 §3.1). */
+export class ActivationRecoveryRefused extends Error {
+  constructor(message) { super(message); this.name = 'ActivationRecoveryRefused'; }
+}
+
+/**
+ * Recover an interrupted symlink activation, FIRST in every mutator and under the lock (Addendum 1 §2.2 as corrected by
+ * Addendum 2 §3.1). It writes only the `previous` link, never `active`, so repeated interruption and retry converge:
+ *   active = after.active  -> previous = after.previous  (the operation took effect: roll forward)
+ *   active = before.active -> previous = before.previous (it did not: roll back)
+ *   anything else          -> refuse; active was moved outside this protocol (e.g. by an older client)
+ * A target bundle that no longer exists, or an intent that is not valid, refuses with the intent and the links kept.
+ */
+export function recoverActivation(base, opts = {}) {
+  const r = readActivationIntent(base);
+  if (r.state === 'none') return { state: 'none' };
+  const file = intentFile(base);
+  if (r.state === 'invalid') {
+    throw new ActivationRecoveryRefused(`the activation intent ${file} is not valid (${r.why}). Nothing was changed, `
+      + 'and it is kept as evidence. Inspect `chaingate status` and `chaingate doctor --json`; then, as a deliberate '
+      + `step, archive it by renaming it to ${INTENT_FILE}.held-<UTC timestamp> (nothing deletes it for you).`);
+  }
+  if (isPointer(opts)) {
+    throw new ActivationRecoveryRefused(`an activation intent ${file} exists, but this platform records activation in `
+      + `${ACTIVATION_FILE}, not in links. Nothing was changed. Archive it by renaming it to ${INTENT_FILE}.held-<UTC timestamp>.`);
+  }
+  const { before, after } = r.intent;
+  const current = linkTarget(activeLink(base));
+  let target;
+  if (current === after.active) target = after.previous;
+  else if (current === before.active) target = before.previous;
+  else {
+    throw new ActivationRecoveryRefused(`the active bundle is ${current ?? '(none)'}, which is neither the interrupted `
+      + `activation's starting point (${before.active ?? '(none)'}) nor its target (${after.active}): it was changed `
+      + `outside this protocol, for example by an older ChainGate. The intent ${file} is kept; nothing was changed.`);
+  }
+  opts.hooks?.duringRecovery?.();
+  if (linkTarget(previousLink(base)) !== target) {
+    if (target === null) removeLink(previousLink(base));
+    else {
+      const ds = lstatOrNull(join(seedsDir(base), target));
+      if (!ds || !ds.isDirectory()) {
+        throw new ActivationRecoveryRefused(`recovering the interrupted activation needs bundle ${target} as the rollback `
+          + `target, and it no longer exists. The intent ${file} and the activation links are kept; nothing was changed.`);
+      }
+      const tmp = `${previousLink(base)}.switching-${process.pid}`;
+      rmSync(tmp, { force: true });
+      symlinkSync(target, tmp);
+      renameSync(tmp, previousLink(base));
+    }
+  }
+  fsyncDir(seedsDir(base));
+  removeIntent(base);
+  return { state: 'recovered', active: current, previous: target };
+}
+
+// Leftovers this runtime can create, by exact name, each carrying the creating pid (Addendum 1 §3.3).
+const OWNED = {
+  seeds: [
+    { re: /^\.staging-(\d+)-\d+$/, kind: 'dir' },
+    { re: /^(?:active|previous)\.switching-(\d+)$/, kind: 'link' },
+    { re: /^activation\.json\.tmp-(\d+)$/, kind: 'file' },
+    { re: /^\.activation-intent\.json\.tmp-(\d+)$/, kind: 'file' },
+  ],
+  base: [
+    { re: /^witness\.db\.staging-(\d+)$/, kind: 'file' },
+    { re: /^witness\.db\.(?:sha256|sig)\.staging-(\d+)$/, kind: 'file' },
+    { re: /^witness\.db\.install-pending\.json\.tmp-(\d+)$/, kind: 'file' },
+  ],
+};
+/** A conservative DELAY, not proof against PID reuse: young leftovers may survive and are reported (Addendum 2 §3.4). */
+export const LEFTOVER_MIN_AGE_MS = 15 * 60 * 1000;
+// What else legitimately lives in seeds/: bundles, repair copies, damaged bundles, the records, held evidence.
+const KNOWN_IN_SEEDS = (n) => BUNDLE_NAME.test(n) || /^[0-9a-f]{16}(\.r[1-9][0-9]*)?\.damaged-/.test(n)
+  || [ACTIVE_LINK, PREVIOUS_LINK, ACTIVATION_FILE, INTENT_FILE].includes(n) || n.startsWith(`${INTENT_FILE}.held-`);
+
+function classifyLeftovers(base, { now = Date.now(), probe = probePid } = {}) {
+  const owned = []; const unrecognised = [];
+  for (const [where, dir] of [['seeds', seedsDir(base)], ['base', base]]) {
+    let names = [];
+    try { names = readdirSync(dir); } catch { continue; }
+    for (const n of names) {
+      const full = join(dir, n);
+      const hit = OWNED[where].map((p) => [p, n.match(p.re)]).find(([, m]) => m);
+      if (!hit) { if (where === 'seeds' && !KNOWN_IN_SEEDS(n)) unrecognised.push(full); continue; }
+      const [p, m] = hit; const pid = Number(m[1]);
+      const st = lstatOrNull(full);
+      if (!st) continue;
+      const typeOk = p.kind === 'dir' ? st.isDirectory() : p.kind === 'link' ? st.isSymbolicLink() : st.isFile();
+      let keep = null;
+      if (!typeOk) keep = 'not the kind of entry that name belongs to';
+      else if (pid === process.pid) keep = 'this process';
+      else {
+        const live = probe(pid);
+        if (live.state === 'alive') keep = `process ${pid} is alive`;
+        else if (live.state !== 'dead') keep = `process ${pid} could not be checked (${live.code})`;
+        else if (now - st.mtimeMs < LEFTOVER_MIN_AGE_MS) keep = 'younger than 15 minutes';
+      }
+      owned.push({ path: full, kind: p.kind, keep });
+    }
+  }
+  return { owned, unrecognised };
+}
+
+/**
+ * Remove leftovers of DEAD mutators, under the lock, at the start of every mutator: an exact owned name carrying a pid
+ * that probes dead, older than 15 minutes, of the expected kind, and not this process's. Everything else is kept.
+ * This is not pruning: no bundle is ever removed. A failed removal is reported with its path, never as removed.
+ */
+export function cleanLeftovers(base, opts = {}) {
+  assertHeld(opts.lock, base);
+  const { owned } = classifyLeftovers(base, opts);
+  const out = { removed: [], kept: [], failed: [] };
+  for (const e of owned) {
+    if (e.keep) { out.kept.push({ path: e.path, why: e.keep }); continue; }
+    try {
+      if (e.kind === 'dir') rmSync(e.path, { recursive: true });
+      else if (e.kind === 'link') removeLink(e.path);
+      else unlinkSync(e.path);
+      out.removed.push(e.path);
+    } catch (err) { out.failed.push({ path: e.path, why: err.code || err.message }); }
+  }
+  return out;
+}
+
+/** Read-only, for doctor: owned leftovers still present (and why each is kept) and unrecognised entries in seeds/. */
+export function surveyLeftovers(base) {
+  const { owned, unrecognised } = classifyLeftovers(base);
+  return { owned: owned.map((e) => ({ path: e.path, why: e.keep ?? 'removable by the next seed command' })), unrecognised };
+}
+
+/**
+ * Hold the lock for the duration of `fn(token)`, after RECOVERY and CLEANUP (in that order) - the prologue every mutator
+ * runs. `report(lines)` receives what recovery and cleanup did.
+ */
+export function withSeedMutationSync(base, fn, opts = {}) {
+  const token = acquireSeedMutationLock(base);
+  try {
+    const rec = recoverActivation(base, opts);
+    const cl = cleanLeftovers(base, { lock: token });
+    opts.report?.({ recovery: rec, cleanup: cl });
+    return fn(token);
+  } finally { releaseSeedMutationLock(token); }
+}
+
+/** As withSeedMutationSync, for an async body (the commands). */
+export async function withSeedMutation(base, fn, opts = {}) {
+  const token = acquireSeedMutationLock(base);
+  try {
+    const rec = recoverActivation(base, opts);
+    const cl = cleanLeftovers(base, { lock: token });
+    opts.report?.({ recovery: rec, cleanup: cl });
+    return await fn(token);
+  } finally { releaseSeedMutationLock(token); }
+}
+
+/** A given token must be live for `base`; without one, the call takes the lock (and runs the prologue) itself. */
+function underLock(base, opts, fn) {
+  if (opts.lock) { assertHeld(opts.lock, base); return fn(opts.lock); }
+  return withSeedMutationSync(base, fn, opts);
 }
 
 /**
