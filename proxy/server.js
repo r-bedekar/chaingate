@@ -20,6 +20,7 @@ import { createSeedV3Gate } from '../seed/v3/gate.js';
 import { openSeed, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV } from '../seed/v3/reader.js';
 import { CHAINGATE_SEED_PUBKEY_B64, CHAINGATE_SEED_PUBKEY_FINGERPRINT } from '../witness/seed_verify.js';
 import { rewritePackument } from '../gates/rewriter.js';
+import { createUnstoredBlocks } from './unstored-blocks.js';
 import { createDepFetcher } from './dep-fetcher.js';
 
 // Read our own package version once at module-load — used by `/_chaingate/self`
@@ -96,6 +97,33 @@ function refuseUnenforceable(res, packageName, detail) {
   });
 }
 
+// U-05 Amendment 3 (P3/P5b): no decision could be made and the configured failure policy refuses.
+function refuseNoDecision(res, packageName, detail) {
+  if (res.headersSent) {
+    if (!res.writableEnded) res.destroy(new Error(detail));
+    return;
+  }
+  writeJson(res, 502, {
+    error: 'chaingate_enforcement_failed',
+    package: packageName,
+    detail: `no decision could be made for ${packageName} (${detail}); the configured failure policy `
+      + '(on_unusable_input: BLOCK) refuses it',
+  });
+}
+
+// U-05 Amendment 3 (Rule K): a failure decision never makes a remembered BLOCK servable.
+function preserveKnownBlock(packageName, version, decision, known) {
+  return {
+    disposition: 'BLOCK',
+    results: [{ gate: 'chaingate', result: 'BLOCK',
+      detail: `known BLOCK preserved: this proxy process decided BLOCK for ${packageName}@${version} and could not `
+        + `store it (${known.detail}); a failure decision cannot make it servable` },
+    ...(Array.isArray(decision?.results) ? decision.results : [])],
+    persisted: false,
+    evaluated: false,
+  };
+}
+
 function writeJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
@@ -136,7 +164,7 @@ async function streamUpstream(res, upstream, statusCode) {
 //
 // Content-encoding is stripped unconditionally because fetchPackument forces
 // `accept-encoding: identity`, so both branches produce the same header shape.
-async function observeAndSendPackument(res, upstream, witness, packageName, log, state = {}) {
+async function observeAndSendPackument(res, upstream, witness, packageName, log, state = {}, ctx = {}) {
   if (upstream.statusCode !== 200) {
     await streamUpstream(res, upstream, upstream.statusCode);
     return;
@@ -157,33 +185,78 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log,
   }
 
   let observed = null;
+  let observeErr = null;
+  let noDecision = false;
   if (parsed && witness) {
+    // Only the observation itself is guarded here. Reporting it comes after (U-05 Amendment 3, O1): a failure while
+    // reporting used to land in this catch and let fallback decisions replace the ones just returned.
     try {
       observed = witness.observePackument(packageName, parsed);
-      log?.info?.(
-        `[witness] ${packageName}: observed ${observed.versionsSeen} versions, +${observed.newBaselines} new`,
-      );
     } catch (err) {
-      log?.warn?.(`[witness] ${packageName}: observe failed: ${err.message}`);
+      observeErr = err;
+    }
+    if (observeErr) {
+      log?.warn?.(`[witness] ${packageName}: observe failed: ${observeErr.message}`);
       // Serving the raw document here discarded every decision the packument would have earned --
       // one exception anywhere in the observe path and a known-malware version went straight
       // through. Ask the witness what the configured gates say a total failure means instead.
       try {
         observed = typeof witness.failureDecisionsFor === 'function'
-          ? witness.failureDecisionsFor(parsed, err, packageName) : null;
+          ? witness.failureDecisionsFor(parsed, observeErr, packageName) : null;
       } catch (inner) {
         log?.error?.(`[witness] ${packageName}: failure decision unavailable: ${inner.message}`);
         observed = null;
+        noDecision = true;
       }
     }
   }
 
+  // U-05 Amendment 3 (P3): no decision at all. The configured failure policy decides; a remembered BLOCK is never
+  // served under any policy.
+  if (noDecision) {
+    if (ctx.failuresBlock) {
+      refuseNoDecision(res, packageName, `observation and its failure decision both failed: ${observeErr.message}`);
+      return;
+    }
+    const known = new Map();
+    for (const [version, entry] of ctx.unstored?.forPackage(packageName) ?? []) {
+      if (parsed?.versions && Object.prototype.hasOwnProperty.call(parsed.versions, version)
+        && !ctx.overriddenLive?.(packageName, version)) {
+        known.set(version, preserveKnownBlock(packageName, version, null, entry));
+      }
+    }
+    if (known.size) observed = { decisions: known };
+  }
+
+  // Reading the returned decisions may itself throw; that escapes to the handler (P5b), before any decision counts.
+  const decisions = observed ? observed.decisions : null;
+  if (decisions instanceof Map && ctx.unstored && !noDecision) {
+    // P6b: remember BLOCKs that were not stored, forget entries a newer decision replaces (Amendment 3, Table M).
+    for (const [version, decision] of decisions) ctx.unstored.note(packageName, version, decision);
+    // Rule K: a failure decision never makes a remembered BLOCK servable (override checked live).
+    for (const [version, decision] of decisions) {
+      if (decision?.evaluated !== false || decision.disposition === 'BLOCK') continue;
+      const known = ctx.unstored.get(packageName, version);
+      if (known && !ctx.overriddenLive?.(packageName, version)) {
+        decisions.set(version, preserveKnownBlock(packageName, version, decision, known));
+      }
+    }
+  }
+  if (decisions) state.decided = true;
+  if (observed && !observeErr) {
+    try {
+      log?.info?.(
+        `[witness] ${packageName}: observed ${observed.versionsSeen} versions, +${observed.newBaselines} new`,
+      );
+    } catch { /* U-05 Amendment 3 (O1): reporting can never replace the returned decisions */ }
+  }
+
   // Rewriter branch: any BLOCK → re-serialize. Otherwise serve raw bytes.
-  const hasBlock = observed && hasBlockDisposition(observed.decisions);
+  const hasBlock = decisions && hasBlockDisposition(decisions);
   if (hasBlock) {
     state.blockComputed = true;
     try {
-      const { packument: rewritten, changed, summary } = rewritePackument(parsed, observed.decisions);
+      const { packument: rewritten, changed, summary } = rewritePackument(parsed, decisions);
       if (changed) {
         for (const b of summary.blocked) {
           log?.warn?.(`[gate] ${packageName}@${b.version}: BLOCK (${b.reason || 'no detail'})`);
@@ -235,18 +308,47 @@ function hasBlockDisposition(decisions) {
 
 // Tarball BLOCK gate. Checks gate_decisions for a recorded BLOCK against
 // (pkg, version) extracted from the tarball filename. Honors overrides.
-function enforceTarballGate(db, canonicalName, filename, log) {
+//
+// U-05 Amendment 3: a BLOCK this process computed but could not store (P6b) is checked FIRST -- a stored decision
+// would have replaced it, so it is always the newer one -- and a failed stored-decision lookup follows the configured
+// failure policy (P6a). `state.tarballDecided` marks that the gate reached a decision (P5b).
+function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = {}) {
   if (!db) return null;
   const version = parseTarballVersion(canonicalName, filename);
   if (version == null) return null;
+  state.tarballVersion = version;
+  const known = ctx.unstored?.get(canonicalName, version) ?? null;
+  if (known) {
+    if (ctx.overriddenLive?.(canonicalName, version)) {
+      log?.info?.(`[override] ${canonicalName}@${version}: allowing a BLOCK that was not stored`);
+      state.tarballDecided = true;
+      return null;
+    }
+    return {
+      package: canonicalName,
+      version,
+      gates: known.gates,
+      decided_at: known.remembered_at,
+      persisted: false,
+      detail: `BLOCK decided by this proxy process and NOT stored (${known.detail}); a restart forgets it`,
+      how_to_override: `chaingate allow ${canonicalName}@${version} --reason "<reason>"`,
+    };
+  }
   let decision;
   try {
     decision = db.getLatestDecision(canonicalName, version);
   } catch (err) {
     log?.warn?.(`[tarball-gate] decision lookup failed: ${err.message}`);
+    if (ctx.failuresBlock) {
+      return { refuse: { status: 503, error: 'chaingate_decision_lookup_failed',
+        detail: `the stored decision for ${canonicalName}@${version} could not be read (${err.message}); the `
+          + 'configured failure policy (on_unusable_input: BLOCK) refuses it' } };
+    }
+    log?.warn?.(`[tarball-gate] ${canonicalName}@${version}: served without a decision (configured failure policy)`);
+    state.tarballDecided = true;
     return null;
   }
-  if (!decision || decision.disposition !== 'BLOCK') return null;
+  if (!decision || decision.disposition !== 'BLOCK') { state.tarballDecided = true; return null; }
   let override = null;
   try {
     override = db.getOverride(canonicalName, version);
@@ -257,6 +359,7 @@ function enforceTarballGate(db, canonicalName, filename, log) {
     log?.info?.(
       `[override] ${canonicalName}@${version}: allowing (reason: ${override.reason})`,
     );
+    state.tarballDecided = true;
     return null;
   }
   return {
@@ -400,6 +503,15 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     witness = createWitness({ db: witnessDb, runGates, config, logger: log });
   }
 
+  // U-05 Amendment 3. The configured failure policy (P3/P5b/P6a): only a seed-v3 gate configured with
+  // on_unusable_input BLOCK refuses when no decision can be made; pilot-only setups keep their ALLOW declaration.
+  const unstored = createUnstoredBlocks({ log });
+  const failuresBlock = Boolean(seedV3) && config.policyOnUnusableInput === 'BLOCK';
+  const overriddenLive = (name, version) => {
+    try { return Boolean(witnessDb?.getOverride(name, version)); } catch { return false; }
+  };
+  const ctx = { unstored, failuresBlock, overriddenLive };
+
   const handler = async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       writeJson(res, 405, { error: 'method_not_allowed', method: req.method });
@@ -438,6 +550,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           },
           config_source: config.configSource ?? null,
         } : null,
+        unstored_blocks: unstored.describe(),
       });
       return;
     }
@@ -458,11 +571,16 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           config,
           requestHeaders: req.headers,
         });
-        await observeAndSendPackument(res, upstream, witness, canonicalName, log, state);
+        await observeAndSendPackument(res, upstream, witness, canonicalName, log, state, ctx);
       } else {
         // Tarball BLOCK gate — check BEFORE contacting upstream so we don't
         // waste bandwidth on something we're going to refuse.
-        const blocked = enforceTarballGate(witnessDb, canonicalName, route.filename, log);
+        const blocked = enforceTarballGate(witnessDb, canonicalName, route.filename, log, ctx, state);
+        if (blocked?.refuse) {
+          writeJson(res, blocked.refuse.status, { error: blocked.refuse.error, package: canonicalName,
+            detail: blocked.refuse.detail });
+          return;
+        }
         if (blocked) {
           writeJson(res, 403, { error: 'blocked_by_chaingate', ...blocked });
           return;
@@ -487,9 +605,23 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       // passthrough that bypasses the witness entirely. If headers are
       // already sent we can't recover — just destroy the socket so the
       // client sees a clean failure instead of a half-written response.
+      // U-05 Amendment 3 (P5b): before any decision exists, the configured failure policy decides, and a remembered
+      // BLOCK is never passed through. Once a decision exists the passthrough is unchanged (Amendment 2 covers BLOCK).
+      let refusal = null;
+      if (state.blockComputed) refusal = 'a BLOCK was computed';
+      else if (route.kind === 'packument' && !state.decided) {
+        if (failuresBlock) refusal = 'no decision was made and the configured failure policy refuses';
+        else if (unstored.forPackage(canonicalName).some(([v]) => !overriddenLive(canonicalName, v))) {
+          refusal = 'no decision was made and the package has a BLOCK this process could not store';
+        }
+      } else if (route.kind !== 'packument' && !state.tarballDecided) {
+        const v = state.tarballVersion;
+        if (v != null && unstored.get(canonicalName, v) && !overriddenLive(canonicalName, v)) refusal = 'remembered';
+        else if (failuresBlock) refusal = 'the tarball gate did not decide and the configured failure policy refuses';
+      }
       log?.warn?.(
         `[proxy] internal error on ${req.method} ${req.url}: ${err.stack || err.message} `
-          + (state.blockComputed ? '(a BLOCK was computed: NOT falling back to raw upstream)' : '(falling back to raw upstream)'),
+          + (refusal ? `(${refusal}: NOT falling back to raw upstream)` : '(falling back to raw upstream)'),
       );
       if (res.headersSent) {
         if (!res.writableEnded) res.destroy(err);
@@ -498,6 +630,21 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       if (state.blockComputed) {
         // U-05 Amendment 2 (P5a): a raw passthrough would serve the version that was just BLOCKed.
         refuseUnenforceable(res, canonicalName, `internal error after the BLOCK was computed: ${err.message}`);
+        return;
+      }
+      if (refusal === 'remembered') {
+        const known = unstored.get(canonicalName, state.tarballVersion);
+        writeJson(res, 403, { error: 'blocked_by_chaingate', package: canonicalName, version: state.tarballVersion,
+          gates: known.gates, decided_at: known.remembered_at, persisted: false,
+          detail: `BLOCK decided by this proxy process and NOT stored (${known.detail}); a restart forgets it` });
+        return;
+      }
+      if (refusal && route.kind === 'packument' && !failuresBlock) {
+        refuseUnenforceable(res, canonicalName, `internal error before a decision, with a BLOCK this process could not store: ${err.message}`);
+        return;
+      }
+      if (refusal) {
+        refuseNoDecision(res, canonicalName, `internal error before a decision: ${err.message}`);
         return;
       }
       try {

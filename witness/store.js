@@ -65,17 +65,23 @@ export function createWitness({ db, runGates, config, logger }) {
    * `runGates.failureDecision` is provided by createGateRunner; a caller that injects a bare
    * function (tests do) falls back to the previous behaviour, which is what it always was.
    */
+  // A failure decision is made because the gates could not run (`evaluated: false`), and is never stored on the path
+  // that returns it (`persisted: false`): the proxy relies on both flags (U-05 Amendment 3, P6b and Rule K).
   function failureDecision(err, detail, identity = null) {
     if (typeof runGates.failureDecision === 'function') {
       const d = runGates.failureDecision(err, identity);
       return {
         disposition: d.disposition,
         results: [{ gate: 'observation_error', result: 'SKIP', detail }, ...d.results],
+        persisted: false,
+        evaluated: false,
       };
     }
     return {
       disposition: 'ALLOW',
       results: [{ gate: 'observation_error', result: 'SKIP', detail }],
+      persisted: false,
+      evaluated: false,
     };
   }
 
@@ -97,6 +103,7 @@ export function createWitness({ db, runGates, config, logger }) {
         detail: `decision computed but NOT stored (${what}: ${err.message})` },
       ...(computed.results || []), ...declared.results],
       persisted: false,
+      ...(computed.evaluated === false ? { evaluated: false } : {}),
     };
   }
 
@@ -177,7 +184,8 @@ export function createWitness({ db, runGates, config, logger }) {
           }
           const disposition = result?.disposition ?? 'ALLOW';
           const gateResults = Array.isArray(result?.results) ? result.results : [];
-          computed = { disposition, results: gateResults };
+          // A failure decision made here IS stored below; it stays marked as a failure decision (Amendment 3).
+          computed = { disposition, results: gateResults, ...(result?.evaluated === false ? { evaluated: false } : {}) };
           evaluated.set(incoming.version, computed);
 
           if (!existing) {
