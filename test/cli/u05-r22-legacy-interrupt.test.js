@@ -185,3 +185,31 @@ test('IL5 a stale marker of a dead process is never cleaned up; it stays pending
     assert.equal(sig.severity, 'unverifiable');
   } finally { h.cleanup(); }
 });
+
+// ---- the completing command's exception waives ONLY the pending-install refusal (decision 7 §2.5) --------------------
+test('completion still runs the gate\'s other checks: a tampered persisted pair refuses even the completing command', async () => {
+  const h = host();
+  try {
+    const m = startMutator(h.base, 'update-seed', [], { killAt: 'afterCommit', env: env(h.neu) });
+    assert.equal(await m.at('afterCommit'), true, 'SEAM-ABSENT'); await m.done;
+    const sig = path.join(h.base, 'witness.db.sig');
+    const b = fs.readFileSync(sig); b[0] ^= 0xff; fs.writeFileSync(sig, b);          // the OLD pair, now tampered
+    const r = await (startMutator(h.base, 'update-seed', [], { env: env(h.neu) })).done;
+    assert.equal(r.code, 5, r.all); assert.match(r.all, /seed-signature/);
+    assert.equal(exists(MARKER(h.base)), true, 'still pending');
+  } finally { h.cleanup(); }
+});
+
+test('completion still verifies the incoming seed: a seed whose signature fails is refused', async () => {
+  const h = host();
+  try {
+    const m = startMutator(h.base, 'update-seed', [], { killAt: 'afterCommit', env: env(h.neu) });
+    assert.equal(await m.at('afterCommit'), true, 'SEAM-ABSENT'); await m.done;
+    const bad = path.join(h.home, 'bad'); fs.mkdirSync(bad);
+    for (const n of ['chaingate-seed.db', 'chaingate-seed.db.sha256']) fs.copyFileSync(path.join(h.neu.dir, n), path.join(bad, n));
+    fs.writeFileSync(path.join(bad, 'chaingate-seed.db.sig'), Buffer.alloc(64, 9));     // same digest, wrong signature
+    const r = await (startMutator(h.base, 'update-seed', [], { env: { ...env(h.neu), U05_LEGACY_BUNDLE: bad } })).done;
+    assert.equal(r.code, 1, r.all); assert.match(r.all, /Verification failed/);
+    assert.equal(exists(MARKER(h.base)), true);
+  } finally { h.cleanup(); }
+});
