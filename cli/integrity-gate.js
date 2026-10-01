@@ -26,9 +26,21 @@ import { fmt } from './format.js';
 import { openWitnessDB } from '../witness/db.js';
 import { verifyPersistedSignature } from '../witness/seed_verify.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from './self-witness.js';
+import { readInstallMarker, markerPath } from './legacy-seed.js';
 import { EXIT } from './constants.js';
 
-export async function assertIntegrity(paths, { startFileUrl, command } = {}) {
+export async function assertIntegrity(paths, { startFileUrl, command, completing = false, pubkey } = {}) {
+  // An interrupted legacy seed installation (U-05 R2-2; Addendum 2 §3.2): every mutating command that passes through
+  // this gate is refused, except the one that completes it. That exception waives ONLY this refusal: self-witness and
+  // the persisted-pair signature below still run, and the completing command still verifies the incoming seed.
+  const marker = readInstallMarker(paths);
+  if (marker.state !== 'none' && !completing) {
+    printTamperBanner(command, marker.state === 'pending'
+      ? `an interrupted legacy seed installation (started ${marker.marker.started_at ?? 'at an unknown time'}) was not `
+        + 'completed; re-run `chaingate update-seed`, or `chaingate init --seed <legacy db> --force` with the same seed, to complete it'
+      : `the pending-install marker ${markerPath(paths)} is not valid (${marker.why}); inspect it before continuing`);
+    return { ok: false, exit: EXIT.INTEGRITY_UNVERIFIABLE };
+  }
   if (!existsSync(paths.witnessDb)) {
     // No DB at all — commands that need one will fail with a better message.
     // Nothing to integrity-check here.
@@ -64,7 +76,7 @@ export async function assertIntegrity(paths, { startFileUrl, command } = {}) {
   // Seed-signature: only enforced when the persisted artifacts exist.
   if (existsSync(paths.witnessDbSha256) && existsSync(paths.witnessDbSig)) {
     try {
-      await verifyPersistedSignature(paths.witnessDbSha256, paths.witnessDbSig);
+      await verifyPersistedSignature(paths.witnessDbSha256, paths.witnessDbSig, pubkey ? { pubkey } : {});
     } catch (err) {
       printTamperBanner(command, `seed-signature: ${err.code ?? 'verify_failed'}: ${err.message}`);
       return { ok: false, exit: EXIT.INTEGRITY_TAMPER };

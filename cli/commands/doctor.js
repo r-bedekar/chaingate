@@ -8,6 +8,7 @@ import { readPidRecord, isPortInUse } from '../proxy-control.js';
 import { witnessStorageCheck } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
+import { readInstallMarker, markerPath } from '../legacy-seed.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
 import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken, staleLegacyLink,
@@ -272,7 +273,26 @@ export default async function doctor(args) {
   //    Ed25519 key" — the trust anchor that matters post-install. Install-time
   //    bundle hashing still happens via verifySeed in init/update-seed.
   {
-    if (!existsSync(paths.witnessDb)) {
+    // An interrupted legacy installation is read FIRST (U-05 R2-2; Addendum 2 §3.2): while it is pending the pair on
+    // disk may be the old one, a partial one or the new one, and none of those describes what is installed.
+    const marker = readInstallMarker(paths);
+    if (marker.state === 'pending') {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: `an interrupted legacy seed installation (started ${marker.marker.started_at ?? 'at an unknown time'}) was `
+          + 'not completed; re-run the same command (`chaingate update-seed`, or `chaingate init --seed <legacy db> --force` '
+          + 'with the same seed) to complete it',
+      });
+    } else if (marker.state === 'invalid') {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: `the pending-install marker ${markerPath(paths)} is not valid (${marker.why}); seed commands refuse until it is inspected`,
+      });
+    } else if (!existsSync(paths.witnessDb)) {
       checks.push({
         name: 'seed-signature',
         pass: false,
