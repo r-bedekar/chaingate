@@ -68,9 +68,12 @@ function readPersisted(env) {
   const cfg = readConfigStrict(file);                     // throws ConfigUnreadable if damaged
   const active = resolveActiveBundle(base);
 
+  // The unstored-BLOCK caps apply with or without a v3 seed (pilot-only setups have the same record).
+  const caps = cfg ? validateConfig(cfg, file).caps : { entries: null, bytes: null };
   const empty = { source: cfg ? file : null, base, seedV3Path: null, seedV3Trust: null,
     seedV3BundleDir: null, seedV3BundleId: null, seedV3Expected: null,
-    policyOnUnusableInput: null, policyOnNoEvidence: null };
+    policyOnUnusableInput: null, policyOnNoEvidence: null,
+    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes };
   if (!active) return empty;
 
   // The bundle says what it is; it is verified through the PINNED directory.
@@ -92,6 +95,8 @@ function readPersisted(env) {
     seedV3Expected: verdict.identity,
     policyOnUnusableInput: policy.on_unusable_input,
     policyOnNoEvidence: policy.on_no_evidence,
+    unstoredBlockCapEntries: caps.entries,
+    unstoredBlockCapBytes: caps.bytes,
   };
 }
 
@@ -129,6 +134,9 @@ export function loadConfig(env = process.env, overrides = {}) {
       env.CHAINGATE_POLICY_ON_UNUSABLE_INPUT || persisted.policyOnUnusableInput,
     policyOnNoEvidence: env.CHAINGATE_POLICY_ON_NO_EVIDENCE || persisted.policyOnNoEvidence,
     domainVersionCount: DOMAIN_VERSION_COUNT_SOURCE,
+    // Validated (ranges, refusing start-up by name) by the proxy: proxy/unstored-blocks.js validateCaps.
+    unstoredBlockCapEntries: env.CHAINGATE_UNSTORED_BLOCK_CAP_ENTRIES || persisted.unstoredBlockCapEntries,
+    unstoredBlockCapBytes: env.CHAINGATE_UNSTORED_BLOCK_CAP_BYTES || persisted.unstoredBlockCapBytes,
     configSource: persisted.source,
     chaingateBase: persisted.base,
   };

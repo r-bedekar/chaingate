@@ -81,7 +81,17 @@ export function validateConfig(cfg, file = '(in memory)') {
     resolved[k] = v;
   }
 
-  return { policy: resolved };
+  // U-05 gap-closure r2: optional bounds on the proxy's in-memory record of BLOCKs it could not store. Only their type is
+  // checked here; the proxy checks the ranges when it starts and refuses to start, by name, on a bad value.
+  const caps = {};
+  for (const [key, out] of [['unstored_block_cap_entries', 'entries'], ['unstored_block_cap_bytes', 'bytes']]) {
+    const v = cfg[key];
+    if (v === undefined || v === null) { caps[out] = null; continue; }
+    if (!Number.isInteger(v)) bad(`${key} must be an integer, got ${JSON.stringify(v)}`);
+    caps[out] = v;
+  }
+
+  return { policy: resolved, caps };
 }
 
 /**

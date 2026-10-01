@@ -113,7 +113,8 @@ test('R-8 (record level) overflow: entry cap and byte cap; FULL is sticky; Table
   assert.equal(r.get('p', '1').detail, 'replaced while FULL', 'replacements continue');
   for (const v of ['1', '2', '3']) r.note('p', v, blockStored);
   assert.equal(r.count, 0); assert.equal(r.full, true, 'FULL stays after the record empties (until the process exits)');
-  assert.equal(out.filter((l) => /FULL/.test(l)).length, 1, 'one FULL transition line');
+  // (test fix, recorded: the first version counted /FULL/ and also matched this test's own detail text above)
+  assert.equal(out.filter((l) => /^\[witness\] unstored-BLOCK record FULL/.test(l)).length, 1, 'one FULL transition line');
   const byBytes = createUnstoredBlocks({ caps: { entries: 1000, bytes: C_FIXED + cost('p', '1', 'd', ['seed-v3']) } });
   byBytes.note('p', '1', blockUnstored('d'));
   byBytes.note('p', '2', blockUnstored('d'));
