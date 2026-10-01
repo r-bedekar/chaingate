@@ -225,8 +225,6 @@ async function main() {
   let native = null; try { native = JSON.parse(d0.stdout).find((c) => c.name === 'native-sqlite'); } catch { /* older CLI */ }
   record('native SQLite module loads (doctor native-sqlite)', native ? native.pass : null, native ? native.detail : 'check not reported by this version');
 
-  // ── import, activate, start ────────────────────────────────────────────────────────────────────
-  const init = cg(['init', ...P, '--seed', seed('A'), '--unsigned-development']);
   // The activation record: seeds/activation.json on Windows (0.1.2+), the seeds/active symlink elsewhere.
   const activeRecord = () => {
     try { const j = JSON.parse(fs.readFileSync(path.join(seedsDir(), 'activation.json'), 'utf8')); return { kind: 'activation.json', id: j.active }; } catch { /* none */ }
@@ -234,6 +232,42 @@ async function main() {
       return { kind: l.isSymbolicLink() ? 'symlink' : l.isDirectory() ? 'directory' : 'other', id: path.basename(fs.realpathSync(path.join(seedsDir(), 'active'))) }; } catch { /* absent or dangling */ }
     return { kind: 'absent', id: null };
   };
+
+  // ── onboarding from an archive (U-05 S6, option M; SEEDS.md "Verify the download") ────────────
+  // Two digests: the ARCHIVE's (the download arrived intact) and the DATABASE's (the content). The extracted database is
+  // checked against the TRUSTED database digest before anything is imported; the .sha256 file inside the same archive
+  // comes from the same place as the database and proves nothing on its own. Fixtures from before 0.1.3 have no archives.
+  let seedA = seed('A');
+  if (cases.archives) {
+    const unpack = (name) => {
+      const d = path.join(proj, `unpacked-${name}`); fs.mkdirSync(d, { recursive: true });
+      const r = spawnSync('tar', ['-xzf', path.join(FIX, cases.archives[name]), '-C', d], { encoding: 'utf8', timeout: 120_000 });
+      return { ok: r.status === 0, db: path.join(d, 'chaingate-seed.db'), err: `${r.stderr || r.error || ''}`.trim() };
+    };
+    const archiveA = path.join(FIX, cases.archives.A);
+    record('archive: the download matches the recorded ARCHIVE SHA-256', sha(archiveA) === cases.archiveA_sha256, cases.archiveA_sha256.slice(0, 16));
+    const tampered = path.join(proj, 'tampered.tar.gz');
+    const tb = fs.readFileSync(archiveA); tb[tb.length >> 1] ^= 0xff; fs.writeFileSync(tampered, tb);
+    record('archive: a tampered archive fails the archive SHA-256 (stop before extracting)', sha(tampered) !== cases.archiveA_sha256, '');
+    const ua = unpack('A');
+    const dbOk = ua.ok && sha(ua.db) === cases.seedA_sha256;
+    const sidecarOk = ua.ok && fs.readFileSync(`${ua.db}.sha256`, 'utf8').trim() === cases.seedA_sha256;
+    record('archive: extracted; the database matches the TRUSTED DATABASE SHA-256, and its .sha256 file agrees', dbOk && sidecarOk, ua.err);
+    const us = unpack('SUBST');
+    const selfConsistent = us.ok && fs.readFileSync(`${us.db}.sha256`, 'utf8').trim() === sha(us.db);
+    record('archive: a substituted archive is self-consistent (its own .sha256 matches) yet FAILS the trusted database SHA-256: stop before init',
+      selfConsistent && sha(us.db) !== cases.seedA_sha256, us.err);
+    if (dbOk && sidecarOk) seedA = ua.db;
+    report.seed_from_archive = seedA !== seed('A');
+  }
+
+  // ── import, activate, start ────────────────────────────────────────────────────────────────────
+  const npmrcNow = () => fs.readFileSync(path.join(proj, '.npmrc'), 'utf8');
+  const unflagged = cg(['init', ...P, '--seed', seedA]);
+  record('init --seed WITHOUT --unsigned-development refuses the unsigned seed: nothing activated, .npmrc untouched, no proxy',
+    unflagged.status !== 0 && activeRecord().kind === 'absent' && npmrcNow() === projNpmrcOriginal && (await self()) === null,
+    `exit ${unflagged.status}: ${unflagged.out.split('\n').slice(-2).join(' | ')}`);
+  const init = cg(['init', ...P, '--seed', seedA, '--unsigned-development']);
   const activeKind = activeRecord().kind;
   report.activation_record = activeKind;
   record('seed A imported and activated (activation link created)', activeKind !== 'absent', `active: ${activeKind}; init exit ${init.status}: ${init.out.split('\n').slice(-3).join(' | ')}`);

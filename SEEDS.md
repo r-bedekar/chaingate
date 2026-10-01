@@ -71,7 +71,42 @@ git cat-file -p seed-v3.0-rc3           # the tag message carries the file SHA-2
 
 On Windows, run the same commands in Git Bash. They need Git 2.34 or later and OpenSSH's `ssh-keygen`.
 
-### 2. Verify the downloaded file
+### 2. If the seed comes as an archive
+
+No archive of this seed is published yet. If one is published, its file name and its **archive SHA-256** are recorded
+here, in the same signed history. The archive holds three files: `chaingate-seed.db`, `chaingate-seed.db.sha256` and
+`chaingate-seed.db.manifest.json`.
+
+Two different digests apply:
+- **Archive SHA-256:** covers the downloaded `.tar.gz` file. It only shows that the download arrived intact.
+- **Database SHA-256:** the file SHA-256 in the table above. It covers the database you import, and **it is the
+  check that matters.** Verify the extracted database against it (step 3) before you import anything. The `.sha256` file
+  inside the archive comes from the same place as the database, so a match with it proves nothing on its own.
+
+**Linux:**
+
+```bash
+archive=<archive file name from this record>
+archive_expected=<archive SHA-256 from this record>
+echo "$archive_expected  $archive" | sha256sum -c -
+mkdir seed && tar -xzf "$archive" -C seed && cd seed
+```
+
+**macOS:** the same, with `shasum -a 256 -c -` in place of `sha256sum -c -`.
+
+**Windows (PowerShell; `tar` ships with Windows 10 version 1803 and later):**
+
+```powershell
+$archive = '<archive file name from this record>'
+$archiveExpected = '<archive SHA-256 from this record>'
+(Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -eq $archiveExpected
+New-Item -ItemType Directory seed | Out-Null; tar -xzf $archive -C seed; Set-Location seed
+```
+
+The archive check must pass (`OK` on Linux and macOS, `True` in PowerShell). Then continue with step 3 inside the `seed`
+folder.
+
+### 3. Verify the database file
 
 Compare with the **trusted digest from step 1**, not only with the `.sha256` file from the same
 release page.
@@ -97,7 +132,9 @@ $expected = '974c7d7ea2f24ef627074517ea49b2f089d5e8108bc22b60401e6b1b612376dc'
 Both lines must print `True`. For `cmd`, run `certutil -hashfile chaingate-seed.db SHA256` and
 compare the output with the trusted digest, ignoring case.
 
-### 3. Use it
+### 4. Use it
+
+Only after step 3 passed:
 
 ```bash
 chaingate init --seed ./chaingate-seed.db --unsigned-development
