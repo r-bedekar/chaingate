@@ -143,7 +143,10 @@ test('R6 an older-schema witness (lacking a runtime column) is refused in place,
   const h = host();
   try {
     const old = buildLegacySeed(path.join(h.home, 'old'), { key, seedVersion: '2026.test.old', sql: 'ALTER TABLE versions DROP COLUMN license;' });
-    legacyWitness(h.base, { from: 'seed', seed: old, local: LOCAL, sidecars: false });
+    // built with raw SQL: the runtime itself cannot prepare its statements on such a witness (found by r22L-ff1, where
+    // the setup through openWitnessDB failed instead of the case under test)
+    fs.mkdirSync(h.base, { recursive: true }); fs.copyFileSync(old.db, h.w);
+    { const d = new Database(h.w); d.prepare("INSERT INTO gate_decisions (id, package_name, version, disposition, gates_fired, decided_at) VALUES (5, 'alpha', '1.0.0', 'BLOCK', '[]', '2026-02-01 00:00:00')").run(); d.close(); }
     const neu = buildLegacySeed(path.join(h.home, 'new'), { key, seedVersion: '2026.test.new', pkgs: NEW_PKGS });
     const before = snapshot(h.w);
     const r = await run(() => updateSeed([], deps(h, neu)));
