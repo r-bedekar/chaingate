@@ -70,18 +70,21 @@ export async function v3Host({ tag } = {}) {
  * Run a Node entry point (or `cmd`) in a child process with a HARD timeout. `timedOut` true means it was still running (for these
  * tests: blocked) when the deadline passed, and was killed.
  */
-export function runNode(args, { env = {}, home, timeoutMs = 15000, cwd = ROOT, nodeArgs = [], cmd = process.execPath } = {}) {
+export function runNode(args, { env = {}, home, timeoutMs = 15000, cwd = ROOT, nodeArgs = [], cmd = process.execPath, until = null } = {}) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const childEnv = { ...process.env, ...env };
     if (home) { childEnv.HOME = home; childEnv.USERPROFILE = home; }
     const c = spawn(cmd, [...nodeArgs, ...args], { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = ''; let timedOut = false;
-    c.stdout.on('data', (d) => { stdout += d; }); c.stderr.on('data', (d) => { stderr += d; });
+    let matched = false;
+    // `until`: stop the child as soon as its output matches (e.g. a proxy that began listening), reported as `matched`
+    const check = () => { if (until && !matched && until.test(plain(stdout + stderr))) { matched = true; c.kill('SIGKILL'); } };
+    c.stdout.on('data', (d) => { stdout += d; check(); }); c.stderr.on('data', (d) => { stderr += d; check(); });
     const timer = setTimeout(() => { timedOut = true; c.kill('SIGKILL'); }, timeoutMs);
     c.on('close', (code, signal) => {
       clearTimeout(timer);
-      resolve({ code, signal, timedOut, ms: Date.now() - t0, stdout: plain(stdout), stderr: plain(stderr),
+      resolve({ code, signal, timedOut, matched, ms: Date.now() - t0, stdout: plain(stdout), stderr: plain(stderr),
         out: plain(stdout + stderr) });
     });
   });
@@ -113,9 +116,9 @@ export function freePort() {
 }
 
 /** The real proxy entry (`node proxy/server.js`) against `base`; resolves when it exits or is killed. */
-export async function runProxyEntry(base, { timeoutMs = 15000, env = {} } = {}) {
+export async function runProxyEntry(base, { timeoutMs = 15000, env = {}, until = null } = {}) {
   const port = await freePort();
-  return runNode([PROXY], { timeoutMs, home: path.dirname(base),
+  return runNode([PROXY], { timeoutMs, until, home: path.dirname(base),
     env: { CHAINGATE_HOME: base, CHAINGATE_WITNESS_DB: path.join(base, 'witness.db'), CHAINGATE_PORT: String(port),
       CHAINGATE_HOST: '127.0.0.1', CHAINGATE_UPSTREAM: 'http://127.0.0.1:9', ...env } });
 }
@@ -128,4 +131,60 @@ export async function metered(script, args, { timeoutMs = 60000 } = {}) {
   try { accesses = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { /* the child died before writing */ }
   fs.rmSync(path.dirname(outFile), { recursive: true, force: true });
   return { ...r, accesses };
+}
+
+export const MUTATOR = path.join(ROOT, 'test', 'helpers', 'u05-r22-mutator.mjs');
+
+/**
+ * Start the real `init` / `update-seed` command function in a child (u05-r22-mutator.mjs), optionally paused or killed at
+ * a named hook. `at(name)` resolves true when the child reached that point, false if it exited first (the point does not
+ * exist in the code under test). Output is matched on the ACCUMULATED text, never through a shared cursor.
+ */
+export function startMutator(base, command, args, { pauseAt, killAt, nth, timeoutMs = 60000 } = {}) {
+  const env = { ...process.env, CHAINGATE_HOME: base, HOME: path.dirname(base), USERPROFILE: path.dirname(base) };
+  if (pauseAt) env.U05_PAUSE_AT = pauseAt;
+  if (killAt) env.U05_KILL_AT = killAt;
+  if (nth) env.U05_AT_NTH = String(nth);
+  const c = spawn(process.execPath, [MUTATOR, base, command, ...args], { cwd: ROOT, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = ''; let err = ''; let closed = false;
+  const waiters = new Set();
+  const settle = () => { for (const w of [...waiters]) if (out.includes(w.text)) { waiters.delete(w); w.resolve(true); } };
+  c.stdout.on('data', (d) => { out += d; settle(); });
+  c.stderr.on('data', (d) => { err += d; });
+  c.stdin.on('error', () => { /* the child may already be gone */ });
+  const timer = setTimeout(() => c.kill('SIGKILL'), timeoutMs);
+  const done = new Promise((resolve) => c.on('close', (code, signal) => {
+    closed = true; clearTimeout(timer);
+    for (const w of waiters) w.resolve(out.includes(w.text));
+    waiters.clear();
+    resolve({ code, signal, out: plain(out), err: plain(err), all: plain(out + err) });
+  }));
+  const waitFor = (text) => (out.includes(text) || closed ? Promise.resolve(out.includes(text))
+    : new Promise((resolve) => waiters.add({ text, resolve })));
+  return { child: c, done, waitFor, at: (name) => waitFor(`AT ${name}`), go: () => { if (!closed) c.stdin.write('g\n'); },
+    output: () => out };
+}
+
+/** A synthetic v3 seed that installs as a distinct bundle (its own snapshot digest); `padTo` makes it multi-chunk. */
+export async function v3Variant(ch, { padTo = 0 } = {}) {
+  const Database = (await import('better-sqlite3')).default;
+  const s = v3Source();
+  const db = new Database(s.db);
+  db.prepare("UPDATE seed_metadata SET value = ? WHERE key = 'corpus_snapshot_digest'").run(String(ch).repeat(64));
+  if (padTo) { db.exec('CREATE TABLE pad (b BLOB)'); db.prepare('INSERT INTO pad VALUES (?)').run(Buffer.alloc(padTo)); }
+  db.close();
+  fs.writeFileSync(s.sha, `${sha256(s.db)}\n`);
+  return s;
+}
+
+/** Set a path's (or a link's own) times `minutes` into the past. */
+export function age(p, minutes) {
+  const t = new Date(Date.now() - minutes * 60000);
+  try { fs.lutimesSync(p, t, t); } catch { fs.utimesSync(p, t, t); }
+}
+
+/** A pid that has exited (a short child, waited for). Reuse by the OS is possible in principle; tests re-check it. */
+export function deadPid() {
+  const r = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']);
+  return Number(String(r.stdout));
 }
