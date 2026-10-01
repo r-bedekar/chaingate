@@ -110,6 +110,11 @@ test('D7/ST2 a source that grows during the copy is refused; at most its opened 
 test('ST3 a source truncated during the copy is refused; nothing left', async () => {
   const h = await v3Host(); const s = otherSource();
   try {
+    // larger than one 1 MiB copy chunk, so the cut lands DURING the copy (found by r22d-post: the synthetic seed fits in
+    // one chunk, and the hook then fired after the last byte had been read)
+    const p = new Database(s.db); p.exec('CREATE TABLE pad (b BLOB)'); p.prepare('INSERT INTO pad VALUES (?)').run(Buffer.alloc(3 << 20)); p.close();
+    fs.writeFileSync(s.sha, `${sha256(s.db)}\n`);
+    assert.ok(fs.statSync(s.db).size > (1 << 20));
     let cut = false;
     const hooks = { midStagingCopy: () => { if (!cut) { cut = true; fs.truncateSync(s.db, 4096); } } };
     const r = await run(() => updateSeed(ARGS(s), deps(h.base, { hooks })));
@@ -149,7 +154,7 @@ test('D3 an injected write error mid-copy: exit 1, the staging copy removed, the
 
 test('D3 EFBIG for real (RLIMIT_FSIZE, Linux): the catchable path cleans up; the errno is recorded', {
   skip: process.platform !== 'linux' ? 'RLIMIT_FSIZE through bash ulimit: Linux only here' : false,
-}, async () => {
+}, async (t) => {
   const h = await v3Host(); const s = otherSource();
   try {
     const blocks = Math.max(1, Math.floor(fs.statSync(s.db).size / 2 / 1024));
@@ -161,6 +166,7 @@ test('D3 EFBIG for real (RLIMIT_FSIZE, Linux): the catchable path cleans up; the
     assert.equal(r.timedOut, false);
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /EFBIG|File too large/);
+    t.diagnostic(`observed: ${(r.out.match(/[^\n]*(EFBIG|File too large)[^\n]*/) || [''])[0].trim()}`);
     assert.deepEqual(staging(h.base), [], 'the partial staging copy was removed');
     assert.equal(activeBundleId(h.base), h.id);
   } finally { s.cleanup(); h.cleanup(); }
