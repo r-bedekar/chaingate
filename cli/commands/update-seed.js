@@ -1,10 +1,11 @@
-import { existsSync, renameSync, unlinkSync, copyFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fmt } from '../format.js';
 import { resolvePaths as defaultResolvePaths } from '../paths.js';
 import { fetchSeedBundle as defaultFetchSeedBundle } from '../seed-download.js';
 import { verifySeed as defaultVerifySeed, verifyStagedSeed } from '../../witness/seed_verify.js';
-import { openWitnessDB } from '../../witness/db.js';
+import { installLegacySeed, readInstallMarker, downloadedSeed, reportLegacyInstall,
+  LegacyInstallRefused, seedVersionAt, storeCountsAt } from '../legacy-seed.js';
 import { assertIntegrity as defaultAssertIntegrity } from '../integrity-gate.js';
 import { EXIT } from '../constants.js';
 import { stageIncoming, finishStagedBundle, activateBundle, rollbackActivation, activeBundleId,
@@ -182,7 +183,11 @@ async function updateSeedLocked(opts, paths, deps, lock) {
     try {
       if (staged.info.schemaVersion === 3) return await updateSeedV3(opts, paths, deps, staged, lock);
     } finally { staged.discard(); }
-    // not a v3 seed: the legacy route below (its routing is the legacy part of R2-2)
+    // P-R3 (O1): a non-v3 file is refused, never answered with a download of something else
+    console.error(fmt.fail('update-seed --seed accepts v3 bundles; a legacy seed is installed with '
+      + '`chaingate init --seed <legacy db>` (add --force to refresh an existing witness database).'));
+    console.error('  Nothing was changed.');
+    return EXIT.ERROR;
   }
 
   // AUTOMATIC v3 SEED DOWNLOAD IS NOT AVAILABLE. Without --seed this command downloads the LEGACY
@@ -190,7 +195,7 @@ async function updateSeedLocked(opts, paths, deps, lock) {
   // bundle. On a host whose detection runs from a v3 bundle that would report "Seed updated" while
   // detection stayed exactly as it was. Refuse before downloading anything, and change nothing:
   // restart (`chaingate init`), a local update (`--seed <bundle>`) and `--rollback` are unaffected.
-  if (!opts.seedPath) {
+  {
     let v3Active = null;
     try { v3Active = activeBundleId(paths.base); } catch { v3Active = '(a v3 activation record that does not resolve)'; }
     if (v3Active) {
@@ -203,109 +208,79 @@ async function updateSeedLocked(opts, paths, deps, lock) {
     }
   }
 
-  if (!existsSync(paths.witnessDb)) {
+  // An interrupted legacy installation is completed by THIS command, even when it was interrupted before witness.db was
+  // created (Addendum 2 §3.2; decision 7 §2.5): the pending marker is what makes this the completing command.
+  const marker = readInstallMarker(paths);
+  if (!existsSync(paths.witnessDb) && marker.state !== 'pending') {
     console.error(fmt.fail('No witness database found. Run `chaingate init` first.'));
     return EXIT.ERROR;
   }
 
   // Refuse to run if the installed chaingate + current seed don't pass
   // self-witness / seed-signature checks. Fetching and swapping the witness
-  // on a tampered install would launder the attack.
-  const gate = await deps.assertIntegrity(paths, { command: 'update-seed' });
+  // on a tampered install would launder the attack. The legacy route is the one that completes an interrupted
+  // installation, so only the pending-install refusal is waived for it; every other check still runs.
+  const gate = await deps.assertIntegrity(paths, { command: 'update-seed', completing: true });
   if (!gate.ok) return gate.exit;
 
-  // 1. Download + verify
+  // 1. Download (bounded, into an owned temporary directory) + verify
   console.log('Downloading latest seed...');
   let bundle;
   try {
-    bundle = await deps.fetchSeedBundle();
+    bundle = await deps.fetchSeedBundle({ base: paths.base, seam: deps.seam });
   } catch (err) {
     console.error(fmt.fail(`Download failed: ${err.message}`));
     return EXIT.ERROR;
   }
-
-  console.log('Verifying signature...');
   try {
-    await deps.verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
-  } catch (err) {
-    console.error(fmt.fail(`Verification failed: ${err.message}`));
-    return EXIT.ERROR;
-  }
+    console.log('Verifying signature...');
+    try {
+      await deps.verifySeed(bundle.dbPath, bundle.sha256Path, bundle.sigPath);
+    } catch (err) {
+      console.error(fmt.fail(`Verification failed: ${err.message}`));
+      return EXIT.ERROR;
+    }
 
-  // 2. Compare seed versions
-  const newDb = openWitnessDB(bundle.dbPath, { readonly: true });
-  const newVersion = newDb.getSeedMetadata('seed_version');
-  newDb.close();
+    // 2. Compare seed versions. Read with plain queries: preparing the runtime's statements on a seed or witness that
+    //    lacks a table or column throws, and such a seed must be refused by the refresh's own checks, not crash here.
+    const newVersion = seedVersionAt(bundle.dbPath);
+    let currentVersion = null; let currentCounts = { packages: 0, versions: 0 };
+    if (existsSync(paths.witnessDb)) {
+      currentVersion = seedVersionAt(paths.witnessDb);
+      currentCounts = storeCountsAt(paths.witnessDb);
+    }
+    if (newVersion === currentVersion && !opts.force && marker.state !== 'pending') {
+      console.log(fmt.ok(`Already up to date (${currentVersion})`));
+      return EXIT.OK;
+    }
 
-  const currentDb = openWitnessDB(paths.witnessDb, { readonly: true });
-  const currentVersion = currentDb.getSeedMetadata('seed_version');
-  const currentCounts = currentDb.getStoreCounts();
-  currentDb.close();
+    // 3. Refresh IN PLACE: one transaction, local decisions and overrides kept (U-05 R2-2, O2; cli/legacy-seed.js).
+    //    Nothing is renamed over the witness database.
+    console.log('Refreshing the witness database in place (local decisions and overrides are kept)...');
+    let did;
+    try {
+      did = installLegacySeed(paths, downloadedSeed(bundle), { lock, mode: 'refresh', hooks: deps.hooks, seam: deps.seam,
+        fsImpl: deps.fsImpl });
+    } catch (err) {
+      if (!(err instanceof LegacyInstallRefused)) throw err;
+      console.error(fmt.fail(err.message));
+      return EXIT.ERROR;
+    }
+    reportLegacyInstall(did);
 
-  if (newVersion === currentVersion && !opts.force) {
-    console.log(fmt.ok(`Already up to date (${currentVersion})`));
+    // 4. Report
+    const newCounts = storeCountsAt(paths.witnessDb);
+
+    const pkgDelta = newCounts.packages - currentCounts.packages;
+    const verDelta = newCounts.versions - currentCounts.versions;
+
+    console.log(fmt.ok(`Seed updated: ${currentVersion ?? 'none'} to ${newVersion}`));
+    console.log(fmt.dim(`  Packages: ${newCounts.packages} (${pkgDelta >= 0 ? '+' : ''}${pkgDelta})`));
+    console.log(fmt.dim(`  Versions: ${newCounts.versions} (${verDelta >= 0 ? '+' : ''}${verDelta})`));
+
     return EXIT.OK;
-  }
-
-  // 3. Atomic swap — preserve gate_decisions and overrides
-  console.log('Migrating local decisions and overrides...');
-  const newDbRw = openWitnessDB(bundle.dbPath);
-  try {
-    // Attach the current DB and copy user data across
-    newDbRw.db.exec(`ATTACH DATABASE '${paths.witnessDb}' AS old`);
-    newDbRw.db.exec(`
-      INSERT OR IGNORE INTO gate_decisions (package_name, version, disposition, gates_fired, decided_at)
-      SELECT package_name, version, disposition, gates_fired, decided_at FROM old.gate_decisions
-    `);
-    newDbRw.db.exec(`
-      INSERT OR REPLACE INTO overrides (package_name, version, reason, created_at)
-      SELECT package_name, version, reason, created_at FROM old.overrides
-    `);
-    newDbRw.db.exec('DETACH DATABASE old');
   } finally {
-    newDbRw.close();
+    const left = bundle.cleanup?.();
+    if (left) console.log(fmt.warn(`  the download directory could not be removed: ${left}`));
   }
-
-  // 4. Rename swap
-  const backupPath = paths.witnessDb + '.bak';
-  renameSync(paths.witnessDb, backupPath);
-  try {
-    renameSync(bundle.dbPath, paths.witnessDb);
-  } catch (err) {
-    // Restore backup on failure
-    renameSync(backupPath, paths.witnessDb);
-    console.error(fmt.fail(`Swap failed: ${err.message}`));
-    return EXIT.ERROR;
-  }
-  try { unlinkSync(backupPath); } catch { /* ok */ }
-
-  // Forward-migrate the swapped-in bundle: covers the case where the bundle
-  // predates a runtime schema addition (e.g. dep_first_publish). Idempotent —
-  // runs CREATE TABLE IF NOT EXISTS, no-op when bundle already matches.
-  const migrateDb = openWitnessDB(paths.witnessDb);
-  migrateDb.applySchema();
-  migrateDb.close();
-
-  // Refresh persisted sig artifacts so doctor can re-verify the new bundle.
-  try {
-    copyFileSync(bundle.sha256Path, paths.witnessDbSha256);
-    copyFileSync(bundle.sigPath, paths.witnessDbSig);
-  } catch (err) {
-    console.error(fmt.warn(`Seed swapped but sig artifacts not persisted: ${err.message}`));
-    console.error('  `chaingate doctor` seed-signature check will fail until next update-seed.');
-  }
-
-  // 5. Report
-  const updatedDb = openWitnessDB(paths.witnessDb, { readonly: true });
-  const newCounts = updatedDb.getStoreCounts();
-  updatedDb.close();
-
-  const pkgDelta = newCounts.packages - currentCounts.packages;
-  const verDelta = newCounts.versions - currentCounts.versions;
-
-  console.log(fmt.ok(`Seed updated: ${currentVersion ?? 'none'} to ${newVersion}`));
-  console.log(fmt.dim(`  Packages: ${newCounts.packages} (${pkgDelta >= 0 ? '+' : ''}${pkgDelta})`));
-  console.log(fmt.dim(`  Versions: ${newCounts.versions} (${verDelta >= 0 ? '+' : ''}${verDelta})`));
-
-  return EXIT.OK;
 }
