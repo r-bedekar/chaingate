@@ -144,6 +144,35 @@ test('S3b a witness WRITE fails after evaluation (SQLite trigger inside the witn
   }
 });
 
+// Owner decision 2026-10-01, item 2 (A1-OV): an exact-version override under a witness write failure gives the SAME
+// disposition as the released 0.1.2, under both input policies. The overridden version's computed ALLOW is the minimum,
+// so the failure decides, as in 0.1.2 (where the failure replaced the computed decision). The expected values were
+// checked against the published 0.1.2 by the U-05 evidence harness qual/a1-ov.mjs; they are pinned here.
+test('A1-OV override x write failure: the same disposition as 0.1.2, under both input policies', () => {
+  const faults = {
+    method: (h) => { h.db.insertGateDecision = () => { throw new Error('injected write failure'); }; },
+    trigger: (h) => h.db.db.exec(`CREATE TRIGGER u05_inject BEFORE INSERT ON gate_decisions WHEN NEW.package_name = 'p'
+      AND NEW.version IN ('1.5.0', '1.4.0') BEGIN SELECT RAISE(ABORT, 'injected trigger failure'); END;`),
+  };
+  for (const [name, cfg] of Object.entries(CONFIGS)) {
+    for (const [fault, inject] of Object.entries(faults)) {
+      const h = harness(cfg);
+      try {
+        inject(h);
+        const out = h.witness.observePackument('p', DOC_P()).decisions;
+        const ov = out.get('1.5.0');
+        assert.equal(ov.disposition, cfg.on_unusable_input, `A1-OV ${name}/${fault}: 0.1.2's outcome (the input rule)`);
+        assert.equal(ov.persisted, false, `A1-OV ${name}/${fault}: not claimed as stored`);
+        assert.ok(noAdvisory(ov), `A1-OV ${name}/${fault}: the overridden pin is not consulted on the failure path`);
+        assert.equal(out.get('1.4.0').disposition, cfg.on_unusable_input, `A1-OV ${name}/${fault}: unpinned control as 0.1.2`);
+        if (fault === 'method') delete h.db.insertGateDecision;
+        assert.equal(h.db.getLatestDecision('p', '1.5.0'), null, `A1-OV ${name}/${fault}: nothing stored`);
+        assert.ok(h.db.getOverride('p', '1.5.0'), `A1-OV ${name}/${fault}: the override itself is untouched`);
+      } finally { h.close(); }
+    }
+  }
+});
+
 test('S5 the observation transaction fails AFTER evaluating (rolled back): computed decisions kept, persisted:false', () => {
   for (const [name, cfg] of Object.entries(CONFIGS)) {
     const h = harness(cfg);
