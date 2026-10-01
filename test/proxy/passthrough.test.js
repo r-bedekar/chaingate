@@ -1,7 +1,10 @@
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { request as undiciRequest } from 'undici';
 
 import { createProxyServer } from '../../proxy/server.js';
@@ -20,13 +23,21 @@ function startFakeUpstream(handler) {
   });
 }
 
+// Without witnessDbPath the proxy opens the DEFAULT database, ~/.chaingate/witness.db -- the user's real one (found by the
+// U-05 isolated-HOME run, 2026-10-01). Each proxy here gets a throwaway database instead.
+const witnessDirs = [];
+after(() => { for (const d of witnessDirs) rmSync(d, { recursive: true, force: true }); });
+
 async function startProxyFor(upstreamUrl, extraConfig = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'cg-passthrough-'));
+  witnessDirs.push(dir);
   const server = createProxyServer({
     port: 0,
     host: '127.0.0.1',
     upstream: upstreamUrl,
     headersTimeoutMs: 2_000,
     bodyTimeoutMs: 2_000,
+    witnessDbPath: join(dir, 'witness.db'),
     ...extraConfig,
   });
   await new Promise((resolve, reject) => {
