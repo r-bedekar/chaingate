@@ -344,7 +344,9 @@ export default async function doctor(args) {
       checks.push({
         name: 'proxy-identity',
         pass: true,
-        detail: 'proxy not running (skipped)',
+        detail: pidRecord?.state === 'indeterminate'
+          ? 'not evaluated: the liveness check for the recorded pid was refused (skipped)'
+          : 'proxy not running (skipped)',
       });
     } else {
       try {
