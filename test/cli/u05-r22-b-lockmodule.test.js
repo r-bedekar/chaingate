@@ -76,14 +76,13 @@ test('LK1 contention: another process holds it past the wait -> LockUnavailable 
 
 test('B6 the holder is killed while a second waits: the second acquires within the wait', async () => {
   const { d, b } = tmpBase();
-  const h = holder(b);
+  const h = holder(b, 'die-after:500');           // it kills itself: this side blocks synchronously while it waits
   try {
     assert.equal(await h.held, true);
-    setTimeout(() => h.c.kill('SIGKILL'), 500);
     const t0 = Date.now();
-    const t = await new Promise((resolve, reject) => setImmediate(() => { try { resolve(acquireSeedMutationLock(b)); } catch (e) { reject(e); } }));
+    const t = acquireSeedMutationLock(b);
     const waited = Date.now() - t0;
-    assert.ok(waited < LOCK_WAIT_MS + 1000, `waited ${waited} ms`);
+    assert.ok(waited >= 200 && waited < LOCK_WAIT_MS, `waited ${waited} ms (it had to wait, and got it inside the window)`);
     releaseSeedMutationLock(t);
   } finally { await h.done; fs.rmSync(d, { recursive: true, force: true }); }
 });
