@@ -67,15 +67,15 @@ export async function v3Host({ tag } = {}) {
 }
 
 /**
- * Run a Node entry point in a child process with a HARD timeout. `timedOut` true means it was still running (for these
+ * Run a Node entry point (or `cmd`) in a child process with a HARD timeout. `timedOut` true means it was still running (for these
  * tests: blocked) when the deadline passed, and was killed.
  */
-export function runNode(args, { env = {}, home, timeoutMs = 15000, cwd = ROOT, nodeArgs = [] } = {}) {
+export function runNode(args, { env = {}, home, timeoutMs = 15000, cwd = ROOT, nodeArgs = [], cmd = process.execPath } = {}) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const childEnv = { ...process.env, ...env };
     if (home) { childEnv.HOME = home; childEnv.USERPROFILE = home; }
-    const c = spawn(process.execPath, [...nodeArgs, ...args], { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+    const c = spawn(cmd, [...nodeArgs, ...args], { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = ''; let timedOut = false;
     c.stdout.on('data', (d) => { stdout += d; }); c.stderr.on('data', (d) => { stderr += d; });
     const timer = setTimeout(() => { timedOut = true; c.kill('SIGKILL'); }, timeoutMs);
