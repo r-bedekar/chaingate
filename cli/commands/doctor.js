@@ -285,12 +285,13 @@ export default async function doctor(args) {
           + 'not completed; re-run the same command (`chaingate update-seed`, or `chaingate init --seed <legacy db> --force` '
           + 'with the same seed) to complete it',
       });
-    } else if (marker.state === 'invalid') {
+    } else if (marker.state === 'invalid' || marker.state === 'unreadable') {
       checks.push({
         name: 'seed-signature',
         pass: false,
         severity: 'unverifiable',
-        detail: `the pending-install marker ${markerPath(paths)} is not valid (${marker.why}); seed commands refuse until it is inspected`,
+        detail: `the pending-install marker ${markerPath(paths)} ${marker.state === 'invalid' ? 'is not valid' : 'cannot be checked'} `
+          + `(${marker.why}); seed commands refuse until it is inspected`,
       });
     } else if (!existsSync(paths.witnessDb)) {
       checks.push({

@@ -38,7 +38,8 @@ export async function assertIntegrity(paths, { startFileUrl, command, completing
     printTamperBanner(command, marker.state === 'pending'
       ? `an interrupted legacy seed installation (started ${marker.marker.started_at ?? 'at an unknown time'}) was not `
         + 'completed; re-run `chaingate update-seed`, or `chaingate init --seed <legacy db> --force` with the same seed, to complete it'
-      : `the pending-install marker ${markerPath(paths)} is not valid (${marker.why}); inspect it before continuing`);
+      : `the pending-install marker ${markerPath(paths)} ${marker.state === 'invalid' ? 'is not valid' : 'cannot be checked'} `
+        + `(${marker.why}); inspect it before continuing`);
     return { ok: false, exit: EXIT.INTEGRITY_UNVERIFIABLE };
   }
   if (!existsSync(paths.witnessDb)) {

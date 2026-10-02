@@ -43,10 +43,18 @@ function fsyncDir(dir) {
 }
 
 // ---- the pending-install marker ---------------------------------------------------------------------------------------
-/** Read-only: { state: 'none' } | { state: 'pending', marker } | { state: 'invalid', why }. Doctor and the gate use it. */
+/**
+ * Read-only: { state: 'none' } | { state: 'pending', marker } | { state: 'invalid', why } | { state: 'unreadable', why }.
+ * Doctor and the gate use it. Only a marker that is genuinely ABSENT (ENOENT) is "none": a location that cannot be
+ * checked (EACCES, EIO, ...) is 'unreadable', never "no marker" (owner decision 8, Q1/Q2).
+ */
 export function readInstallMarker(paths) {
   const file = markerPath(paths);
-  let st; try { st = fs.lstatSync(file); } catch { return { state: 'none' }; }
+  let st;
+  try { st = fs.lstatSync(file); } catch (e) {
+    if (e.code === 'ENOENT') return { state: 'none' };
+    return { state: 'unreadable', why: `it could not be checked (${e.code || e.message})` };
+  }
   if (!st.isFile()) return { state: 'invalid', why: 'it is not a regular file' };
   let rec;
   try { rec = JSON.parse(readBounded(file, CAPS.marker, { noFollow: true }).toString('utf8')); }
@@ -252,22 +260,36 @@ export function createWitnessFromStaged(paths, staged, { hooks = {}, fsImpl = {}
     if (src.size !== staged.size) throw new LegacyInstallRefused(`the verified seed changed size (${src.size}, not ${staged.size}); nothing was installed`);
     copyFdExact(src.fd, staged.size, tmp, staged.path, hooks);
   } catch (e) { fs.rmSync(tmp, { force: true }); throw e; } finally { fs.closeSync(src.fd); }
+  // Once link() has PUBLISHED witness.db, any later failure is reported as such (committed), so the caller keeps the
+  // pending marker and the same command completes the installation (owner decision 8, Q3/Q4).
+  const afterPublication = (what, e) => new LegacyInstallRefused(`the witness database was created (published), but `
+    + `${what} failed (${e.code || e.message}); the installation stays pending: re-run the same command with the same `
+    + 'seed to complete it', { committed: true, kind: 'published' });
+  let outcome;
   try {
     const out = openRegular(tmp);
     try { if (hashRange(out.fd, 0, staged.size, tmp) !== staged.digest) throw new LegacyInstallRefused('the staging copy does not match the verified digest; nothing was installed'); }
     finally { fs.closeSync(out.fd); }
     hooks.beforeWitnessLink?.();
-    try { (fsImpl.linkSync ?? fs.linkSync)(tmp, paths.witnessDb); } catch (e) {
-      if (e.code === 'EEXIST') return 'exists';
-      if (LINK_UNSUPPORTED.has(e.code)) {
+    try { (fsImpl.linkSync ?? fs.linkSync)(tmp, paths.witnessDb); outcome = 'created'; } catch (e) {
+      if (e.code === 'EEXIST') outcome = 'exists';
+      else if (LINK_UNSUPPORTED.has(e.code)) {
         throw new LegacyInstallRefused(`this filesystem cannot create the witness database without risking an overwrite `
           + `(link: ${e.code}); nothing was installed`, { kind: 'unsupported' });
-      }
-      throw e;
+      } else throw e;
     }
-    fsyncDir(dir);
-    return 'created';
-  } finally { fs.rmSync(tmp, { force: true }); }
+    if (outcome === 'created') {
+      try { fsyncDir(dir); } catch (e) { throw afterPublication('synchronising its directory', e); }
+    }
+  } catch (e) {
+    try { fs.rmSync(tmp, { force: true }); } catch { /* an owned name: a later seed command removes it */ }
+    throw e;
+  }
+  try { fs.rmSync(tmp, { force: true }); } catch (e) {
+    if (outcome === 'created') throw afterPublication('removing the staging copy', e);
+    // 'exists': this step published nothing; the leftover has an owned name and a later seed command removes it
+  }
+  return outcome;
 }
 
 /**
@@ -306,9 +328,10 @@ export function installLegacySeed(paths, staged, { lock, mode, hooks = {}, seam,
       + 'stop it first: chaingate stop. Nothing was changed.', { kind: 'proxy-running' });
   }
   const m = readInstallMarker(paths);
-  if (m.state === 'invalid') {
-    throw new LegacyInstallRefused(`the pending-install marker ${markerPath(paths)} is not valid (${m.why}); nothing was `
-      + 'changed. Inspect it; a marker this version does not recognise is never guessed around.', { kind: 'marker' });
+  if (m.state === 'invalid' || m.state === 'unreadable') {
+    throw new LegacyInstallRefused(`the pending-install marker ${markerPath(paths)} ${m.state === 'invalid' ? 'is not valid'
+      : 'cannot be checked'} (${m.why}); nothing was changed. Inspect it; a marker this version cannot read is never `
+      + 'guessed around.', { kind: 'marker' });
   }
   const completing = m.state === 'pending';
   if (completing && m.marker.new_sha256 !== staged.digest) {
