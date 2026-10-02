@@ -199,8 +199,8 @@ with no Python or compiler.
   `npm.cmd install -g @cgsec/chaingate --allow-scripts=better-sqlite3`. To approve it once for all
   your global installs: `npm.cmd config set allow-scripts=better-sqlite3 --location=user`.
 - Start ChainGate with your v3 seed:
-  `chaingate.cmd init --seed C:\path\to\chaingate-seed.db --unsigned-development`. Without `--seed`,
-  `init` downloads the older legacy witness seed instead (see below).
+  `chaingate.cmd init --seed C:\path\to\chaingate-seed.db --unsigned-development`. On a new install,
+  `init` without `--seed` downloads the older legacy witness seed instead (see below).
 - [SEEDS.md](SEEDS.md) shows how to check a seed file's SHA-256 in PowerShell.
 
 From source:
@@ -217,8 +217,10 @@ current release candidate seed is **unsigned**, so it also needs `--unsigned-dev
 tool reports `authenticated: false`. [SEEDS.md](SEEDS.md) lists each v3 seed's exact identifiers and
 how to verify a download. [SECURITY.md](SECURITY.md) describes the trust model.
 
-Running `chaingate init` without `--seed` does **not** set up v3 detection. It downloads the older,
-signed legacy witness seed (about 100 MB) and tells you so. For v3 detection, always pass `--seed`.
+Running `chaingate init` without `--seed` does **not** set up v3 detection. On a new install (no v3
+seed and no witness database yet) it downloads the older, signed legacy witness seed (about 100 MB)
+and tells you so. It never downloads with `--no-seed`, or on a host that uses a v3 seed. For v3
+detection, always pass `--seed`.
 
 **1. Initialize.** This installs the v3 seed, starts the proxy and points npm at it:
 
@@ -295,7 +297,32 @@ restores `.npmrc`.
 previous one with `chaingate update-seed --rollback`. A running proxy keeps its current seed until
 you restart it with `chaingate stop && chaingate init`. On a host that uses a v3 seed,
 `chaingate update-seed` without `--seed` **refuses**, because v3 seeds cannot be downloaded
-automatically.
+automatically. `update-seed --seed` accepts v3 seeds only; a legacy seed file is refused (see
+[Seed bundles](#seed-bundles)).
+
+**One seed command at a time.** `init`, `update-seed` and `update-seed --rollback` take a lock on the
+ChainGate directory (the file `.seed-mutation.lock`) before they read or change anything about seeds.
+A second seed command started meanwhile waits about 2 seconds, then stops with "another seed command
+... is running" and changes nothing; run it again when the first has finished. The proxy, `status`
+and `doctor` never wait for it. If a command is killed, the operating system releases the lock.
+ChainGate 0.1.2 and earlier do not take this lock, so do not run seed commands from different
+versions against the same directory. Seed commands are not supported on network filesystems or FAT.
+
+**If a seed command is interrupted.** On Linux and macOS, the next seed command first finishes or
+undoes an interrupted activation (`status` and `doctor` report one that is pending; they never repair
+it themselves). If that record is unreadable, seed commands stop and say so: inspect
+`chaingate status` and `chaingate doctor --json`, then rename the file to
+`.activation-intent.json.held-<UTC timestamp>` yourself; ChainGate never deletes it. Partial copies left
+by a killed command are removed by a later seed command, once the process that made them has exited
+and they are more than 15 minutes old. Until then, `doctor` lists them under `seed-leftovers`.
+
+**Space.** Installing a seed copies it first, so it needs about the seed's size free **in addition to**
+what is already used, plus the small sidecar files and a 64 MiB reserve, on the filesystem that holds
+the ChainGate directory. ChainGate refuses up front when there is clearly not enough. That check is
+not a guarantee, because other programs can use space at the same time. A copy that fails is removed,
+and the active seed stays as it was. Seed metadata files are read with fixed size limits (4 KiB for
+`.sha256` and `.sig`, 64 KiB for `bundle.json` and `config.json`), and a FIFO, device or other
+non-regular file in their place is refused.
 
 ## Seed bundles
 
@@ -306,9 +333,36 @@ There are two kinds of seed.
   not downloaded automatically, and none has been published yet.** It is opened read-only and checked
   against its `.sha256` file. It counts as authenticated only when a signature verifies against the
   built-in key (see SECURITY.md).
-- **Legacy witness seed**, published as `seed-v2.x` GitHub releases. `chaingate init` without `--seed`
-  downloads this signed seed for the older witness store. It does **not** set up v3 detection, and
-  `init` says so.
+- **Legacy witness seed**, published as `seed-v2.x` GitHub releases. On a new install, `chaingate init`
+  without `--seed` downloads this signed seed for the older witness store. It does **not** set up v3
+  detection, and `init` says so.
+
+**The legacy witness seed, in detail:**
+
+- It is never installed on a host that uses a v3 seed, and never without a valid signature.
+- `--force` does not replace the witness database, and `--no-seed` never downloads. `--seed` and
+  `--no-seed` together are refused.
+- To refresh the legacy seed of an existing witness database, run `chaingate update-seed`, or
+  `chaingate init --seed <legacy db> --force`. Stop the proxy first. The refresh happens in place, in
+  one database transaction, and keeps your local decisions and overrides. Baselines the proxy
+  recorded for versions the new seed does not contain are not kept, as before.
+- Downloads are limited to 256 MiB for the database and 4 KiB for each signature file, with time
+  limits, and the temporary download directory is removed afterwards.
+
+**An interrupted legacy installation.** ChainGate marks a legacy seed installation as pending
+(`witness.db.install-pending.json`) before it changes the witness database. While it is pending,
+`chaingate doctor` reports the seed signature as unverifiable, and `init`, `allow` and the other
+commands that pass ChainGate's integrity check refuse, except the one that completes the
+installation. To complete it, run the same command again with the same seed: `chaingate update-seed`,
+or `chaingate init --seed <legacy db> --force`.
+
+Completing it needs the **exact** seed that was being installed and its signature files. This applies
+to a local legacy bundle as much as to a published release, so **keep the original bundle until the
+installation has completed**. If that seed or its signature files are no longer available, the
+installation stays pending: ChainGate has no supported way to substitute another seed or to reset it.
+Do not delete the witness database or the marker file to get past this, and do not try to bypass
+signature verification. Other integrity failures are reported as before; completing an installation
+does not skip them.
 
 [SECURITY.md](SECURITY.md) describes the full trust model.
 
