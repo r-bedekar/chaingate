@@ -43,6 +43,9 @@ export function buildLegacySeed(dir, { key, seedVersion = '2026.test.2', pkgs = 
   fs.rmSync(dbPath, { force: true });
   const db = new Database(dbPath);
   db.exec(schemaWithout(drop));
+  // One transaction for the fixture rows: row-by-row autocommit cost one fsync per row (about 4,000 for the timed-kill
+  // trials' seed), which took the Windows CI unit job past its time limit. The rows written are the same.
+  db.exec('BEGIN');
   for (const p of pkgs) {
     db.prepare("INSERT INTO packages (id, ecosystem, package_name) VALUES (?, 'npm', ?)").run(p.id, p.name);
     for (const v of p.versions) {
@@ -74,6 +77,7 @@ export function buildLegacySeed(dir, { key, seedVersion = '2026.test.2', pkgs = 
   if (!drop.includes('dep_first_publish')) {
     for (const r of depFirstPublish) db.prepare("INSERT INTO dep_first_publish (package_name, first_publish, status) VALUES (?, ?, 'ok')").run(r.name, r.at);
   }
+  db.exec('COMMIT');
   if (sql) db.exec(sql);
   db.close();
   const digest = sha256File(dbPath);
