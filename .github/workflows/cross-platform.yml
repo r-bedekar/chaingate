@@ -145,3 +145,49 @@ jobs:
             versions.txt
             ${{ runner.temp }}/acceptance-*.json
             ${{ runner.temp }}/global-install.log
+
+  # U-05 R2-2 D6: a REAL filesystem smaller than the seed. Admission refuses up front; forced past admission through the
+  # test seam, the copy hits a real ENOSPC and the staging copy is removed. Linux: a tmpfs (CI may mount with sudo; the
+  # local qualification host cannot). macOS: an hdiutil image. Windows: needs an administrator-made fixed-size VHD, so it
+  # is NOT TESTED here.
+  small-filesystem:
+    name: D6 small filesystem / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: mount a 16 MiB filesystem
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            D=/mnt/cg-small
+            sudo mkdir -p "$D" && sudo mount -t tmpfs -o "size=16m,uid=$(id -u),gid=$(id -g)" tmpfs "$D"
+          else
+            hdiutil create -size 16m -fs APFS -volname cgsmall "$RUNNER_TEMP/cgsmall.dmg"
+            hdiutil attach "$RUNNER_TEMP/cgsmall.dmg"
+            D=/Volumes/cgsmall
+          fi
+          df -k "$D"
+          echo "CG_R22_SMALL_FS=$D" >> "$GITHUB_ENV"
+      - name: D6 (it must RUN here, not skip)
+        shell: bash
+        run: |
+          node --test test/cli/u05-r22-d-staging.test.js 2>&1 | tee d6-output.txt; rc=${PIPESTATUS[0]}
+          if ! grep -E '^ok .* D6 ' d6-output.txt | grep -qv SKIP; then echo 'D6 did not run'; exit 1; fi
+          exit "$rc"
+      - name: report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d6-${{ matrix.os }}
+          path: d6-output.txt
