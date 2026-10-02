@@ -7,6 +7,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 
 import { createProxyServer } from '../../proxy/server.js';
@@ -158,7 +159,7 @@ export function insertRows(w, list, overrides = []) {
   tx(); raw.close();
 }
 
-const HIST = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'fixtures', 'u05-d10-historical');
+const HIST = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'u05-d10-historical');
 /** A scenario's rows as WRITTEN BY a published runtime (fixtures captured by capture.mjs). */
 export function historical(runtimeVersion, scenario) {
   const f = JSON.parse(fs.readFileSync(path.join(HIST, `${runtimeVersion}.json`), 'utf8'));

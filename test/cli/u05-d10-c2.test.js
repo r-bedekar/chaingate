@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { openWitnessDB } from '../../witness/db.js';
 import { seed, registry, proxy, tarball, packument, rows, dispositions, failingWitness, insertRows, historical,
@@ -216,7 +217,7 @@ test('C2-12 `why --cached` shows the decision that applies beside the latest row
   const { spawnSync } = await import('node:child_process');
   const dir = tmp('why'); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const w = path.join(dir, 'witness.db'); const h = historical('0.1.2', 'ch-gap'); insertRows(w, h.rows, h.overrides);
-  const cli = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'cli', 'index.js');
+  const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'cli', 'index.js');
   const r = spawnSync(process.execPath, [cli, 'why', 'p@1.4.0', '--cached', '--json'],
     { env: { ...process.env, CHAINGATE_WITNESS_DB: w, NO_COLOR: '1' }, encoding: 'utf8' });
   const j = JSON.parse(r.stdout);
