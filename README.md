@@ -71,7 +71,9 @@ npm (developer or CI)  ->  ChainGate proxy  ->  upstream registry
 The whole path, from `npm install` to a decision with its reasons, works today.
 
 **Local npm proxy.** Sits between npm and the upstream registry, built on `undici`. It rewrites
-package metadata and evaluates every version it resolves.
+package metadata and evaluates every version it resolves. Installs from a lockfile (`npm ci`, and `npm install` with a
+complete lockfile) ask only for tarballs, so before it serves a tarball it has not evaluated in this run, the proxy
+evaluates that exact version first and applies its current decision.
 
 **CLI.** Ten commands: `init`, `status`, `check`, `why`, `history`, `allow`,
 `overrides`, `update-seed`, `doctor`, `stop`.
@@ -86,16 +88,42 @@ overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = too
 emits a versioned `chaingate.check/2` record (0.1.2 and earlier wrote `chaingate.check/1`, which is still
 read); `examples/ci/` has an offline CI consumer for both.
 
+**A failure never turns a BLOCK into permission.** A BLOCK stays in force until the check that issued it
+definitively clears it (for example, the content hash matches its first-seen value again, or the seed no longer
+records the advisory), or until you add an exact override with `chaingate allow`. A skipped check, an error, missing
+evidence, an unreadable seed or an input the seed cannot use never clears it. This also applies to decisions written
+by earlier versions; nothing in your history is rewritten.
+
+**Exception, by your choice:** with `on_unusable_input: WARN`, a version whose stored decision cannot be read at all is
+served. A BLOCK the running proxy holds in memory is still refused. Without a v3 seed (a legacy seed or
+`--no-seed`), a decision that cannot be read is refused; those configurations do not provide v3 detection.
+
 **When a BLOCK cannot be stored.** If a BLOCK decision cannot be stored, the running proxy remembers and
-enforces it in memory. Restarting the proxy clears that memory. A subsequent packument evaluation can reconstruct
-a pin-based BLOCK if the accepted seed and pin lookup remain available. A direct tarball request before that
-evaluation is not protected by the forgotten record unless a stored BLOCK independently applies. Tarball requests
-for versions the proxy has never evaluated are not covered by this protection.
+enforces it in memory. Restarting the proxy clears that memory, but the first request for each version after a restart
+is evaluated again before anything is served, so a BLOCK the seed or the stored history supports is computed again.
+
+**What the proxy cannot see.** ChainGate decides only requests that reach it:
+- npm reuses its local cache by content hash without contacting any registry, so a version already in the cache is
+  installed without a check. Give CI jobs an empty cache, and clear the cache (`npm cache clean --force`) when you
+  start using ChainGate on a machine;
+- a lockfile `resolved` URL on any host other than `registry.npmjs.org` or the proxy (a private registry, a mirror)
+  is fetched from that host directly. With `replace-registry-host=never`, even `registry.npmjs.org` URLs are;
+- an upstream other than `registry.npmjs.org` may give tarball URLs on its own host, which npm then fetches directly.
+
+**Protected CI workflow (tested):**
+1. Start the proxy with your seed (`chaingate init --seed …`).
+2. Set `registry` to the proxy, and keep npm's default `replace-registry-host`.
+3. Keep lockfile `resolved` URLs on `registry.npmjs.org`.
+4. Run `npm ci --cache "$(mktemp -d)"`.
+
+A pinned version then fails the install; any other version is evaluated before it is served.
 
 This in-memory record is bounded: by default 50,000 entries and an estimated 64 MiB of retained data. You can change
 these with `unstored_block_cap_entries` and `unstored_block_cap_bytes` in the configuration, or
 `CHAINGATE_UNSTORED_BLOCK_CAP_ENTRIES` and `CHAINGATE_UNSTORED_BLOCK_CAP_BYTES`. The bound applies to the record, not
-to the proxy's total memory, and the default values are not a measured safe limit for every machine. Nothing is ever
+to the proxy's total memory, and the default values are not a measured safe limit for every machine. On the tested
+Linux configuration, a record at its 64 MiB byte cap (maximum-size names and details) came with about 122 MB of heap
+and 336 MB resident memory in the proxy process. Nothing is ever
 evicted. When a new BLOCK does not fit, the record becomes **FULL** and stays FULL until the proxy is restarted. While
 FULL, the proxy refuses (HTTP 503 `chaingate_storage_degraded`) every tarball that has no stored or remembered BLOCK and
 no exact-version override, including tarballs whose stored decision is ALLOW or WARN. This happens under every

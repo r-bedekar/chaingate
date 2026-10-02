@@ -210,7 +210,9 @@ measures below remove one connection-reuse condition. They do not
 make an untrusted registry trustworthy.
 
 - **Pinned HTTP client.** All upstream requests use an Agent from the
-  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments,
+  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments
+  (including the metadata request the proxy makes to evaluate a version
+  before serving a tarball it has not evaluated in this run),
   tarballs, background dependency lookups and the raw upstream
   fallback the proxy uses when an unexpected internal error occurs
   before any decision exists under `on_unusable_input: WARN` or with
