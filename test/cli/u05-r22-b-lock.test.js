@@ -20,6 +20,8 @@ const CONTENTION = /another seed command .*is running/;
 const manifestSha = (base, id) => JSON.parse(fs.readFileSync(path.join(seedsDir(base), id, 'bundle.json'), 'utf8')).sha256;
 const doctorChecks = (r) => { try { return JSON.parse(r.stdout); } catch { assert.fail(`doctor --json printed no JSON:\n${r.out}`); } };
 const INTENT = (base) => path.join(seedsDir(base), '.activation-intent.json');
+/** Killed at the hook: SIGKILL on POSIX; on Windows the child ends with a non-zero code and no signal (TerminateProcess). */
+const assertKilled = (r) => assert.ok(r.signal === 'SIGKILL' || (process.platform === 'win32' && r.code !== 0 && r.code !== null), `not killed: ${JSON.stringify({ code: r.code, signal: r.signal })}`);
 
 /** Install `s` as a new active bundle through the real CLI; returns its bundle id. */
 async function install(h, s) {
@@ -122,7 +124,7 @@ test('D3k a mutator killed mid-copy leaves partial staging; the next mutator rem
   try {
     const m1 = startMutator(h.base, 'update-seed', SEEDARGS(y1), { killAt: 'midStagingCopy' });
     assert.equal(await m1.at('midStagingCopy'), true); const r1 = await m1.done;
-    assert.equal(r1.signal, 'SIGKILL');
+    assertKilled(r1);
     const left = fs.readdirSync(seedsDir(h.base)).filter((n) => n.startsWith('.staging-'));
     assert.equal(left.length, 1, 'the killed copy left its staging directory');
     age(path.join(seedsDir(h.base), left[0]), 20);
@@ -374,7 +376,7 @@ test('B10 the lock path is named in exactly one runtime module', () => {
   const hits = [];
   const walk = (d) => { for (const n of fs.readdirSync(d, { withFileTypes: true })) {
     const p = path.join(d, n.name);
-    if (n.isDirectory()) walk(p); else if (/\.(m?js)$/.test(n.name) && fs.readFileSync(p, 'utf8').includes('.seed-mutation.lock')) hits.push(path.relative(ROOT, p));
+    if (n.isDirectory()) walk(p); else if (/\.(m?js)$/.test(n.name) && fs.readFileSync(p, 'utf8').includes('.seed-mutation.lock')) hits.push(path.relative(ROOT, p).split(path.sep).join('/'));
   } };
   for (const d of ['cli', 'proxy', 'witness', 'seed', 'gates']) walk(path.join(ROOT, d));
   if (fs.readFileSync(path.join(ROOT, 'config-store.js'), 'utf8').includes('.seed-mutation.lock')) hits.push('config-store.js');

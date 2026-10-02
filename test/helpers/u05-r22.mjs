@@ -6,7 +6,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { buildSyntheticSeed } from '../seed-v3/u01-cases.mjs';
 
@@ -102,7 +102,13 @@ export async function runCli(base, args, opts = {}) {
   const after = exists(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : null;
   if (after && after !== before && /^\d+$/.test(after)) {
     r.spawnedProxy = Number(after);
+    // stopped the way a user stops it (a clean shutdown leaves no WAL to recover), then made sure it is gone
+    await runNode([CLI, 'stop'], { env: { CHAINGATE_HOME: base, ...(opts.env || {}) }, home: opts.home ?? path.dirname(base), timeoutMs: 20000 });
     try { process.kill(r.spawnedProxy, 'SIGKILL'); } catch { /* already gone */ }
+    for (let i = 0; i < 100; i += 1) {
+      try { process.kill(r.spawnedProxy, 0); } catch { break; }
+      await new Promise((res) => setTimeout(res, 100));
+    }
   }
   return r;
 }
@@ -126,7 +132,8 @@ export async function runProxyEntry(base, { timeoutMs = 15000, env = {}, until =
 /** A child running `script` (a module under test/helpers) with the read meter; returns its result and the accesses. */
 export async function metered(script, args, { timeoutMs = 60000 } = {}) {
   const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cg-meter-')), 'accesses.json');
-  const r = await runNode([script, ...args], { timeoutMs, nodeArgs: ['--import', METER], env: { U05_READ_METER_OUT: outFile } });
+  // --import takes a URL: a Windows absolute path would read as a URL scheme
+  const r = await runNode([script, ...args], { timeoutMs, nodeArgs: ['--import', pathToFileURL(METER).href], env: { U05_READ_METER_OUT: outFile } });
   let accesses = [];
   try { accesses = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { /* the child died before writing */ }
   fs.rmSync(path.dirname(outFile), { recursive: true, force: true });

@@ -131,7 +131,7 @@ for (const [label, opt, why] of [
   });
 }
 
-test('S-7 ignores SIGTERM: TIMEOUT within the deadline; record kept', async () => {
+test('S-7 ignores SIGTERM: TIMEOUT within the deadline; record kept', { skip: process.platform === 'win32' ? 'POSIX signal semantics: on Windows SIGTERM is TerminateProcess and cannot be ignored or handled' : false }, async () => {
   const dir = tmp();
   const f = await fake(dir, { ignoreTerm: true });
   const t0 = Date.now();
@@ -142,7 +142,7 @@ test('S-7 ignores SIGTERM: TIMEOUT within the deadline; record kept', async () =
   assert.match(r.detail, /alive/);
 });
 
-test('S-8 the owned proxy exits and another listener takes the port: STOPPED_PORT_TAKEN naming it', async () => {
+test('S-8 the owned proxy exits and another listener takes the port: STOPPED_PORT_TAKEN naming it', { skip: process.platform === 'win32' ? 'POSIX signal semantics: on Windows SIGTERM is TerminateProcess and cannot be ignored or handled' : false }, async () => {
   const dir = tmp();
   const pidOut = path.join(dir, 'listener.pid');
   const f = await fake(dir, { takeover: true, pidOut });   // on SIGTERM: closes, a detached listener binds ITS port, exits
@@ -168,7 +168,7 @@ test('S-9 the process exits between the check and the signal (ESRCH): STOPPED', 
   assert.equal(r.outcome, 'stopped');
 });
 
-test('S-10 .npmrc: only the ChainGate block is removed on success; byte-identical on an unsuccessful stop', async () => {
+test('S-10 .npmrc: only the ChainGate block is removed on success; byte-identical on an unsuccessful stop', { skip: process.platform === 'win32' ? 'POSIX signal semantics: on Windows SIGTERM is TerminateProcess and cannot be ignored or handled' : false }, async () => {
   const dir = tmp();
   const head = 'registry=https://registry.example/\r\n//registry.example/:_authToken=X\r\n@scope:registry=https://s.example/\r\n';
   const tail = 'save-exact=true\n';

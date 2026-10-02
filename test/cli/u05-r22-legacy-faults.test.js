@@ -75,8 +75,8 @@ test('Q2 marker lstat EIO (injected): not "no marker"; the gate refuses; an inst
 });
 
 // ---- Q3 / Q4: failures AFTER link() has published witness.db ---------------------------------------------------------
-function afterPublication(label, inject) {
-  test(`${label}: the marker stays, publication is reported, and completion converges`, () => {
+function afterPublication(label, inject, opts = {}) {
+  test(`${label}: the marker stays, publication is reported, and completion converges`, opts, () => {
     const { home, base } = freshHome('faults');
     try {
       const p = pathsFor(base);
@@ -106,7 +106,7 @@ afterPublication('Q3 link() succeeded, then the directory sync fails (EIO)', (p,
   fs.openSync = function (f, ...a) { const fd = realOpen.call(fs, f, ...a); if (String(f) === path.dirname(p.witnessDb)) dirFds.add(fd); return fd; };
   try { patched('fsyncSync', (fd) => dirFds.has(fd) && fs.existsSync(p.witnessDb), 'EIO', run); }
   finally { fs.openSync = realOpen; }
-});
+}, { skip: process.platform === 'win32' ? 'Windows cannot fsync a directory, so ChainGate does not sync one there: no such failure point' : false });
 
 afterPublication('Q4 link() succeeded, then removing the staging copy fails (EBUSY)', (p, run) => {
   patched('rmSync', (f) => /witness\.db\.staging-\d+$/.test(String(f)) && fs.existsSync(p.witnessDb), 'EBUSY', run);

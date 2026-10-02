@@ -146,7 +146,8 @@ test('K-4 the CLI/proxy interaction while a refresh holds the write lock: the pr
     const s2 = JSON.parse((await runCli(h.base, ['status', '--json'], { timeoutMs: 20000 })).stdout);
     assert.equal(s2.seed.version, '2026.test.new');
   } finally {
-    if (proxy) proxy.kill('SIGKILL');
+    // wait for the proxy to exit before removing its directory (Windows refuses to remove files a process holds open)
+    if (proxy && proxy.exitCode === null && proxy.signalCode === null) { const gone = new Promise((r) => proxy.on('close', r)); proxy.kill('SIGKILL'); await gone; }
     await new Promise((r) => upstream.close(r));
     h.cleanup();
   }

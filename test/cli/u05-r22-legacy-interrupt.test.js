@@ -56,7 +56,7 @@ for (const [point, nth, expected] of POINTS) {
       const m = startMutator(h.base, 'update-seed', [], { killAt: point, nth, env: env(h.neu) });
       const reached = await m.at(point); const r = await m.done;
       assert.equal(reached, true, `SEAM-ABSENT: no ${point} point\n${r.all}`);
-      assert.equal(r.signal, 'SIGKILL');
+      assert.ok(r.signal === 'SIGKILL' || (process.platform === 'win32' && r.code !== 0 && r.code !== null), `not killed: ${JSON.stringify({ code: r.code, signal: r.signal })}`);
       assert.equal(exists(MARKER(h.base)), true, 'the marker was made durable before the database changed');
       assert.equal(seedVersionOf(h.w), expected === 'old' ? '2026.test.old' : '2026.test.new');
       if (expected === 'old') assert.deepEqual(snapshot(h.w).rows, before.rows, 'before COMMIT: the old committed state');
