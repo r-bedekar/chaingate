@@ -121,11 +121,20 @@ test('R-8 (record level) overflow: entry cap and byte cap; FULL is sticky; Table
   assert.equal(byBytes.full, true, 'the byte cap binds before the entry cap');
 });
 
-test('Table M is unchanged: stored BLOCK forgets; evaluated non-BLOCK forgets; failure and override-based ALLOW keep', () => {
+// Table M as amended by owner decision 10 (C2): an evaluated non-BLOCK forgets a held BLOCK ONLY when it definitively
+// clears every reason of it (witness/decision-rule.js); a plain or non-definitive ALLOW keeps it.
+const PIN = 'cft-policy-1.1: seed-v3:known-malicious-pin: recorded advisory ADV-1 pins p@1 (source test)';
+const definitiveClear = { disposition: 'ALLOW', results: [{ gate: 'seed-v3', result: 'ALLOW',
+  detail: 'cft-policy-1.1: seed-v3:known-malicious-pin: no recorded advisory pins this version' }] };
+test('Table M (amended by decision 10): stored BLOCK forgets; a definitive clearance forgets; anything else keeps', () => {
   const r = createUnstoredBlocks({ caps: BIG });
-  r.note('p', '1', blockUnstored()); r.note('p', '1', failureWarn); assert.ok(r.get('p', '1'));
+  r.note('p', '1', blockUnstored(PIN)); r.note('p', '1', failureWarn); assert.ok(r.get('p', '1'));
   r.note('p', '1', overrideAllow); assert.ok(r.get('p', '1'));
-  r.note('p', '1', evaluatedAllow); assert.equal(r.get('p', '1'), null);
+  r.note('p', '1', evaluatedAllow); assert.ok(r.get('p', '1'), 'a non-definitive evaluated ALLOW keeps it (C2)');
+  r.note('p', '1', definitiveClear); assert.equal(r.get('p', '1'), null, 'a definitive clearance forgets it');
+  r.note('p', '3', blockUnstored()); r.note('p', '3', definitiveClear);
+  assert.ok(r.get('p', '3'), 'an unrecognised BLOCK reason is never cleared by an evaluation');
+  r.note('p', '3', blockStored); assert.equal(r.get('p', '3'), null, 'only a stored BLOCK replaces it');
   r.note('p', '2', blockUnstored()); r.note('p', '2', blockStored); assert.equal(r.get('p', '2'), null);
   assert.equal(r.estimatedBytes, C_FIXED);
 });

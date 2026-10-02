@@ -8,7 +8,8 @@
 // Lifecycle, per returned decision for name@version (Amendment 3, Table M; unchanged):
 //   BLOCK, not stored                              -> remember (the latest replaces the earlier)
 //   BLOCK, stored                                  -> forget: the database now governs
-//   non-BLOCK, evaluated, not override-based       -> forget: the newest evaluated decision governs
+//   non-BLOCK, evaluated, not override-based       -> forget ONLY if it definitively clears every reason of the held
+//                                                     BLOCK (owner decision 10, C2: witness/decision-rule.js); else keep
 //   non-BLOCK failure decision (evaluated: false)  -> keep: a failure never erases a known BLOCK
 //   override-based ALLOW                           -> keep: overrides are checked live, so removing one restores the BLOCK
 //
@@ -24,6 +25,8 @@
 //   entry   E = 2*(len(version) + len(detail) + sum(len(gates)) + 24) + C_ENTRY
 //   package P = 2*len(name) + C_PKG                 T = sum(E) + sum(P) + C_FIXED
 // Nothing is persisted: a restart forgets every entry and the FULL state.
+
+import { reasonBits, clearedBits } from '../witness/decision-rule.js';
 
 export const LIMITS = Object.freeze({
   NAME_MAX: 214, VERSION_MAX: 256, DETAIL_MAX: 160, GATES_MAX: 8, GATE_NAME_MAX: 64, TS_LEN: 24,
@@ -135,14 +138,19 @@ export function createUnstoredBlocks({ log = null, caps = DEFAULT_CAPS, now = Da
         + `version ${version.length}/${LIMITS.VERSION_MAX}); it is never truncated`);
       return;
     }
-    const entry = { remembered_at: iso(), detail: blockDetail(decision), gates: blockGates(decision), charged: 0 };
+    // `reasons`: the held BLOCK's reasons as a small fixed-size bit set (C2). Like `charged`, it is covered by the entry's
+    // fixed overhead C_ENTRY in the accepted accounting model, which is therefore unchanged.
+    const entry = { remembered_at: iso(), detail: blockDetail(decision), gates: blockGates(decision), charged: 0,
+      reasons: reasonBits(decision.results) };
     entry.charged = entryCost(version, entry);
     const pkg = byPackage.get(name);
     const existing = pkg?.versions.get(version);
     if (existing) {
+      // C2: the reasons the new BLOCK does not definitively clear stay held beside its own.
+      entry.reasons |= existing.reasons & ~clearedBits(existing.reasons, decision.results);
       const delta = entry.charged - existing.charged;
       if (total + delta <= cap.bytes) { pkg.versions.set(version, entry); total += delta; }
-      else { existing.remembered_at = entry.remembered_at; counters.replacement_detail_kept += 1; }
+      else { existing.remembered_at = entry.remembered_at; existing.reasons = entry.reasons; counters.replacement_detail_kept += 1; }
     } else {
       const add = entry.charged + (pkg ? 0 : packageCost(name));
       if (count + 1 > cap.entries || total + add > cap.bytes) {
@@ -172,7 +180,10 @@ export function createUnstoredBlocks({ log = null, caps = DEFAULT_CAPS, now = Da
       if (block && !stored) { remember(name, version, decision); return; }
       if (block) { forget(name, version); return; }
       if (decision.evaluated === false || isOverrideBased(decision)) return;
-      forget(name, version);
+      // C2 (owner decision 10): forgotten only when this decision definitively clears EVERY reason of the held BLOCK.
+      const held = byPackage.get(name)?.versions.get(version);
+      if (!held) return;
+      if ((held.reasons & ~clearedBits(held.reasons, decision.results)) === 0) forget(name, version);
     },
     get(name, version) { return byPackage.get(name)?.versions.get(version) ?? null; },
     forPackage(name) { return [...(byPackage.get(name)?.versions ?? new Map())]; },

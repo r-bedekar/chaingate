@@ -44,6 +44,7 @@
 
 import { parseVersionsFromPackument } from './baseline.js';
 import { isOverrideRow } from './db.js';
+import { applicableFromRows, step, isActualEvaluation } from './decision-rule.js';
 
 const ECOSYSTEM = 'npm';
 
@@ -108,25 +109,6 @@ export function createWitness({ db, runGates, config, logger }) {
     };
   }
 
-  /**
-   * THE prior decision for (pkg, version), read with the one rule the tarball gate also uses (U-05 gap-closure r2, N3):
-   * a stored override ALLOW counts only while the override exists. `live` says whether it does -- for a decision the
-   * runner made BECAUSE of an override it is true by construction; for any other decision the override rows are skipped.
-   */
-  function effectivePrior(packageName, version, live) {
-    const latest = db.getLatestDecision(packageName, version);
-    if (!latest || live || !isOverrideRow(latest.gates_fired)) return latest;
-    return db.getLatestNonOverrideDecision(packageName, version);
-  }
-
-  /** The underlying stored BLOCK (override rows skipped), or null -- also when it cannot be read (today's behaviour). */
-  function underlyingStoredBlock(packageName, version) {
-    try {
-      const row = effectivePrior(packageName, version, false);
-      return row && row.disposition === 'BLOCK' ? row : null;
-    } catch { return null; }
-  }
-
   function overrideEstablished(packageName, version) {
     try { return Boolean(db.getOverride(packageName, version)); } catch { return false; }
   }
@@ -136,6 +118,17 @@ export function createWitness({ db, runGates, config, logger }) {
    * applies to this exact version. Nothing is inserted; the stored BLOCK is returned -- it IS stored -- with the failure's
    * own rows after it. (Rule K's wording, for the stored case.)
    */
+  /** C2 (owner decision 10): the stored BLOCK still applies because this evaluation did not definitively clear it. */
+  function applicableBlockKept(packageName, version, row, pending, computed) {
+    return {
+      disposition: 'BLOCK',
+      results: [{ gate: 'chaingate', result: 'BLOCK',
+        detail: `stored BLOCK still applies: ${packageName}@${version} was BLOCKed (decided ${row.decided_at ?? 'at an unknown time'}) `
+          + `and this evaluation did not definitively clear ${pending.join(', ')}` },
+      ...(Array.isArray(computed?.results) ? computed.results : [])],
+    };
+  }
+
   function preservedStoredBlock(packageName, version, row, failed) {
     return {
       disposition: 'BLOCK',
@@ -200,6 +193,7 @@ export function createWitness({ db, runGates, config, logger }) {
     // throw is now inside one guard.
     // Decisions computed inside the transaction, kept OUTSIDE it: a rolled-back transaction must not take them along.
     const evaluated = new Map();
+    const actual = new Set();          // C1: versions actually evaluated (decision 10, F1/F1a), kept outside the transaction
     const storageFailures = [];
     let inserted = 0;
     let txn;
@@ -252,17 +246,28 @@ export function createWitness({ db, runGates, config, logger }) {
           computed = { disposition, results: gateResults, ...(result?.evaluated === false ? { evaluated: false } : {}) };
           stage = 'write';
 
-          // N1 (W2): a failure-derived non-BLOCK never downgrades the underlying stored BLOCK. With an exact override
+          // U-05 owner decision 10 (C2): ONE applicable-BLOCK rule (witness/decision-rule.js) over the stored history
+          // and this result. A read error here is a storage failure for this version (the catch below).
+          const overrideBased = isOverrideRow(gateResults);
+          const stored = db.getDecisionHistory(packageName, incoming.version);
+          const before = applicableFromRows(stored);
+          const after = step(new Set(before.pending), gateResults);
+          // N1 (W2): a failure-derived non-BLOCK never downgrades the applicable BLOCK. With an exact override
           // established the failure decision is returned as before (A1-OV); either way nothing is inserted over it.
           let returned = computed;
           let skipInsert = false;
           if (computed.evaluated === false && disposition !== 'BLOCK') {
-            const kept = underlyingStoredBlock(packageName, incoming.version);
-            if (kept) {
+            if (before.block) {
               skipInsert = true;
               if (!overrideEstablished(packageName, incoming.version)) {
-                returned = preservedStoredBlock(packageName, incoming.version, kept, computed);
+                returned = preservedStoredBlock(packageName, incoming.version, before.block, computed);
               }
+            }
+          } else if (!overrideBased && disposition !== 'BLOCK' && before.block && after.pending.size > 0) {
+            // C2: an evaluation that does not DEFINITIVELY clear every pending reason (a SKIP, an error, a missing gate,
+            // an input-rule result) leaves the BLOCK applicable. Its row is still written below, once, as evidence.
+            if (!overrideEstablished(packageName, incoming.version)) {
+              returned = applicableBlockKept(packageName, incoming.version, before.block, [...after.pending].sort(), computed);
             }
           }
           evaluated.set(incoming.version, returned);
@@ -279,16 +284,19 @@ export function createWitness({ db, runGates, config, logger }) {
             // Idempotent re-observe: bumpLastSeen fires inside recordBaseline's write path.
             db.recordBaseline(packageName, incoming.version, incoming);
             // W1: state-change logging against the EFFECTIVE prior decision -- the same rows the tarball gate applies --
-            // so a new evaluation after a revoked override is recorded even when it repeats the override's ALLOW.
-            const prior = skipInsert ? null
-              : effectivePrior(packageName, incoming.version, isOverrideRow(gateResults));
-            if (!skipInsert && (!prior || prior.disposition !== disposition)) {
+            // so a new evaluation after a revoked override is recorded even when it repeats the override's ALLOW. C2: a
+            // result that definitively clears a pending reason is recorded even when the disposition repeats (a
+            // clearance must not be lost behind an earlier non-definitive row of the same disposition).
+            const prior = skipInsert ? null : (overrideBased ? (stored.at(-1) ?? null) : before.latest);
+            if (!skipInsert && (!prior || prior.disposition !== disposition || after.cleared.length > 0)) {
               db.insertGateDecision(packageName, incoming.version, disposition, gateResults);
               inserted += 1;
             }
           }
 
           decisions.set(incoming.version, returned);
+          // C1 (owner decision 10, F1/F1a): this version was actually evaluated in this observation.
+          if (computed.evaluated !== false && isActualEvaluation(gateResults)) actual.add(incoming.version);
         } catch (err) {
           log.warn(
             `[witness] version ${packageName}@${incoming.version} failed: ${err.message}`,
@@ -314,7 +322,7 @@ export function createWitness({ db, runGates, config, logger }) {
         decisions.set(versionStr, failureDecision(err, err.message, { packageName, version: versionStr }));
       }
 
-        return { decisions, newBaselines, versionsSeen: versions.length };
+        return { decisions, newBaselines, versionsSeen: versions.length, actual };
       });
       const out = txn(parsedVersions);
       recordOutcome(storageFailures, inserted);          // committed: the rows inserted above are durable
@@ -334,7 +342,7 @@ export function createWitness({ db, runGates, config, logger }) {
           ? computedDespiteFailure(computed, err, 'observation transaction failed', identity)
           : failureDecision(err, `observation failed: ${err.message}`, identity));
       }
-      return { decisions, newBaselines: 0, versionsSeen: parsedVersions.length, failed: true };
+      return { decisions, newBaselines: 0, versionsSeen: parsedVersions.length, failed: true, actual };
     }
   }
 

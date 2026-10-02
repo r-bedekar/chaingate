@@ -80,9 +80,14 @@ function showCached(parsed, opts) {
   const db = openWitnessDB(dbPath, { readonly: true });
   try {
     const row = db.getLatestDecision(parsed.name, parsed.version);
+    // Owner decision 10 (C2): the decision that APPLIES under the one applicable-BLOCK rule, beside the latest row.
+    let applicable = null;
+    try { applicable = row ? db.getApplicableDecision(parsed.name, parsed.version) : null; } catch { applicable = null; }
+    const applies = applicable ? { disposition: applicable.disposition, block_row: applicable.block?.id ?? null,
+      pending: applicable.pending, override: applicable.override } : null;
     if (opts.json) {
       console.log(JSON.stringify({ label: 'CACHED-UNBOUND', note: UNBOUND_LABEL,
-        package: parsed.name, version: parsed.version, cached: row || null }, null, 2));
+        package: parsed.name, version: parsed.version, cached: row || null, applicable: applies }, null, 2));
     } else {
       console.log(fmt.yellow ? fmt.yellow(UNBOUND_LABEL) : UNBOUND_LABEL);
       if (!row) {
@@ -90,6 +95,10 @@ function showCached(parsed, opts) {
       } else {
         console.log(`  ${parsed.name}@${parsed.version}  stored disposition ${row.disposition}  at ${row.decided_at}`);
         for (const gate of row.gates_fired || []) console.log(renderGate(gate));
+        if (applies && applies.disposition !== row.disposition) {
+          console.log(`  applies: ${applies.disposition} -- stored BLOCK #${applies.block_row} is not definitively cleared `
+            + `(${applies.pending.join(', ')})`);
+        }
       }
       console.log(`  For a current evaluation: chaingate check ${parsed.name}@${parsed.version} --packument <file>`);
     }

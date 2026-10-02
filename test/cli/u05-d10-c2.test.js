@@ -69,6 +69,17 @@ test('C2-3 (WARN) a BLOCK held only in memory is kept when a later evaluation do
   assert.equal(t1.json?.persisted, false);
 });
 
+test('C2-3b (WARN) a held BLOCK is forgotten once a later evaluation definitively clears it (added with the C2 commit)', async (t) => {
+  const w = await world(t, { policy: 'WARN' }); const witness = failingWitness(w.dir);
+  const px = await proxy({ upstream: w.reg.url, witness, policy: 'WARN', seedDb: w.s.dbPath });
+  t.after(() => px.stop());
+  await packument(px, 'p');
+  w.reg.set('p', { mode: { '1.4.0': 'alt' } }); await packument(px, 'p');
+  assert.equal((await tarball(px, 'p', '1.4.0')).status, 403, 'held');
+  w.reg.set('p', { mode: { '1.4.0': 'real' } }); await packument(px, 'p');  // the hash matches the baseline again
+  assert.equal((await tarball(px, 'p', '1.4.0')).status, 200, 'cleared definitively: forgotten and served');
+});
+
 test('C2-4 a missing gate is not clearance: the v3 seed removed, the pin BLOCK stays', async (t) => {
   const w = await world(t);
   let px = await proxy({ upstream: w.reg.url, witness: w.witness, seedDb: w.s.dbPath });
@@ -121,8 +132,12 @@ const verdict = (a) => (a.block ? 'BLOCK' : a.disposition);
 test('C2-6 two blocking gates: both must be accounted for', (t) => {
   const rowsA = [R(1, '1.3.0', 'BLOCK', [CHB, PIN11]), R(2, '1.3.0', 'WARN', [CHOK, INPUT11])];
   assert.equal(verdict(applicable(t, rowsA)), 'BLOCK', 'content-hash cleared, the pin not');
+  // Each reason is cleared by its own definitive result at any later point: content-hash in row 2, the pin in row 3.
+  // (Expectation corrected with the C2 commit: the failing-first version expected BLOCK here, which the rule does not say.)
   const rowsB = [...rowsA, R(3, '1.3.0', 'ALLOW', [CHSKIP, NOPIN11])];
-  assert.equal(verdict(applicable(t, rowsB)), 'BLOCK', 'the pin cleared later is enough only if content-hash stayed cleared');
+  assert.equal(verdict(applicable(t, rowsB)), 'ALLOW', 'content-hash cleared in row 2, the pin in row 3');
+  const rowsB2 = [...rowsA, R(3, '1.3.0', 'BLOCK', [CHB, NOPIN11]), R(4, '1.3.0', 'ALLOW', [CHSKIP, NOPIN11])];
+  assert.equal(verdict(applicable(t, rowsB2)), 'BLOCK', 'content-hash BLOCKed again in row 3 and only SKIPped since');
   const rowsC = [R(1, '1.3.0', 'BLOCK', [CHB, PIN11]), R(2, '1.3.0', 'ALLOW', [CHOK, NOPIN11])];
   const c = applicable(t, rowsC);
   assert.equal(verdict(c), 'ALLOW', 'both definitively cleared in one row');
@@ -195,3 +210,16 @@ for (const runtime of PUBLISHED) {
     }
   });
 }
+
+test('C2-12 `why --cached` shows the decision that applies beside the latest row (added with the C2 commit)', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const dir = tmp('why'); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const w = path.join(dir, 'witness.db'); const h = historical('0.1.2', 'ch-gap'); insertRows(w, h.rows, h.overrides);
+  const cli = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'cli', 'index.js');
+  const r = spawnSync(process.execPath, [cli, 'why', 'p@1.4.0', '--cached', '--json'],
+    { env: { ...process.env, CHAINGATE_WITNESS_DB: w, NO_COLOR: '1' }, encoding: 'utf8' });
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.cached.disposition, 'ALLOW', 'the latest row (an evidence-gap ALLOW)');
+  assert.equal(j.applicable.disposition, 'BLOCK');
+  assert.deepEqual(j.applicable.pending, ['content-hash']);
+});

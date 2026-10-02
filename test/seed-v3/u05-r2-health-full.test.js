@@ -153,14 +153,19 @@ for (const [label, cfg] of [['LIVE', LIVE], ['WARN', WARNCFG], ['pilot', null]])
       assert.equal(await st(tgz('z', '2.0.0')), 403);
       h.proxy.witnessDb.getOverride = real;
       const realLatest = h.proxy.witnessDb.getLatestDecision.bind(h.proxy.witnessDb);
+      const realApplicable = h.proxy.witnessDb.getApplicableDecision.bind(h.proxy.witnessDb);
+      // Vehicle (owner decision 10, C2): the FULL branch reads getApplicableDecision; the injection moves with it.
       h.proxy.witnessDb.getLatestDecision = () => { throw new Error('injected lookup failure'); };
+      h.proxy.witnessDb.getApplicableDecision = () => { throw new Error('injected lookup failure'); };
       assert.equal(await st(tgz('q', '1.3.0')), 503, 'P6a while FULL');
       assert.equal(await st(tgz('x', '2.0.0')), 403, 'remembered still 403');
       h.proxy.witnessDb.getLatestDecision = () => ({ get disposition() { throw new Error('injected: record unreadable'); } });
+      h.proxy.witnessDb.getApplicableDecision = () => ({ get block() { throw new Error('injected: record unreadable'); } });
       // Addendum §C step 5: a read that throws while FULL is refused by the FULL branch itself (503) under every
       // configuration; the outer-catch FULL rule is defence in depth. Today: LIVE 502, otherwise passthrough.
       assert.equal(await st(tgz('q', '1.3.0')), 503, 'an unreadable decision record while FULL: refused');
       h.proxy.witnessDb.getLatestDecision = realLatest;
+      h.proxy.witnessDb.getApplicableDecision = realApplicable;
       const q = await h.get('/q');
       assert.equal(q.status, 200, 'the normal packument path is unchanged while FULL');
       h.proxy.witness.observePackument = () => { throw new Error('injected observation failure'); };

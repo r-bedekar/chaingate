@@ -42,6 +42,9 @@ export { manifestFor };
 export function scriptedGate(verdicts = {}) {
   const gate = { name: 'content-hash', verdicts, evaluate: (i) => {
     const v = gate.verdicts[`${i.packageName}@${i.version}`];
+    // Owner decision 10 (C2): an explicit scripted ALLOW stands for content-hash's DEFINITIVE clearance, in its own words;
+    // only that clears a held or stored content-hash BLOCK (a plain ALLOW or a SKIP no longer does).
+    if (v === 'ALLOW') return { gate: 'content-hash', result: 'ALLOW', detail: `integrity hash matches baseline (scripted for ${i.packageName}@${i.version})` };
     return v ? { gate: 'content-hash', result: v, detail: `scripted ${v} for ${i.packageName}@${i.version}` }
       : { gate: 'content-hash', result: 'ALLOW', detail: 'scripted ALLOW' };
   } };

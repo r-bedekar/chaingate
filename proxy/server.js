@@ -12,7 +12,7 @@ import {
   UpstreamTimeoutError,
   UpstreamError,
 } from './registry.js';
-import { openWitnessDB, isOverrideRow } from '../witness/db.js';
+import { openWitnessDB } from '../witness/db.js';
 import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
@@ -358,11 +358,11 @@ function enforceWhileFull(db, canonicalName, filename, log, ctx, state) {
     }
     const known = ctx.unstored?.get(canonicalName, version) ?? null;
     if (known) return rememberedBlock(canonicalName, version, known);
-    let decision = db.getLatestDecision(canonicalName, version);
-    if (decision && isOverrideRow(decision.gates_fired)) decision = db.getLatestNonOverrideDecision(canonicalName, version);
-    if (decision && decision.disposition === 'BLOCK') return storedBlock(canonicalName, version, decision);
-    return refuse(decision ? `its applicable stored decision is ${decision.disposition}, which is not permission while the `
-      + 'record is full' : 'it has no stored decision');
+    // Owner decision 10 (C2): the one applicable-BLOCK rule (override handled above).
+    const applicable = db.getApplicableDecision(canonicalName, version, { overrideLive: false });
+    if (applicable.block) return storedBlock(canonicalName, version, applicable.block);
+    return refuse(applicable.latest ? `its applicable stored decision is ${applicable.disposition}, which is not permission `
+      + 'while the record is full' : 'it has no stored decision');
   } catch (err) {
     return refuse(`its stored decision could not be read (${err.message})`);
   }
@@ -416,27 +416,7 @@ export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, s
     state.tarballDecided = true;
     return null;
   };
-  let decision;
-  try {
-    decision = db.getLatestDecision(canonicalName, version);
-  } catch (err) {
-    return lookupFailed(err);
-  }
-  // U-05 gap-closure r2, N3: a stored override ALLOW applies only while that exact override still exists. The store
-  // compares new decisions with the same rows (witness/store.js effectivePrior), so the two never disagree.
-  if (decision && isOverrideRow(decision.gates_fired)) {
-    if (ctx.overriddenLive?.(canonicalName, version)) {
-      log?.info?.(`[override] ${canonicalName}@${version}: allowing (stored override, still present)`);
-      state.tarballDecided = true;
-      return null;
-    }
-    try {
-      decision = db.getLatestNonOverrideDecision(canonicalName, version);
-    } catch (err) {
-      return lookupFailed(err);
-    }
-  }
-  if (!decision || decision.disposition !== 'BLOCK') { state.tarballDecided = true; return null; }
+  // An exact override applies while it exists (N3). One that cannot be read is no override, as before.
   let override = null;
   try {
     override = db.getOverride(canonicalName, version);
@@ -444,13 +424,20 @@ export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, s
     log?.warn?.(`[tarball-gate] override lookup failed: ${err.message}`);
   }
   if (override) {
-    log?.info?.(
-      `[override] ${canonicalName}@${version}: allowing (reason: ${override.reason})`,
-    );
+    log?.info?.(`[override] ${canonicalName}@${version}: allowing (reason: ${override.reason})`);
     state.tarballDecided = true;
     return null;
   }
-  return storedBlock(canonicalName, version, decision);
+  // U-05 owner decision 10 (C2): the decision that APPLIES under the one applicable-BLOCK rule (witness/decision-rule.js),
+  // the same rule the store uses for its writes: a later SKIP, error, input-rule or unrecognised row never clears a BLOCK.
+  let applicable;
+  try {
+    applicable = db.getApplicableDecision(canonicalName, version, { overrideLive: false });
+  } catch (err) {
+    return lookupFailed(err);
+  }
+  if (!applicable.block) { state.tarballDecided = true; return null; }
+  return storedBlock(canonicalName, version, applicable.block);
 }
 
 function defaultLogger() {

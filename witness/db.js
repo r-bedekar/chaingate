@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { applicableFromRows } from './decision-rule.js';
 
 /**
  * A stored decision row that recorded an exact-version override ALLOW: the runner's synthetic `override` result
@@ -277,6 +278,13 @@ export class WitnessDB {
          WHERE package_name = ? AND version = ?
          ORDER BY decided_at DESC, id DESC`,
       ),
+      // U-05 owner decision 10 (C2): the same order, oldest first, for the applicable-BLOCK walk.
+      decisionsOldestFirst: this.db.prepare(
+        `SELECT id, disposition, gates_fired, decided_at
+         FROM gate_decisions
+         WHERE package_name = ? AND version = ?
+         ORDER BY decided_at ASC, id ASC`,
+      ),
     };
   }
 
@@ -374,6 +382,29 @@ export class WitnessDB {
       return { id: row.id, disposition: row.disposition, gates_fired: parsed, decided_at: row.decided_at };
     }
     return null;
+  }
+
+  /**
+   * Every stored decision for (pkg, version), oldest first, with gates_fired parsed (a row whose gates_fired does not
+   * parse keeps the raw text, which the applicable-BLOCK rule reads as unclassified). Read-only.
+   */
+  getDecisionHistory(packageName, version) {
+    this._prepare();
+    return this._stmts.decisionsOldestFirst.all(packageName, version).map((row) => {
+      let parsed;
+      try { parsed = JSON.parse(row.gates_fired); } catch { parsed = row.gates_fired; }
+      return { id: row.id, disposition: row.disposition, gates_fired: parsed, decided_at: row.decided_at };
+    });
+  }
+
+  /**
+   * U-05 owner decision 10 (C2): the decision that APPLIES to (pkg, version) under the one applicable-BLOCK rule
+   * (witness/decision-rule.js). `overrideLive` defaults to whether an exact override exists now. Read errors propagate:
+   * a caller that cannot read the history has no decision. Read-only.
+   */
+  getApplicableDecision(packageName, version, { overrideLive } = {}) {
+    const live = overrideLive === undefined ? Boolean(this.getOverride(packageName, version)) : Boolean(overrideLive);
+    return applicableFromRows(this.getDecisionHistory(packageName, version), { overrideLive: live });
   }
 
   getOverride(packageName, version) {

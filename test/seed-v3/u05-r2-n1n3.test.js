@@ -49,7 +49,9 @@ async function bench({ failAs = 'WARN', pinned = false, dir = null } = {}, fn) {
   const scripted = { name: 'content-hash', onErrorResult: failAs, evaluate: (i) => {
     if (i.packageName === 'x' && i.version === '2.0.0') {
       if (mode.moduleThrows) throw new Error('injected module failure');
-      return { gate: 'content-hash', result: mode.verdict, detail: `scripted ${mode.verdict}` };
+      // Owner decision 10 (C2): a scripted ALLOW is content-hash's DEFINITIVE clearance, in its own words.
+      return { gate: 'content-hash', result: mode.verdict,
+        detail: mode.verdict === 'ALLOW' ? 'integrity hash matches baseline (scripted)' : `scripted ${mode.verdict}` };
     }
     return { gate: 'content-hash', result: 'ALLOW', detail: 'scripted ALLOW' };
   } };
@@ -137,14 +139,16 @@ test('A-b: override revoked, then a genuine non-override ALLOW becomes the effec
   });
 });
 
-test('A-c1: override revoked, then a genuine WARN', async () => {
+test('A-c1 (amended by owner decision 10, C2): override revoked, then a WARN that does not clear the BLOCK', async () => {
+  // C2: a WARN from the gate that BLOCKed is not that gate's definitive clearance, so the BLOCK still applies. The row is
+  // written once as evidence. A definitive clearance after a revoke is the E-ALLOW test above (served).
   await bench({}, async (h) => {
     blockThenOverride(h);
     h.db.deleteOverride('x', '2.0.0');
     h.mode.verdict = 'WARN';
-    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'WARN');
+    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'BLOCK', 'the applicable BLOCK is kept');
     assert.deepEqual(h.rows('x', '2.0.0').map((x) => x.disposition), ['BLOCK', 'ALLOW', 'WARN']);
-    assert.equal(await h.tarball('x', '2.0.0'), 200, 'WARN is not refused at the tarball gate');
+    assert.equal(await h.tarball('x', '2.0.0'), 403, 'the BLOCK applies at the tarball gate');
   });
 });
 
@@ -183,17 +187,17 @@ test('A-d2: several override rows, override revoked: all skipped; tarball 403', 
   });
 });
 
-test("A-d2': override rows around an evaluated WARN: the effective row is the WARN", async () => {
+test("A-d2' (amended by owner decision 10, C2): override rows around a WARN that does not clear the BLOCK", async () => {
   await bench({}, async (h) => {
     h.mode.verdict = 'ALLOW'; h.observe(DOC_X());                     // baseline (first-seen E-ALLOW)
     for (const [d, r] of [['BLOCK', E_BLOCK_ROW], ['ALLOW', O_ROW], ['WARN', [{ gate: 'content-hash', result: 'WARN', detail: 'synthetic' }]], ['ALLOW', O_ROW]]) {
       h.db.insertGateDecision('x', '2.0.0', d, r);
     }
-    assert.equal(await h.tarball('x', '2.0.0'), 200, 'effective E-WARN: served');
+    assert.equal(await h.tarball('x', '2.0.0'), 403, 'C2: the synthetic WARN is not a definitive clearance: refused');
     h.mode.runnerThrows = true;
     const before = h.rows('x', '2.0.0').length;
-    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'WARN', 'served WARN');
-    assert.equal(h.rows('x', '2.0.0').length, before, 'same disposition as the effective row: no insert');
+    assert.ok(preserved(h.observe(DOC_X()).get('2.0.0')), 'a failure preserves the applicable BLOCK');
+    assert.equal(h.rows('x', '2.0.0').length, before, 'nothing inserted over it');
   });
 });
 
@@ -221,16 +225,16 @@ test('A-d4: no earlier non-override row: after the revoke the version has no eff
   });
 });
 
-test('A-d5: legacy failure row after a BLOCK is still read as written (deferred limitation, pinned)', async () => {
+test('A-d5 (closed by owner decision 10, C2; was a pinned limitation): a legacy failure row after a BLOCK does not clear it', async () => {
   await bench({}, async (h) => {
     h.mode.verdict = 'ALLOW'; h.observe(DOC_X());
     h.db.insertGateDecision('x', '2.0.0', 'BLOCK', E_BLOCK_ROW);
     h.db.insertGateDecision('x', '2.0.0', 'WARN', F_WARN_ROW);
-    assert.equal(await h.tarball('x', '2.0.0'), 200, 'F rows are NOT skipped when reading (no migration, no N2)');
+    assert.equal(await h.tarball('x', '2.0.0'), 403, 'the F row is read as it was written and does not clear the BLOCK (no migration)');
     h.mode.runnerThrows = true;
     const before = h.rows('x', '2.0.0').length;
-    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'WARN');
-    assert.equal(h.rows('x', '2.0.0').length, before, 'underlying is the legacy F-WARN: no preservation, no insert');
+    assert.ok(preserved(h.observe(DOC_X()).get('2.0.0')), 'a failure preserves the applicable BLOCK');
+    assert.equal(h.rows('x', '2.0.0').length, before, 'nothing inserted over it');
   });
 });
 
@@ -242,11 +246,11 @@ test('A-d6: legacy override row with no live override: skipped; tarball 403', as
   });
 });
 
-test('A-d7: a row whose gates_fired does not parse is read as today (not an override row)', async () => {
+test('A-d7 (amended by owner decision 10, C2): a row whose gates_fired does not parse is not an override row and not a clearance', async () => {
   await bench({}, async (h) => {
     h.db.insertGateDecision('x', '2.0.0', 'BLOCK', E_BLOCK_ROW);
     h.db.db.prepare("INSERT INTO gate_decisions (package_name, version, disposition, gates_fired) VALUES ('x', '2.0.0', 'ALLOW', 'not json')").run();
-    assert.equal(await h.tarball('x', '2.0.0'), 200);
+    assert.equal(await h.tarball('x', '2.0.0'), 403, 'unrecognised content never clears a BLOCK');
   });
 });
 
@@ -262,13 +266,13 @@ test('T1: E-BLOCK, then the runner throws (W): preserved, not downgraded; tarbal
   });
 });
 
-test('T1b (deferred limitation, pinned): a module-level failure after E-BLOCK still supersedes it', async () => {
+test('T1b (closed by owner decision 10, C2; was a pinned limitation): a module-level failure after E-BLOCK does not supersede it', async () => {
   await bench({}, async (h) => {
     h.mode.verdict = 'BLOCK'; h.observe(DOC_X());
     h.mode.moduleThrows = true;
-    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'WARN', 'the module declares WARN; the runner returned normally');
-    assert.deepEqual(h.rows('x', '2.0.0').map((x) => x.disposition), ['BLOCK', 'WARN'], 'inserted (no structured marker: N2 deferred)');
-    assert.equal(await h.tarball('x', '2.0.0'), 200, 'served: a stated remaining limitation');
+    assert.equal(h.observe(DOC_X()).get('2.0.0').disposition, 'BLOCK', 'the module error (gate_error) is not a clearance');
+    assert.deepEqual(h.rows('x', '2.0.0').map((x) => x.disposition), ['BLOCK', 'WARN'], 'the error row is written once, as evidence');
+    assert.equal(await h.tarball('x', '2.0.0'), 403, 'the BLOCK applies');
   });
 });
 
