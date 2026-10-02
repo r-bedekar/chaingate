@@ -9,14 +9,15 @@ import path from 'node:path';
 
 import { openWitnessDB } from '../../witness/db.js';
 import { seed, registry, proxy, tarball, packument, rows, dispositions, failingWitness, insertRows, historical,
-  PUBLISHED, tmp } from '../helpers/u05-d10.mjs';
+  PUBLISHED, tmp, stopAll, safely } from '../helpers/u05-d10.mjs';
 
 const silence = () => { const e = console.error; const w = console.warn; console.error = () => {}; console.warn = () => {}; return () => { console.error = e; console.warn = w; }; };
 
 async function world(t, { policy = 'BLOCK' } = {}) {
   const dir = tmp('c2'); const reg = await registry(); const s = seed();
   const restore = silence();
-  t.after(async () => { restore(); await reg.close(); s.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await stopAll(); restore(); await safely(() => reg.close()); await safely(() => s.cleanup());
+    await safely(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })); });
   return { dir, reg, s, witness: path.join(dir, 'witness.db'), policy };
 }
 

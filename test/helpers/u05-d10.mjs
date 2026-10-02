@@ -97,8 +97,22 @@ export async function proxy({ upstream, witness, policy = 'BLOCK', v3 = true, se
   }
   const px = createProxyServer(cfg, h);
   const port = await listen(px);
-  return { px, url: `http://127.0.0.1:${port}`, stop: async () => { await closeServer(px); try { handle?.close?.(); } catch { /* closed */ } } };
+  let stopped = null;
+  const p = { px, url: `http://127.0.0.1:${port}`, stop: () => {
+    // Idempotent; a test may stop a proxy itself and the cleanup stops every proxy still live (stopAll).
+    stopped ??= (async () => { LIVE.delete(p); await closeServer(px); try { handle?.close?.(); } catch { /* closed */ } })();
+    return stopped;
+  } };
+  LIVE.add(p);
+  return p;
 }
+
+// Every proxy still running. Windows cannot delete a file a live proxy holds open (EBUSY), and a proxy left running keeps
+// the test file's process alive, so each test's cleanup stops them all FIRST (harness correction, CI run 37024289506).
+const LIVE = new Set();
+export async function stopAll() { for (const p of [...LIVE]) { try { await p.stop(); } catch { /* reported by the test */ } } }
+/** Run one cleanup step; a failure in it never skips the next one. */
+export async function safely(fn) { try { await fn(); } catch { /* best effort */ } }
 
 export function getJson(url) {
   return new Promise((resolve, reject) => {

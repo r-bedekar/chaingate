@@ -7,13 +7,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { seed, registry, proxy, tarball, packument, failingWitness, tmp } from '../helpers/u05-d10.mjs';
+import { seed, registry, proxy, tarball, packument, failingWitness, tmp, stopAll, safely } from '../helpers/u05-d10.mjs';
 
 const silence = () => { const e = console.error; const w = console.warn; console.error = () => {}; console.warn = () => {}; return () => { console.error = e; console.warn = w; }; };
 async function world(t) {
   const dir = tmp('c1'); const reg = await registry(); const s = seed();
   const restore = silence();
-  t.after(async () => { restore(); await reg.close(); s.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await stopAll(); restore(); await safely(() => reg.close()); await safely(() => s.cleanup());
+    await safely(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })); });
   return { dir, reg, s, witness: path.join(dir, 'witness.db') };
 }
 

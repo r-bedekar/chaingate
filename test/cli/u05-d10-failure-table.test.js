@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { seed, registry, proxy, tarball, packument, failingWitness, tmp } from '../helpers/u05-d10.mjs';
+import { seed, registry, proxy, tarball, packument, failingWitness, tmp, stopAll, safely } from '../helpers/u05-d10.mjs';
 
 const silence = () => { const e = console.error; const w = console.warn; console.error = () => {}; console.warn = () => {}; return () => { console.error = e; console.warn = w; }; };
 const CONFIGS = { 'V-B': { policy: 'BLOCK', v3: true }, 'V-W': { policy: 'WARN', v3: true }, N: { policy: 'BLOCK', v3: false } };
@@ -22,7 +22,8 @@ async function world(t, key, { witnessFn = null } = {}) {
   const restore = silence();
   const witness = witnessFn ? witnessFn(dir) : path.join(dir, 'witness.db');
   const px = await proxy({ upstream: reg.url, witness, seedDb: s.dbPath, ...CONFIGS[key] });
-  t.after(async () => { await px.stop(); restore(); await reg.close(); s.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await stopAll(); restore(); await safely(() => reg.close()); await safely(() => s.cleanup());
+    await safely(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })); });
   return { reg, px, witness, s };
 }
 
