@@ -176,16 +176,18 @@ test('M5 capacity: no eviction; every remembered BLOCK stays enforced; the count
   });
 });
 
-test('M6 restart forgets (documented P6c gap) and the next packument request remembers again', async () => {
+test('M6 (P6c closed by owner decision 10, C1) restart forgets, but the first tarball is evaluated before it is served', async () => {
   const seed = buildSeed({ layout: '1.1' });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'u05-a3-restart-'));
   try {
     await withProxy({ cfg: LIVE, dir, seed }, async (h) => { await rememberPinned(h); });
     await withProxy({ cfg: LIVE, dir, seed }, async (h) => {        // same witness database: the trigger is still there
       assert.equal((await self(h.proxyUrl)).unstored_blocks?.count, 0, 'a new process remembers nothing');
-      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 200, 'direct tarball before any packument: P6c');
+      const r = await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`);
+      assert.equal(r.status, 403, 'direct tarball before any packument: evaluated first (C1), refused');
+      assert.equal(r.json?.persisted, false, 'computed again and held again (storage still failing)');
       await get(`${h.proxyUrl}/p`);
-      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 403, 'remembered again after re-evaluation');
+      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 403, 'still remembered after a resolving request');
     });
   } finally { seed.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); }
 });

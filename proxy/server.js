@@ -21,6 +21,7 @@ import { openSeed, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV } from '../seed/v3/re
 import { CHAINGATE_SEED_PUBKEY_B64, CHAINGATE_SEED_PUBKEY_FINGERPRINT } from '../witness/seed_verify.js';
 import { rewritePackument } from '../gates/rewriter.js';
 import { createUnstoredBlocks, validateCaps } from './unstored-blocks.js';
+import { createEvaluationTracker, EvaluationBusy } from './evaluation-tracker.js';
 import { createLogBoundary } from './log-boundary.js';
 import { storageReport } from './storage-health.js';
 import { createDepFetcher } from './dep-fetcher.js';
@@ -255,6 +256,8 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log,
   if (decisions instanceof Map && ctx.unstored && !noDecision) {
     // P6b: remember BLOCKs that were not stored, forget entries a newer decision replaces (Amendment 3, Table M).
     for (const [version, decision] of decisions) ctx.unstored.note(packageName, version, decision);
+    // C1 (owner decision 10): a resolving request evaluates too; its actually evaluated versions need no second evaluation.
+    if (observed?.actual && ctx.tracker) ctx.tracker.markAll(packageName, observed.actual);
     // Rule K: a failure decision never makes a remembered BLOCK servable (override checked live).
     for (const [version, decision] of decisions) {
       if (decision?.evaluated !== false || decision.disposition === 'BLOCK') continue;
@@ -390,11 +393,28 @@ function storedBlock(canonicalName, version, decision) {
   };
 }
 
+/**
+ * Owner decision 10 (step 1, step 5c): no evaluation covers the requested version and no BLOCK applies. The configuration's
+ * existing "no decision could be made" semantics decide: a v3 seed with on_unusable_input BLOCK refuses; WARN, and
+ * configurations without a v3 seed (the pilot gates' ALLOW declaration), serve, logged. Never marked as evaluated.
+ */
+function evaluationFailed(canonicalName, what, why, log, ctx, state) {
+  if (ctx.failuresBlock) {
+    return { refuse: { status: 503, error: 'chaingate_evaluation_failed',
+      detail: `${canonicalName} (${what}) was not evaluated: ${why}; the configured failure policy `
+        + '(on_unusable_input: BLOCK) refuses it' } };
+  }
+  log?.warn?.(`[tarball-gate] ${canonicalName} (${what}): served without an evaluation (${why}; configured failure policy)`);
+  state.tarballDecided = true;
+  return null;
+}
+
 export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, state = {}) {
   if (ctx.unstored?.full) return enforceWhileFull(db, canonicalName, filename, log, ctx, state);
   if (!db) return null;
   const version = parseTarballVersion(canonicalName, filename);
-  if (version == null) return null;
+  // Owner decision 10, step 1: no exact version, so no evaluation can cover it; the configured failure semantics decide.
+  if (version == null) return evaluationFailed(canonicalName, filename, 'the version cannot be derived from the tarball name', log, ctx, state);
   state.tarballVersion = version;
   const known = ctx.unstored?.get(canonicalName, version) ?? null;
   if (known) {
@@ -407,10 +427,13 @@ export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, s
   }
   const lookupFailed = (err) => {
     log?.warn?.(`[tarball-gate] decision lookup failed: ${err.message}`);
-    if (ctx.failuresBlock) {
+    // D-2 (owner decision 10): without a v3 seed there is no failure policy, and a lookup error is refused. D-1: an
+    // explicitly configured on_unusable_input WARN keeps availability; a held BLOCK was refused above.
+    if (ctx.lookupErrorsRefuse ?? ctx.failuresBlock) {
       return { refuse: { status: 503, error: 'chaingate_decision_lookup_failed',
-        detail: `the stored decision for ${canonicalName}@${version} could not be read (${err.message}); the `
-          + 'configured failure policy (on_unusable_input: BLOCK) refuses it' } };
+        detail: `the stored decision for ${canonicalName}@${version} could not be read (${err.message}); `
+          + (ctx.failuresBlock ? 'the configured failure policy (on_unusable_input: BLOCK) refuses it'
+            : 'without a v3 seed a decision that cannot be read is refused') } };
     }
     log?.warn?.(`[tarball-gate] ${canonicalName}@${version}: served without a decision (configured failure policy)`);
     state.tarballDecided = true;
@@ -436,8 +459,15 @@ export function enforceTarballGate(db, canonicalName, filename, log, ctx = {}, s
   } catch (err) {
     return lookupFailed(err);
   }
-  if (!applicable.block) { state.tarballDecided = true; return null; }
-  return storedBlock(canonicalName, version, applicable.block);
+  if (applicable.block) return storedBlock(canonicalName, version, applicable.block);
+  // Owner decision 10 (C1): no applicable BLOCK. Serve only on an evaluation this process made for this exact version.
+  if (state.c1?.busy) {
+    return { refuse: { status: 503, error: 'chaingate_evaluation_busy',
+      detail: `${canonicalName}@${version} could not be evaluated now (${state.c1.why}); a resource refusal, not a finding` } };
+  }
+  if (state.c1 && !state.c1.ok) return evaluationFailed(canonicalName, version, state.c1.why, log, ctx, state);
+  state.tarballDecided = true;
+  return null;
 }
 
 function defaultLogger() {
@@ -587,7 +617,53 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     try { return Boolean(witnessDb?.getOverride(name, version)); } catch { return false; }
   };
   const counters = { observation_errors: 0 };
-  const ctx = { unstored, failuresBlock, overriddenLive, counters };
+  // D-2 (owner decision 10): decision-lookup errors are refused without a v3 seed too (healthy path unchanged).
+  const lookupErrorsRefuse = failuresBlock || !seedV3;
+  // C1 (owner decision 10): the exact versions this process evaluated, and the bounded single-flight evaluations.
+  const tracker = witness ? createEvaluationTracker(hooks.c1 ?? {}) : null;
+  const ctx = { unstored, failuresBlock, lookupErrorsRefuse, overriddenLive, counters, tracker };
+
+  /**
+   * C1: evaluate a package exactly as a resolving request would (the same upstream client, metadata and observation),
+   * without serving its document. Returns { ok } or { ok: false, why }. Marks only the versions actually evaluated.
+   */
+  async function evaluatePackage(rawName, canonicalName, authorization) {
+    let upstream;
+    try {
+      upstream = await fetchPackument(rawName, { config, requestHeaders: authorization ? { authorization } : {} });
+    } catch (err) {
+      return { ok: false, why: `the metadata request failed (${err.message})` };
+    }
+    if (upstream.statusCode !== 200) {
+      try { await upstream.body.dump(); } catch { /* nothing to drain */ }
+      return { ok: false, why: `the registry answered ${upstream.statusCode} for the metadata` };
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(Buffer.from(await upstream.body.arrayBuffer()).toString('utf8'));
+    } catch (err) {
+      return { ok: false, why: `the metadata could not be read (${err.message})` };
+    }
+    if (!parsed || typeof parsed !== 'object' || !parsed.versions || typeof parsed.versions !== 'object') {
+      return { ok: false, why: 'the metadata lists no versions' };
+    }
+    let observed;
+    try {
+      observed = witness.observePackument(canonicalName, parsed);
+    } catch (err) {
+      counters.observation_errors += 1;
+      // As on the metadata path: what the configured gates say a total failure means is remembered (held BLOCKs); the
+      // package is not marked evaluated.
+      try {
+        const f = witness.failureDecisionsFor(parsed, err, canonicalName);
+        for (const [v, d] of f.decisions) unstored.note(canonicalName, v, d);
+      } catch { /* no failure decision either: nothing is marked, the failure semantics decide */ }
+      return { ok: false, why: `the observation failed (${err.message})` };
+    }
+    for (const [v, d] of observed.decisions) unstored.note(canonicalName, v, d);
+    if (observed.actual) tracker.markAll(canonicalName, observed.actual);
+    return { ok: true };
+  }
 
   const handler = async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -628,6 +704,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           config_source: config.configSource ?? null,
         } : null,
         unstored_blocks: unstored.describe(),
+        evaluation: tracker ? tracker.stats() : null,
         // U-05 gap-closure r2, Addendum 1 §B: the process's decision-storage state, from its own signals.
         storage: storageReport({ health: witness?.storageHealth?.() ?? null, count: unstored.count,
           full: Boolean(unstored.full), observationErrors: counters.observation_errors }),
@@ -655,6 +732,21 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         });
         await observeAndSendPackument(res, upstream, witness, canonicalName, log, state, ctx);
       } else {
+        // Owner decision 10 (C1): a version this process has not evaluated is evaluated BEFORE the gate decides --
+        // single flight per package, bounded -- unless a held BLOCK or a live exact override already decides it, or the
+        // record is FULL (its own rules refuse).
+        const version = witness && tracker && !unstored.full ? parseTarballVersion(canonicalName, route.filename) : null;
+        if (version != null && !unstored.get(canonicalName, version) && !overriddenLive(canonicalName, version)
+          && !tracker.isEvaluated(canonicalName, version)) {
+          try {
+            const r = await tracker.run(canonicalName, () => evaluatePackage(route.name, canonicalName, req.headers.authorization));
+            state.c1 = tracker.isEvaluated(canonicalName, version) ? { ok: true }
+              : { ok: false, why: r.ok ? 'the requested version was not actually evaluated (absent from the metadata, or decided '
+                + 'by a failure or the input rule)' : r.why };
+          } catch (err) {
+            state.c1 = err instanceof EvaluationBusy ? { busy: true, why: err.message } : { ok: false, why: err.message };
+          }
+        }
         // Tarball BLOCK gate — check BEFORE contacting upstream so we don't
         // waste bandwidth on something we're going to refuse.
         const blocked = enforceTarballGate(witnessDb, canonicalName, route.filename, log, ctx, state);
