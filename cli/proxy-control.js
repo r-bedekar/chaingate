@@ -133,13 +133,13 @@ export const STOP_OUTCOMES = Object.freeze(['not_running', 'stopped', 'stopped_p
  *          not_running, stopped and stopped_port_taken.
  */
 export async function stopProxy(pidFile, { port = DEFAULT_PORT, host = DEFAULT_HOST, waitMs = 8000, selfTimeoutMs = 1500,
-  pollMs = 100, kill = process.kill } = {}) {
+  pollMs = 100, kill = process.kill, probePort = isPortInUse, self: askSelf = fetchSelf } = {}) {
   const removeRecord = () => { try { unlinkSync(pidFile); } catch { /* already gone */ } };
   const rec = readPidRecord(pidFile, { kill });
   if (!rec || rec.state === 'malformed' || rec.state === 'dead') {
     if (rec) removeRecord();
-    const listening = await isPortInUse(port, host);
-    const extra = listening ? `; ${host}:${port} is in use by ${describeListener(await fetchSelf(host, port, selfTimeoutMs))}, `
+    const listening = await probePort(port, host);
+    const extra = listening ? `; ${host}:${port} is in use by ${describeListener(await askSelf(host, port, selfTimeoutMs))}, `
       + 'which this command did not start and did not stop' : '';
     const what = !rec ? 'no pid record' : rec.state === 'malformed' ? 'the pid record was not a pid (removed)'
       : `pid ${rec.pid} is not running (stale record removed)`;
@@ -151,7 +151,7 @@ export async function stopProxy(pidFile, { port = DEFAULT_PORT, host = DEFAULT_H
       + 'It was not established whether it is the ChainGate proxy. Nothing was signalled; the pid record was left in place' });
   if (rec.state === 'indeterminate') return denied(rec.code);
 
-  const self = await fetchSelf(host, port, selfTimeoutMs);
+  const self = await askSelf(host, port, selfTimeoutMs);
   const owned = self.ok && self.json.service === 'chaingate-proxy' && Number.isInteger(self.json.pid) && self.json.pid === pid;
   if (!owned) {
     const why = !self.ok ? `${host}:${port} ${self.why}`
@@ -176,15 +176,21 @@ export async function stopProxy(pidFile, { port = DEFAULT_PORT, host = DEFAULT_H
   }
   for (;;) {
     const p = probePid(pid, kill).state;
-    const listening = await isPortInUse(port, host);
+    const listening = await probePort(port, host);
     if (p === 'dead' && !listening) {
       removeRecord();
       return { outcome: 'stopped', pid, waitedMs: Date.now() - started, detail: `pid ${pid} exited and ${host}:${port} is closed` };
     }
     if (p === 'dead' && listening) {
-      removeRecord();
-      return { outcome: 'stopped_port_taken', pid, waitedMs: Date.now() - started,
-        detail: `pid ${pid} exited, but ${host}:${port} is now answered by ${describeListener(await fetchSelf(host, port, selfTimeoutMs))}` };
+      // Only an IDENTIFIABLE answer means something else took the port. Windows keeps a terminated process's listening
+      // socket for a moment, so the port can still accept while nothing answers: that is waited out within this bound.
+      const who = await askSelf(host, port, selfTimeoutMs);
+      if (who.ok || Date.now() - started >= waitMs) {
+        removeRecord();
+        return { outcome: 'stopped_port_taken', pid, waitedMs: Date.now() - started,
+          detail: `pid ${pid} exited, but ${host}:${port} ${who.ok ? `is now answered by ${describeListener(who)}`
+            : 'still accepts connections and nothing identifies itself there'}` };
+      }
     }
     if (Date.now() - started >= waitMs) {
       return { outcome: 'timeout', pid, waitedMs: Date.now() - started,
