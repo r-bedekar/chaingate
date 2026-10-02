@@ -19,9 +19,13 @@ export const sha256 = (f) => createHash('sha256').update(fs.readFileSync(f)).dig
 export const plain = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, '');
 export const exists = (p) => { try { fs.lstatSync(p); return true; } catch { return false; } };
 
-/** mkfifo is POSIX; Windows has named pipes instead (qualified natively, R2-2 §3.3). */
-export const canFifo = process.platform !== 'win32'
-  && spawnSync('mkfifo', ['--version'], { stdio: 'ignore' }).status === 0;
+/** mkfifo is POSIX; Windows has named pipes instead (qualified natively, R2-2 §3.3). Probed by making one: BSD mkfifo
+ *  (macOS) has no --version, which skipped every FIFO case there (found in CI run 36987903455). */
+export const canFifo = process.platform !== 'win32' && (() => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fifo-probe-'));
+  try { return spawnSync('mkfifo', [path.join(d, 'p')], { stdio: 'ignore' }).status === 0; }
+  finally { fs.rmSync(d, { recursive: true, force: true }); }
+})();
 export function mkfifo(p) {
   const r = spawnSync('mkfifo', [p]);
   if (r.status !== 0) throw new Error(`mkfifo ${p}: ${r.stderr}`);
