@@ -191,3 +191,34 @@ jobs:
         with:
           name: d6-${{ matrix.os }}
           path: d6-output.txt
+
+  # U-05 gap-closure r2 §3.9, reduced: the unstored-BLOCK record and the log budget measured on this platform (the full
+  # set runs on the Linux qualification host; Windows runs it from the kit). Figures are reported, not asserted as limits.
+  measurement:
+    name: r2 measurement (reduced) / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: M1 M3 M4 L2 (reduced)
+        shell: bash
+        run: |
+          mkdir -p measure
+          for s in M3 M4 M1 L2; do node test/measure/r2-measure.mjs --pkg . --wt . --scenario $s --reduced --out measure/$s.json || rc=1; done
+          exit ${rc:-0}
+      - name: report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: measure-${{ matrix.os }}
+          path: measure/
