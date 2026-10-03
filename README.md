@@ -72,8 +72,33 @@ The whole path, from `npm install` to a decision with its reasons, works today.
 
 **Local npm proxy.** Sits between npm and the upstream registry, built on `undici`. It rewrites
 package metadata and evaluates every version it resolves. Installs from a lockfile (`npm ci`, and `npm install` with a
-complete lockfile) ask only for tarballs, so before it serves a tarball it has not evaluated in this run, the proxy
-evaluates that exact version first and applies its current decision.
+complete lockfile) ask only for tarballs, so before it serves a tarball whose exact version the running proxy has not
+evaluated, the proxy fetches that package's metadata, evaluates it and applies the version's current decision. This
+applies in every configuration that has a witness store. A version stays tracked as evaluated while the proxy runs, up
+to 100,000 tracked versions; a version published later, one whose evaluation failed, and one dropped from that bounded
+tracking are evaluated again on their next request.
+
+If the requested version cannot be evaluated (the metadata cannot be fetched, the version is missing from it or could
+not be evaluated, or the version cannot be derived from the tarball name), the existing policy for a request without a
+decision applies, and the tarball is not counted as evaluated:
+- with a v3 seed and `on_unusable_input: BLOCK`, it is refused (HTTP 503 `chaingate_evaluation_failed`);
+- with `on_unusable_input: WARN`, or without a v3 seed, it is served without an evaluation, and the log says so.
+
+When too many evaluations are already waiting, a request is refused with HTTP 503 `chaingate_evaluation_busy`, a
+resource refusal, not a finding. A stored or remembered BLOCK is refused, and an exact override is honoured, whatever
+the evaluation's outcome. While the in-memory record is FULL (below), its own rules apply instead.
+
+**Cost of evaluating before serving (measured).** A lockfile install through a newly started proxy fetches and
+evaluates each package's metadata before serving its tarball. On the tested Linux host, with a synthetic workload of
+200 packages whose metadata each lists 200 versions (medians of 3 runs, local registry on loopback):
+- `npm ci` took 10.2 s on a newly started proxy, against 0.9 s for the same install without this evaluation;
+- it took 13.5 s after a restart with those packages already in the witness store, where stored histories are read
+  too.
+
+That is about 50 ms per package for this workload, not a general figure: the cost depends on each package's size and
+history, the upstream and the machine. Repeat installs on the same running proxy took 0.9 s, because their versions
+were still tracked as evaluated. A new version, or one dropped from the tracking, is evaluated again. A CI job that
+starts a new proxy every run pays the first-install cost every time.
 
 **CLI.** Ten commands: `init`, `status`, `check`, `why`, `history`, `allow`,
 `overrides`, `update-seed`, `doctor`, `stop`.
@@ -99,8 +124,10 @@ served. A BLOCK the running proxy holds in memory is still refused. Without a v3
 `--no-seed`), a decision that cannot be read is refused; those configurations do not provide v3 detection.
 
 **When a BLOCK cannot be stored.** If a BLOCK decision cannot be stored, the running proxy remembers and
-enforces it in memory. Restarting the proxy clears that memory, but the first request for each version after a restart
-is evaluated again before anything is served, so a BLOCK the seed or the stored history supports is computed again.
+enforces it in memory. Restarting the proxy clears that memory. After a restart, a version is evaluated again before
+its tarball is served (with the failure policy above), and a BLOCK that this evaluation reproduces from the seed or the
+stored history is refused again. A BLOCK it cannot reproduce is lost at the restart, for example a content-hash BLOCK
+whose stored baseline is no longer available.
 
 **What the proxy cannot see.** ChainGate decides only requests that reach it:
 - npm reuses its local cache by content hash without contacting any registry, so a version already in the cache is
@@ -211,12 +238,17 @@ with no Python or compiler.
 
 | OS | Architecture | Node.js | npm | How it was tested |
 |----|--------------|---------|-----|-------------------|
-| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | full local qualification (suite, lifecycle, parity, installed package, offline kit) |
-| Linux (Ubuntu 24.04) | x64 | 22.23.2; 24.21.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| macOS 15 | arm64 | 22.23.2; 24.20.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| macOS 15 | x64 | 22.23.2; 24.19.0 | 10.9.8, 12.1.0; 11.17.0, 12.1.0 | CI: test suite and install acceptance |
-| Windows Server 2022 (administrator account) | x64 | 22.23.2-22.23.3; 24.21.0 | 10.9.9, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| Windows 10 Pro (standard account) | x64 | 24.21.0 | 11.19.0 | install acceptance: global and project installs |
+| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | full local qualification (suite, lifecycle, parity, installed package, BLOCK through the proxy with real npm, protected CI workflow, resource and log measurement, offline kit) |
+| Linux (Ubuntu 24.04) | x64 | 22.23.3; 24.21.0 | 10.9.9, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance; real small-filesystem (disk-full) checks and reduced measurement |
+| macOS 15 | arm64 | 22.23.2; 24.20.0 | 10.9.8, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance; real small-filesystem (disk-full) checks and reduced measurement |
+| macOS 15 | x64 | 22.23.2; 24.19.0 | 10.9.8, 12.2.0; 11.17.0, 12.2.0 | CI: test suite and install acceptance |
+| Windows Server 2022 (administrator account) | x64 | 22.23.3; 24.21.0 | 10.9.9, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance |
+| Windows 10 Pro (standard account) | x64 | 24.21.0 | 11.19.0 | global and project install acceptance, BLOCK through the proxy with real npm, protected CI workflow, installed-package checks, Windows device, pipe, size-limit, junction, lock and free-space checks |
+
+Not tested on Windows:
+- **A real full disk.** Free-space handling there was exercised only by a simulated free-space figure and injected
+  write errors.
+- **An activation file that is a symbolic link.** A standard account cannot create one; a junction was tested.
 
 **On Windows:**
 
