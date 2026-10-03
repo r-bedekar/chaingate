@@ -1,9 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { CAPS, FileRefused, readBounded } from '../../seed/v3/bounded-file.js';
 import { fmt, renderTable, colorDisposition } from '../format.js';
 import { resolvePaths } from '../paths.js';
-import { readPid } from '../proxy-control.js';
+import { readPidRecord, fetchSelf } from '../proxy-control.js';
+import { describeStorage } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
-import { resolveActiveBundle, bundleFiles, ActivationBroken } from '../seed-bundle.js';
+import { resolveActiveBundle, bundleFiles, ActivationBroken, readActivationIntent } from '../seed-bundle.js';
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
 
 function parseArgs(args) {
@@ -30,15 +32,25 @@ export default async function status(args) {
   try {
     const a = resolveActiveBundle(paths.base);
     if (a) {
-      let m = {};
-      try { m = JSON.parse(readFileSync(bundleFiles(a.dir).manifest, 'utf8')); } catch { /* reported below */ }
+      // bounded and non-blocking (U-05 R2-2 (c)): a FIFO or an oversized manifest is reported, never waited on
+      let m = {}; let manifestError = null;
+      try { m = JSON.parse(readBounded(bundleFiles(a.dir).manifest, CAPS.manifest).toString('utf8')); } catch (e) {
+        manifestError = e instanceof FileRefused ? e.why : e.message;
+      }
       seedV3 = { active: true, bundle_id: a.id, sha256: m.sha256 ?? null, trust: m.trust ?? null,
         signed: m.signed ?? null, corpus_snapshot_digest: m.corpus_snapshot_digest ?? null,
-        staged_at: m.staged_at ?? null, verified: false };
+        staged_at: m.staged_at ?? null, verified: false, ...(manifestError ? { manifest_error: manifestError } : {}) };
     }
   } catch (err) {
     if (!(err instanceof ActivationBroken)) throw err;
     seedV3 = { active: false, broken: true, link: err.link };
+  }
+
+  // An interrupted activation (U-05 R2-2 (b)): reported, never recovered here.
+  const intent = readActivationIntent(paths.base);
+  if (intent.state !== 'none') {
+    seedV3.pending_intent = intent.state === 'pending';
+    if (intent.state === 'invalid') seedV3.intent_invalid = intent.why;
   }
 
   const db = openWitnessDB(paths.witnessDb, { readonly: true });
@@ -49,7 +61,15 @@ export default async function status(args) {
     const recent = db.getRecentDecisions(5);
     const seedVersion = db.getSeedMetadata('seed_version');
     const seedExported = db.getSeedMetadata('exported_at');
-    const pid = readPid(paths.pidFile);
+    // The proxy process: three-state liveness, and what it says about itself (U-05 gap-closure r2, Addendum 1 §B). Its
+    // in-memory BLOCK count is the PROCESS's state; the decision totals above are what the database holds.
+    const pidRecord = readPidRecord(paths.pidFile);
+    const pid = pidRecord?.state === 'alive' ? pidRecord.pid : null;
+    let self = null;
+    if (pid) {
+      const r = await fetchSelf(DEFAULT_HOST, DEFAULT_PORT, 1500);
+      if (r.ok) self = r.json;
+    }
 
     if (opts.json) {
       console.log(JSON.stringify({
@@ -58,14 +78,21 @@ export default async function status(args) {
         recent,
         seed: { version: seedVersion, exported_at: seedExported },
         seed_v3: seedV3,
-        proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST },
+        proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST,
+          pid_state: pidRecord?.state ?? 'none', responding: Boolean(self),
+          storage: self?.storage ?? null, unstored_blocks: self?.unstored_blocks ?? null, self },
       }, null, 2));
       return seedV3.broken ? EXIT.ERROR : EXIT.OK;
     }
 
     const proxyStatus = pid
-      ? fmt.green(`running on ${DEFAULT_HOST}:${DEFAULT_PORT} (pid ${pid})`)
-      : fmt.red('stopped');
+      ? (self ? fmt.green(`running on ${DEFAULT_HOST}:${DEFAULT_PORT} (pid ${pid})`)
+        : fmt.yellow(`running (pid ${pid}), not answering on ${DEFAULT_HOST}:${DEFAULT_PORT}`))
+      : pidRecord?.state === 'indeterminate'
+        ? fmt.yellow(`pid ${pidRecord.pid}: liveness check refused (${pidRecord.code}); not established whether it is running`)
+        : fmt.red('stopped');
+    const storageState = self?.storage?.state;
+    const storageText = describeStorage(self);
 
     const seedLine = seedVersion
       ? `${seedVersion} (exported ${seedExported ?? 'unknown'})`
@@ -75,14 +102,19 @@ export default async function status(args) {
       ? fmt.red(`BROKEN: the activation link ${seedV3.link} does not resolve. Run \`chaingate update-seed --rollback\` or \`chaingate init --seed <bundle>\``)
       : seedV3.active
         ? `bundle ${seedV3.bundle_id}  sha256 ${String(seedV3.sha256 ?? 'unknown').slice(0, 16)}...  trust ${seedV3.trust ?? 'unknown'}`
-          + fmt.dim('  (recorded; `chaingate doctor` verifies it)')
+          + (seedV3.manifest_error ? fmt.red(`  (its bundle.json is unreadable: ${seedV3.manifest_error})`)
+            : fmt.dim('  (recorded; `chaingate doctor` verifies it)'))
         : fmt.dim('none active (run `chaingate init --seed <bundle>`)');
 
     console.log(renderTable([
       ['Witness store:', `${counts.packages} packages, ${counts.versions} versions, ${counts.files} files`],
       ['Detection seed (v3):', v3Line],
+      ...(intent.state === 'pending' ? [['', fmt.yellow('an interrupted activation is pending; the next seed command recovers it')]] : []),
+      ...(intent.state === 'invalid' ? [['', fmt.red(`the activation intent is not valid (${intent.why}); see \`chaingate doctor\``)]] : []),
       ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
+      ...(storageText && storageState !== 'healthy' && storageState !== 'no_evidence'
+        ? [['Decision storage:', (['recovered'].includes(storageState) ? fmt.dim : fmt.red)(storageText)]] : []),
       ['Decisions:', `${stats.total} total, ${stats.ALLOW} ALLOW, ${stats.WARN} WARN, ${stats.BLOCK} BLOCK`],
     ]));
 

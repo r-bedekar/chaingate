@@ -108,6 +108,16 @@ install-time hash would fire false-positive on every healthy
 installation. What the post-install check does prove, and the
 property that matters at this layer, is that this install was
 seeded from a bundle signed by the project's pinned key.
+The persisted pair shows that the installed seed came from a signed bundle; it does not
+authenticate the current, mutable `witness.db`.
+
+While an interrupted legacy installation is pending (`witness.db.install-pending.json`), the persisted
+pair on disk may be the old pair, a partial pair or the new pair. ChainGate never leaves an old digest
+beside a new signature, but none of those states describes what is installed. So `chaingate doctor`
+reports the seed signature as unverifiable, and the integrity gate refuses every mutating command
+except the one that completes the installation. For that command it waives only this refusal: the
+other integrity checks, and the verification of the incoming seed, still apply.
+
 Defending the local `witness.db` against an attacker who already has filesystem
 write access is outside what the signatures can protect. At that
 level, the protection is the filesystem permissions on
@@ -166,6 +176,11 @@ On `chaingate update-seed`:
    does not fetch it and the signature does not cover it.)
 5. Verifies SHA-256 and Ed25519 signature locally before installing
 
+Each download is bounded on the bytes actually received, whatever the server's headers say: at most
+256 MiB for the database and 4 KiB for each signature file, with connection, idle and total time
+limits. The temporary download directory is removed on every exit path. This limit applies only to
+legacy seed downloads, not to v3 seeds or to a local file given with `--seed`.
+
 This design decouples seed releases from any future CLI version
 releases on the same repository: a future `v1.0.0` CLI release
 won't shadow a recent `seed-v3` for users running `update-seed`.
@@ -195,9 +210,15 @@ measures below remove one connection-reuse condition. They do not
 make an untrusted registry trustworthy.
 
 - **Pinned HTTP client.** All upstream requests use an Agent from the
-  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments,
-  tarballs, background dependency lookups and the fail-open raw
-  fallback. The Agent is set explicitly because on Node 22 importing
+  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments
+  (including the metadata request the proxy makes to evaluate a version
+  before serving a tarball it has not evaluated in this run),
+  tarballs, background dependency lookups and the raw upstream
+  fallback the proxy uses when an unexpected internal error occurs
+  before any decision exists under `on_unusable_input: WARN` or with
+  pilot gates only (under `on_unusable_input: BLOCK`, or while the
+  record of unstored BLOCKs is full, the proxy refuses such requests
+  instead). The Agent is set explicitly because on Node 22 importing
   `node:http` installs Node's own bundled undici as the process-wide
   default. Without that, the pinned version would never handle
   upstream traffic. The process-wide default itself is left

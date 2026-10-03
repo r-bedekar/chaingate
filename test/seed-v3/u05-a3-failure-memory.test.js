@@ -85,6 +85,8 @@ async function rememberPinned({ proxy, proxyUrl }) {
 // SKIP (gates/index.js HISTORY_INDEPENDENT_GATES); it is a test gate, not the real content-hash module.
 const scriptedGate = (verdicts) => ({ name: 'content-hash', evaluate: (input) => {
   const v = verdicts(input);
+  // Owner decision 10 (C2): an explicit scripted ALLOW is content-hash's DEFINITIVE clearance, in its own words.
+  if (v === 'ALLOW') return { gate: 'content-hash', result: 'ALLOW', detail: `integrity hash matches baseline (scripted for ${input.packageName}@${input.version})` };
   return v ? { gate: 'content-hash', result: v, detail: `scripted ${v} for ${input.packageName}@${input.version}` }
     : { gate: 'content-hash', result: 'ALLOW', detail: 'scripted ALLOW' };
 } });
@@ -174,16 +176,18 @@ test('M5 capacity: no eviction; every remembered BLOCK stays enforced; the count
   });
 });
 
-test('M6 restart forgets (documented P6c gap) and the next packument request remembers again', async () => {
+test('M6 (P6c closed by owner decision 10, C1) restart forgets, but the first tarball is evaluated before it is served', async () => {
   const seed = buildSeed({ layout: '1.1' });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'u05-a3-restart-'));
   try {
     await withProxy({ cfg: LIVE, dir, seed }, async (h) => { await rememberPinned(h); });
     await withProxy({ cfg: LIVE, dir, seed }, async (h) => {        // same witness database: the trigger is still there
       assert.equal((await self(h.proxyUrl)).unstored_blocks?.count, 0, 'a new process remembers nothing');
-      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 200, 'direct tarball before any packument: P6c');
+      const r = await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`);
+      assert.equal(r.status, 403, 'direct tarball before any packument: evaluated first (C1), refused');
+      assert.equal(r.json?.persisted, false, 'computed again and held again (storage still failing)');
       await get(`${h.proxyUrl}/p`);
-      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 403, 'remembered again after re-evaluation');
+      assert.equal((await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`)).status, 403, 'still remembered after a resolving request');
     });
   } finally { seed.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -256,7 +260,9 @@ test('F3 P6a (the stored-decision lookup throws): a remembered BLOCK is refused;
   for (const [cfg, unknownStatus] of [[LIVE, 503], [WARNCFG, 200]]) {
     await withProxy({ cfg }, async (h) => {
       await rememberPinned(h);
+      // Vehicle (owner decision 10, C2): the gate reads getApplicableDecision; the injection moves with it.
       h.proxy.witnessDb.getLatestDecision = () => { throw new Error('injected lookup failure'); };
+      h.proxy.witnessDb.getApplicableDecision = () => { throw new Error('injected lookup failure'); };
       const known = await get(`${h.proxyUrl}${tgz('p', '1.3.0')}`);
       assert.equal(known.status, 403, `${cfg.on_unusable_input}: the remembered BLOCK is refused`);
       const unknown = await get(`${h.proxyUrl}${tgz('p', '1.4.0')}`);
@@ -269,6 +275,7 @@ test('F3 P6a (the stored-decision lookup throws): a remembered BLOCK is refused;
 test('F4 P5b tarball (an error before the gate decided): LIVE refuses; WARN passes through unless remembered', async () => {
   const brokenRecord = (h) => {
     h.proxy.witnessDb.getLatestDecision = () => ({ get disposition() { throw new Error('injected: decision record unreadable'); } });
+    h.proxy.witnessDb.getApplicableDecision = () => ({ get block() { throw new Error('injected: decision record unreadable'); } });
   };
   await withProxy({ cfg: LIVE }, async (h) => {
     brokenRecord(h);

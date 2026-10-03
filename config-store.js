@@ -10,8 +10,9 @@
 // be read as a complete, consistent configuration is a REFUSAL. A host that was configured to
 // enforce must never be talked out of it by a corrupt file.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { CAPS, FileRefused, readBounded } from './seed/v3/bounded-file.js';
 
 export const CONFIG_VERSION = 1;
 
@@ -81,7 +82,17 @@ export function validateConfig(cfg, file = '(in memory)') {
     resolved[k] = v;
   }
 
-  return { policy: resolved };
+  // U-05 gap-closure r2: optional bounds on the proxy's in-memory record of BLOCKs it could not store. Only their type is
+  // checked here; the proxy checks the ranges when it starts and refuses to start, by name, on a bad value.
+  const caps = {};
+  for (const [key, out] of [['unstored_block_cap_entries', 'entries'], ['unstored_block_cap_bytes', 'bytes']]) {
+    const v = cfg[key];
+    if (v === undefined || v === null) { caps[out] = null; continue; }
+    if (!Number.isInteger(v)) bad(`${key} must be an integer, got ${JSON.stringify(v)}`);
+    caps[out] = v;
+  }
+
+  return { policy: resolved, caps };
 }
 
 /**
@@ -106,9 +117,10 @@ export function readConfigStrict(file) {
   if (!existsSync(file)) return null;
   let parsed;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    // one non-blocking descriptor, a regular file of at most CAPS.config bytes (U-05 R2-2 (c))
+    parsed = JSON.parse(readBounded(file, CAPS.config).toString('utf8'));
   } catch (err) {
-    throw new ConfigUnreadable(file, err.message);
+    throw new ConfigUnreadable(file, err instanceof FileRefused ? err.why : err.message);
   }
   validateConfig(parsed, file);
   return parsed;

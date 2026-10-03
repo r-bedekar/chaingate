@@ -123,7 +123,8 @@ test('init: a v3 init reports the witness database exactly once (created, or reu
   // the v3 branch reports created OR reused; the legacy branch must not add "Existing witness database found"
   assert.match(src, /Using the existing witness database \(writable, separate from the seed\)/);
   const legacy = src.indexOf("console.log(fmt.ok('Existing witness database found'))");
-  const guard = src.lastIndexOf('} else if (v3Installed) {', legacy);
+  // U-05 R2-2 legacy routing: the legacy section now returns early after a v3 install (was: an else-if branch)
+  const guard = src.lastIndexOf('if (v3Installed) return { intended, v3Installed };', legacy);
   assert.ok(guard > 0 && guard < legacy, 'the legacy "Existing witness database found" line is skipped after a v3 install');
 });
 

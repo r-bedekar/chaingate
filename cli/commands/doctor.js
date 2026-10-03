@@ -4,13 +4,15 @@ import { dirname, join } from 'node:path';
 import { fmt } from '../format.js';
 import { resolvePaths } from '../paths.js';
 import { npmrcPath } from '../npmrc.js';
-import { readPid, isPortInUse } from '../proxy-control.js';
+import { readPidRecord, isPortInUse } from '../proxy-control.js';
+import { witnessStorageCheck } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { verifyPersistedSignature } from '../../witness/seed_verify.js';
+import { readInstallMarker, markerPath } from '../legacy-seed.js';
 import { checkSelfWitness, hasAnyChaingateInWitness, OWN_PACKAGE_NAME } from '../self-witness.js';
 import { DEFAULT_PORT, DEFAULT_HOST, NPMRC_MARKER_START, EXIT } from '../constants.js';
 import { resolveActiveBundle, verifyBundleDir, activeBundleId, ActivationBroken, staleLegacyLink,
-  previousBundleId } from '../seed-bundle.js';
+  previousBundleId, readActivationIntent, intentFile, surveyLeftovers, INTENT_FILE } from '../seed-bundle.js';
 import { readConfigStrict, validateConfig, POLICY_VALUES } from '../../config-store.js';
 import { probeNativeSqlite, nativeSqliteHelp } from '../native-sqlite.js';
 
@@ -172,6 +174,30 @@ export default async function doctor(args) {
   checks.push({ name: 'domain-version-count', pass: true,
     detail: 'from-packument (internal: package-scoped, derived per document; not an operator setting)' });
 
+  // U-05 R2-2 (b): an interrupted activation, and leftovers of interrupted seed commands. Read-only: doctor takes no
+  // lock and repairs nothing; the next seed command recovers and cleans under the lock. Shown only when present.
+  {
+    const ri = readActivationIntent(paths.base);
+    if (ri.state === 'pending') {
+      checks.push({ name: 'seed-activation-intent', pass: false, severity: 'unverifiable',
+        detail: `an interrupted activation is pending (${intentFile(paths.base)}); the next \`chaingate init --seed\`, `
+          + '`chaingate update-seed --seed` or `chaingate update-seed --rollback` recovers it. Until then the rollback '
+          + 'target may not be the one recorded.' });
+    } else if (ri.state === 'invalid') {
+      checks.push({ name: 'seed-activation-intent', pass: false, severity: 'unverifiable',
+        detail: `the activation intent ${intentFile(paths.base)} is not valid (${ri.why}); seed commands refuse until `
+          + `it is inspected and archived by renaming it to ${INTENT_FILE}.held-<UTC timestamp>` });
+    }
+    const sv = surveyLeftovers(paths.base);
+    if (sv.owned.length || sv.unrecognised.length) {
+      const parts = [
+        ...sv.owned.map((e) => `${e.path} (${e.why})`),
+        ...sv.unrecognised.map((p) => `${p} (unrecognised entry; kept)`),
+      ];
+      checks.push({ name: 'seed-leftovers', pass: false, severity: 'notice', detail: parts.join('; ') });
+    }
+  }
+
   // 1. Chaingate directory exists and is writable
   {
     const ok = existsSync(paths.base);
@@ -202,13 +228,17 @@ export default async function doctor(args) {
     checks.push({ name: 'witness-db', pass, detail });
   }
 
-  // 3. Proxy PID alive
+  // 3. Proxy PID alive. Three answers (U-05 gap-closure r2): a refused liveness check is reported as exactly that.
+  const pidRecord = readPidRecord(paths.pidFile);
   {
-    const pid = readPid(paths.pidFile);
+    const st = pidRecord?.state;
     checks.push({
       name: 'proxy-pid',
-      pass: !!pid,
-      detail: pid ? `running (pid ${pid})` : 'not running',
+      pass: st === 'alive',
+      detail: st === 'alive' ? `running (pid ${pidRecord.pid})`
+        : st === 'indeterminate' ? `pid ${pidRecord.pid}: the operating system refused the liveness check (${pidRecord.code}); `
+          + 'not established whether it is running or is the ChainGate proxy'
+          : 'not running',
     });
   }
 
@@ -243,7 +273,27 @@ export default async function doctor(args) {
   //    Ed25519 key" — the trust anchor that matters post-install. Install-time
   //    bundle hashing still happens via verifySeed in init/update-seed.
   {
-    if (!existsSync(paths.witnessDb)) {
+    // An interrupted legacy installation is read FIRST (U-05 R2-2; Addendum 2 §3.2): while it is pending the pair on
+    // disk may be the old one, a partial one or the new one, and none of those describes what is installed.
+    const marker = readInstallMarker(paths);
+    if (marker.state === 'pending') {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: `an interrupted legacy seed installation (started ${marker.marker.started_at ?? 'at an unknown time'}) was `
+          + 'not completed; re-run the same command (`chaingate update-seed`, or `chaingate init --seed <legacy db> --force` '
+          + 'with the same seed) to complete it',
+      });
+    } else if (marker.state === 'invalid' || marker.state === 'unreadable') {
+      checks.push({
+        name: 'seed-signature',
+        pass: false,
+        severity: 'unverifiable',
+        detail: `the pending-install marker ${markerPath(paths)} ${marker.state === 'invalid' ? 'is not valid' : 'cannot be checked'} `
+          + `(${marker.why}); seed commands refuse until it is inspected`,
+      });
+    } else if (!existsSync(paths.witnessDb)) {
       checks.push({
         name: 'seed-signature',
         pass: false,
@@ -332,17 +382,21 @@ export default async function doctor(args) {
   //    or pid mismatch means the running proxy is not the one just installed —
   //    a tamper signal (exit 5). Unreachable when the proxy is down is not
   //    a tamper signal; just skip.
+  let selfDoc = null;
   {
-    const pidFromFile = readPid(paths.pidFile);
+    const pidFromFile = pidRecord?.state === 'alive' ? pidRecord.pid : null;
     if (!pidFromFile) {
       checks.push({
         name: 'proxy-identity',
         pass: true,
-        detail: 'proxy not running (skipped)',
+        detail: pidRecord?.state === 'indeterminate'
+          ? 'not evaluated: the liveness check for the recorded pid was refused (skipped)'
+          : 'proxy not running (skipped)',
       });
     } else {
       try {
         const self = await fetchProxySelf(DEFAULT_HOST, DEFAULT_PORT);
+        selfDoc = self && typeof self === 'object' ? self : null;
         const versionMatch = self.version === CLI_VERSION;
         const pidMatch = Number(self.pid) === Number(pidFromFile);
         if (versionMatch && pidMatch) {
@@ -369,6 +423,10 @@ export default async function doctor(args) {
     }
   }
 
+  // 9. The running proxy's decision-storage state (U-05 gap-closure r2, Addendum 1 §B): BLOCKs held only in memory, FULL,
+  //    and the write evidence. Persisted decisions are the witness-db check's; this reads the process.
+  checks.push(witnessStorageCheck({ pid: pidRecord, self: selfDoc }));
+
   // Output
   if (opts.json) {
     console.log(JSON.stringify(checks, null, 2));
@@ -384,6 +442,7 @@ export default async function doctor(args) {
     else if (c.pass) icon = fmt.ok(c.name);
     else if (c.severity === 'tamper') icon = fmt.fail(`${c.name} [TAMPER]`);
     else if (c.severity === 'unverifiable') icon = fmt.warn(`${c.name} [unverifiable]`);
+    else if (c.severity === 'notice') icon = fmt.warn(`${c.name} [notice]`);
     else icon = fmt.fail(c.name);
     console.log(`  ${icon}  ${fmt.dim(c.detail)}`);
   }

@@ -71,7 +71,34 @@ npm (developer or CI)  ->  ChainGate proxy  ->  upstream registry
 The whole path, from `npm install` to a decision with its reasons, works today.
 
 **Local npm proxy.** Sits between npm and the upstream registry, built on `undici`. It rewrites
-package metadata and evaluates every version it resolves.
+package metadata and evaluates every version it resolves. Installs from a lockfile (`npm ci`, and `npm install` with a
+complete lockfile) ask only for tarballs, so before it serves a tarball whose exact version the running proxy has not
+evaluated, the proxy fetches that package's metadata, evaluates it and applies the version's current decision. This
+applies in every configuration that has a witness store. A version stays tracked as evaluated while the proxy runs, up
+to 100,000 tracked versions; a version published later, one whose evaluation failed, and one dropped from that bounded
+tracking are evaluated again on their next request.
+
+If the requested version cannot be evaluated (the metadata cannot be fetched, the version is missing from it or could
+not be evaluated, or the version cannot be derived from the tarball name), the existing policy for a request without a
+decision applies, and the tarball is not counted as evaluated:
+- with a v3 seed and `on_unusable_input: BLOCK`, it is refused (HTTP 503 `chaingate_evaluation_failed`);
+- with `on_unusable_input: WARN`, or without a v3 seed, it is served without an evaluation, and the log says so.
+
+When too many evaluations are already waiting, a request is refused with HTTP 503 `chaingate_evaluation_busy`, a
+resource refusal, not a finding. A stored or remembered BLOCK is refused, and an exact override is honoured, whatever
+the evaluation's outcome. While the in-memory record is FULL (below), its own rules apply instead.
+
+**Cost of evaluating before serving (measured).** A lockfile install through a newly started proxy fetches and
+evaluates each package's metadata before serving its tarball. On the tested Linux host, with a synthetic workload of
+200 packages whose metadata each lists 200 versions (medians of 3 runs, local registry on loopback):
+- `npm ci` took 10.2 s on a newly started proxy, against 0.9 s for the same install without this evaluation;
+- it took 13.5 s after a restart with those packages already in the witness store, where stored histories are read
+  too.
+
+That is about 50 ms per package for this workload, not a general figure: the cost depends on each package's size and
+history, the upstream and the machine. Repeat installs on the same running proxy took 0.9 s, because their versions
+were still tracked as evaluated. A new version, or one dropped from the tracking, is evaluated again. A CI job that
+starts a new proxy every run pays the first-install cost every time.
 
 **CLI.** Ten commands: `init`, `status`, `check`, `why`, `history`, `allow`,
 `overrides`, `update-seed`, `doctor`, `stop`.
@@ -86,11 +113,58 @@ overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = too
 emits a versioned `chaingate.check/2` record (0.1.2 and earlier wrote `chaingate.check/1`, which is still
 read); `examples/ci/` has an offline CI consumer for both.
 
+**A failure never turns a BLOCK into permission.** A BLOCK stays in force until the check that issued it
+definitively clears it (for example, the content hash matches its first-seen value again, or the seed no longer
+records the advisory), or until you add an exact override with `chaingate allow`. A skipped check, an error, missing
+evidence, an unreadable seed or an input the seed cannot use never clears it. This also applies to decisions written
+by earlier versions; nothing in your history is rewritten.
+
+**Exception, by your choice:** with `on_unusable_input: WARN`, a version whose stored decision cannot be read at all is
+served. A BLOCK the running proxy holds in memory is still refused. Without a v3 seed (a legacy seed or
+`--no-seed`), a decision that cannot be read is refused; those configurations do not provide v3 detection.
+
 **When a BLOCK cannot be stored.** If a BLOCK decision cannot be stored, the running proxy remembers and
-enforces it in memory. Restarting the proxy clears that memory. A subsequent packument evaluation can reconstruct
-a pin-based BLOCK if the accepted seed and pin lookup remain available. A direct tarball request before that
-evaluation is not protected by the forgotten record unless a stored BLOCK independently applies. Tarball requests
-for versions the proxy has never evaluated are not covered by this protection.
+enforces it in memory. Restarting the proxy clears that memory. After a restart, a version is evaluated again before
+its tarball is served (with the failure policy above), and a BLOCK that this evaluation reproduces from the seed or the
+stored history is refused again. A BLOCK it cannot reproduce is lost at the restart, for example a content-hash BLOCK
+whose stored baseline is no longer available.
+
+**What the proxy cannot see.** ChainGate decides only requests that reach it:
+- npm reuses its local cache by content hash without contacting any registry, so a version already in the cache is
+  installed without a check. Give CI jobs an empty cache, and clear the cache (`npm cache clean --force`) when you
+  start using ChainGate on a machine;
+- a lockfile `resolved` URL on any host other than `registry.npmjs.org` or the proxy (a private registry, a mirror)
+  is fetched from that host directly. With `replace-registry-host=never`, even `registry.npmjs.org` URLs are;
+- an upstream other than `registry.npmjs.org` may give tarball URLs on its own host, which npm then fetches directly.
+
+**Protected CI workflow (tested):**
+1. Start the proxy with your seed (`chaingate init --seed …`).
+2. Set `registry` to the proxy, and keep npm's default `replace-registry-host`.
+3. Keep lockfile `resolved` URLs on `registry.npmjs.org`.
+4. Run `npm ci --cache "$(mktemp -d)"`.
+
+A pinned version then fails the install; any other version is evaluated before it is served.
+
+This in-memory record is bounded: by default 50,000 entries and an estimated 64 MiB of retained data. You can change
+these with `unstored_block_cap_entries` and `unstored_block_cap_bytes` in the configuration, or
+`CHAINGATE_UNSTORED_BLOCK_CAP_ENTRIES` and `CHAINGATE_UNSTORED_BLOCK_CAP_BYTES`. The bound applies to the record, not
+to the proxy's total memory, and the default values are not a measured safe limit for every machine. On the tested
+Linux configuration, a record at its 64 MiB byte cap (maximum-size names and details) came with about 122 MB of heap
+and 336 MB resident memory in the proxy process. Nothing is ever
+evicted. When a new BLOCK does not fit, the record becomes **FULL** and stays FULL until the proxy is restarted. While
+FULL, the proxy refuses (HTTP 503 `chaingate_storage_degraded`) every tarball that has no stored or remembered BLOCK and
+no exact-version override, including tarballs whose stored decision is ALLOW or WARN. This happens under every
+`on_unusable_input` setting, and requests whose decision cannot be made are refused too. FULL is a resource-safety
+refusal, not a finding that the package is malicious. An exact override (`chaingate allow`) still lets that one version
+through, but only when the override can be looked up at request time.
+
+`chaingate status` and `chaingate doctor` show the running proxy's storage state (`witness-storage` in doctor):
+- whether decisions are being stored;
+- how many BLOCKs are held only in memory, with some of their names to re-request;
+- whether the record is FULL.
+
+Any BLOCK held only in memory, and FULL, are reported as degraded; doctor exits 1. The proxy's log is rate-limited, and
+lines it suppresses are counted and summarised. It is not a complete record of every decision.
 
 **Seed verification.** Every seed is checked against its `.sha256` file before use. A seed counts as
 **authenticated** only when its Ed25519 signature verifies against a key built into the runtime. An
@@ -164,12 +238,17 @@ with no Python or compiler.
 
 | OS | Architecture | Node.js | npm | How it was tested |
 |----|--------------|---------|-----|-------------------|
-| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | full local qualification (suite, lifecycle, parity, installed package, offline kit) |
-| Linux (Ubuntu 24.04) | x64 | 22.23.2; 24.21.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| macOS 15 | arm64 | 22.23.2; 24.20.0 | 10.9.8, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| macOS 15 | x64 | 22.23.2; 24.19.0 | 10.9.8, 12.1.0; 11.17.0, 12.1.0 | CI: test suite and install acceptance |
-| Windows Server 2022 (administrator account) | x64 | 22.23.2-22.23.3; 24.21.0 | 10.9.9, 12.1.0; 11.19.0, 12.1.0 | CI: test suite and install acceptance |
-| Windows 10 Pro (standard account) | x64 | 24.21.0 | 11.19.0 | install acceptance: global and project installs |
+| Linux (Ubuntu 24.04) | x64 | 22.22.2 | 10.9.7 | full local qualification (suite, lifecycle, parity, installed package, BLOCK through the proxy with real npm, protected CI workflow, resource and log measurement, offline kit) |
+| Linux (Ubuntu 24.04) | x64 | 22.23.3; 24.21.0 | 10.9.9, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance; real small-filesystem (disk-full) checks and reduced measurement |
+| macOS 15 | arm64 | 22.23.2; 24.20.0 | 10.9.8, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance; real small-filesystem (disk-full) checks and reduced measurement |
+| macOS 15 | x64 | 22.23.2; 24.19.0 | 10.9.8, 12.2.0; 11.17.0, 12.2.0 | CI: test suite and install acceptance |
+| Windows Server 2022 (administrator account) | x64 | 22.23.3; 24.21.0 | 10.9.9, 12.2.0; 11.19.0, 12.2.0 | CI: test suite and install acceptance |
+| Windows 10 Pro (standard account) | x64 | 24.21.0 | 11.19.0 | global and project install acceptance, BLOCK through the proxy with real npm, protected CI workflow, installed-package checks, Windows device, pipe, size-limit, junction, lock and free-space checks |
+
+Not tested on Windows:
+- **A real full disk.** Free-space handling there was exercised only by a simulated free-space figure and injected
+  write errors.
+- **An activation file that is a symbolic link.** A standard account cannot create one; a junction was tested.
 
 **On Windows:**
 
@@ -180,8 +259,8 @@ with no Python or compiler.
   `npm.cmd install -g @cgsec/chaingate --allow-scripts=better-sqlite3`. To approve it once for all
   your global installs: `npm.cmd config set allow-scripts=better-sqlite3 --location=user`.
 - Start ChainGate with your v3 seed:
-  `chaingate.cmd init --seed C:\path\to\chaingate-seed.db --unsigned-development`. Without `--seed`,
-  `init` downloads the older legacy witness seed instead (see below).
+  `chaingate.cmd init --seed C:\path\to\chaingate-seed.db --unsigned-development`. On a new install,
+  `init` without `--seed` downloads the older legacy witness seed instead (see below).
 - [SEEDS.md](SEEDS.md) shows how to check a seed file's SHA-256 in PowerShell.
 
 From source:
@@ -198,8 +277,10 @@ current release candidate seed is **unsigned**, so it also needs `--unsigned-dev
 tool reports `authenticated: false`. [SEEDS.md](SEEDS.md) lists each v3 seed's exact identifiers and
 how to verify a download. [SECURITY.md](SECURITY.md) describes the trust model.
 
-Running `chaingate init` without `--seed` does **not** set up v3 detection. It downloads the older,
-signed legacy witness seed (about 100 MB) and tells you so. For v3 detection, always pass `--seed`.
+Running `chaingate init` without `--seed` does **not** set up v3 detection. On a new install (no v3
+seed and no witness database yet) it downloads the older, signed legacy witness seed (about 100 MB)
+and tells you so. It never downloads with `--no-seed`, or on a host that uses a v3 seed. For v3
+detection, always pass `--seed`.
 
 **1. Initialize.** This installs the v3 seed, starts the proxy and points npm at it:
 
@@ -253,6 +334,19 @@ $ chaingate stop
 ✓ .npmrc restored
 ```
 
+`chaingate stop` signals only the process recorded for this scope, and only after that process answers on
+127.0.0.1:6173 as the ChainGate proxy with the same pid. It prints "Proxy stopped" only once the process has exited and
+the port is closed, waiting up to about 8 seconds.
+
+The stop does not succeed when:
+- the process does not exit in time;
+- it is not confirmed to be the proxy;
+- the operating system refuses the check.
+
+In those cases nothing is changed, the `.npmrc` block is left in place, the command says what it found, and it exits
+with code 1. A pid can be reused by another process in the milliseconds between the last check and the signal; signals
+cannot rule that out.
+
 While ChainGate's block is in your `.npmrc`, npm sends every request to the proxy. If the proxy is
 not running, for example after a restart, npm cannot install anything until you either run
 `chaingate init` again, which restarts the proxy on the active seed, or run `chaingate stop`, which
@@ -263,7 +357,32 @@ restores `.npmrc`.
 previous one with `chaingate update-seed --rollback`. A running proxy keeps its current seed until
 you restart it with `chaingate stop && chaingate init`. On a host that uses a v3 seed,
 `chaingate update-seed` without `--seed` **refuses**, because v3 seeds cannot be downloaded
-automatically.
+automatically. `update-seed --seed` accepts v3 seeds only; a legacy seed file is refused (see
+[Seed bundles](#seed-bundles)).
+
+**One seed command at a time.** `init`, `update-seed` and `update-seed --rollback` take a lock on the
+ChainGate directory (the file `.seed-mutation.lock`) before they read or change anything about seeds.
+A second seed command started meanwhile waits about 2 seconds, then stops with "another seed command
+... is running" and changes nothing; run it again when the first has finished. The proxy, `status`
+and `doctor` never wait for it. If a command is killed, the operating system releases the lock.
+ChainGate 0.1.2 and earlier do not take this lock, so do not run seed commands from different
+versions against the same directory. Seed commands are not supported on network filesystems or FAT.
+
+**If a seed command is interrupted.** On Linux and macOS, the next seed command first finishes or
+undoes an interrupted activation (`status` and `doctor` report one that is pending; they never repair
+it themselves). If that record is unreadable, seed commands stop and say so: inspect
+`chaingate status` and `chaingate doctor --json`, then rename the file to
+`.activation-intent.json.held-<UTC timestamp>` yourself; ChainGate never deletes it. Partial copies left
+by a killed command are removed by a later seed command, once the process that made them has exited
+and they are more than 15 minutes old. Until then, `doctor` lists them under `seed-leftovers`.
+
+**Space.** Installing a seed copies it first, so it needs about the seed's size free **in addition to**
+what is already used, plus the small sidecar files and a 64 MiB reserve, on the filesystem that holds
+the ChainGate directory. ChainGate refuses up front when there is clearly not enough. That check is
+not a guarantee, because other programs can use space at the same time. A copy that fails is removed,
+and the active seed stays as it was. Seed metadata files are read with fixed size limits (4 KiB for
+`.sha256` and `.sig`, 64 KiB for `bundle.json` and `config.json`), and a FIFO, device or other
+non-regular file in their place is refused.
 
 ## Seed bundles
 
@@ -274,9 +393,36 @@ There are two kinds of seed.
   not downloaded automatically, and none has been published yet.** It is opened read-only and checked
   against its `.sha256` file. It counts as authenticated only when a signature verifies against the
   built-in key (see SECURITY.md).
-- **Legacy witness seed**, published as `seed-v2.x` GitHub releases. `chaingate init` without `--seed`
-  downloads this signed seed for the older witness store. It does **not** set up v3 detection, and
-  `init` says so.
+- **Legacy witness seed**, published as `seed-v2.x` GitHub releases. On a new install, `chaingate init`
+  without `--seed` downloads this signed seed for the older witness store. It does **not** set up v3
+  detection, and `init` says so.
+
+**The legacy witness seed, in detail:**
+
+- It is never installed on a host that uses a v3 seed, and never without a valid signature.
+- `--force` does not replace the witness database, and `--no-seed` never downloads. `--seed` and
+  `--no-seed` together are refused.
+- To refresh the legacy seed of an existing witness database, run `chaingate update-seed`, or
+  `chaingate init --seed <legacy db> --force`. Stop the proxy first. The refresh happens in place, in
+  one database transaction, and keeps your local decisions and overrides. Baselines the proxy
+  recorded for versions the new seed does not contain are not kept, as before.
+- Downloads are limited to 256 MiB for the database and 4 KiB for each signature file, with time
+  limits, and the temporary download directory is removed afterwards.
+
+**An interrupted legacy installation.** ChainGate marks a legacy seed installation as pending
+(`witness.db.install-pending.json`) before it changes the witness database. While it is pending,
+`chaingate doctor` reports the seed signature as unverifiable, and `init`, `allow` and the other
+commands that pass ChainGate's integrity check refuse, except the one that completes the
+installation. To complete it, run the same command again with the same seed: `chaingate update-seed`,
+or `chaingate init --seed <legacy db> --force`.
+
+Completing it needs the **exact** seed that was being installed and its signature files. This applies
+to a local legacy bundle as much as to a published release, so **keep the original bundle until the
+installation has completed**. If that seed or its signature files are no longer available, the
+installation stays pending: ChainGate has no supported way to substitute another seed or to reset it.
+Do not delete the witness database or the marker file to get past this, and do not try to bypass
+signature verification. Other integrity failures are reported as before; completing an installation
+does not skip them.
 
 [SECURITY.md](SECURITY.md) describes the full trust model.
 
