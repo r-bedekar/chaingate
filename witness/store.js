@@ -275,10 +275,15 @@ export function createWitness({ db, runGates, config, logger }) {
           }
           // 0.1.5 static checks: the newest static:* rows -- a walked outcome, or "not armed" as stated -- ride into every
           // re-evaluation too; the runner never produces them, and whether a later download walks again is decided there
-          // (proxy/static-checks.js staticSettled), never here. They are NOTE/SKIP/ALLOW: the disposition is untouched.
+          // (proxy/static-checks.js staticSettled), never here. A contributing check's row is NOTE/SKIP/ALLOW and moves nothing;
+          // a named check's row (S0 and S5 since 0.1.5, then S6-S9) is a WARN and keeps the record's WARN, as MC's carried row
+          // does (since 0.1.6: before, the carried WARN row sat under an ALLOW and the next download printed no warning).
           const isStatic = (g) => g && typeof g.gate === 'string' && g.gate.startsWith('static:');
           const staticPrev = newestFirst.map((r) => r.gates_fired.filter(isStatic)).find((xs) => xs.length);
-          if (staticPrev && !isOverrideRow(gateResults) && !gateResults.some(isStatic)) gateResults.push(...staticPrev);
+          if (staticPrev && !isOverrideRow(gateResults) && !gateResults.some(isStatic)) {
+            gateResults.push(...staticPrev);
+            if (staticPrev.some((g) => g.result === 'WARN') && disposition !== 'BLOCK') disposition = 'WARN';
+          }
           // Since 0.1.6: install-introduced as a download's walk re-read it against the tarball package.json rides into every
           // re-evaluation (the runner reads only the registry entry); then the re-tier's late guards over what was carried
           // (gates/retier-late.js), so a strict row that warned again after a download keeps warning.
