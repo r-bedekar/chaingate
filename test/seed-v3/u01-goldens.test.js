@@ -34,7 +34,13 @@ const isRefusal = (d) => d.results.length === 1 && d.results[0].gate === 'seed-v
 
 // T-2 D1/D2, written from the decision tables (not from runtime output). Applied to a COPY of the golden.
 const POLICY_1_0 = 'cft-policy-1.0';
-const POLICY_CURRENT = 'cft-policy-1.2';   // U-05 D1/D2 to 1.1, then I1 E1/E2 to 1.2
+const POLICY_CURRENT = 'cft-policy-1.3';   // U-05 D1/D2 to 1.1, then I1 E1/E2 to 1.2, then 0.1.6 to 1.3
+// 0.1.6 (cft-policy-1.3) adds ONE enumerated difference, R1: a decision whose strict row warned carries the re-tier block
+// (`retier` on the decision, its compact form on the gate result and the check record). It is derived from the golden's own
+// rows: present exactly when a frozen strict row is WARN. Every golden's re-tier is `raised`, so no row, detail or disposition
+// moves; the rest of the comparison is unchanged.
+const STRICT_ROWS = ['seed-v3:channel-a:critical', 'seed-v3:dac-trajectory:surface'];
+const RETIER_CASES = new Set();
 function expectedUnderCurrent(g) {
   const out = structuredClone(g);
   assert.equal(out.decision.policy_version, POLICY_1_0, `${g.id}: the golden records policy 1.0`);
@@ -90,7 +96,15 @@ function compareAll(seed, cases, golden, label) {
     assert.equal(g.threw, null);
 
     // the refactored GATE: GateResult and the full decision, exactly
-    const { gateResult, decision } = viaGate(seed, c);
+    const via = viaGate(seed, c);
+    const { retier: gateRetier, ...gateResult } = via.gateResult; const { retier: decisionRetier, ...decision } = via.decision;
+    const strictWarned = g.decision.results.some((x) => STRICT_ROWS.includes(x.gate) && x.result === 'WARN');
+    assert.equal(Boolean(decisionRetier), strictWarned, `${c.id}: R1 the re-tier block is present exactly when a strict row warned`);
+    assert.equal(Boolean(gateRetier), strictWarned, `${c.id}: R1 on the gate result too`);
+    if (decisionRetier) {
+      assert.equal(decisionRetier.placement, 'raised', `${c.id}: R1 no golden is re-tiered`); assert.equal(gateRetier.placement, 'raised');
+      RETIER_CASES.add(c.id);
+    }
     assert.deepEqual(gateResult, g.gate_result, `${c.id}: gate result differs from the frozen gate`);
     assert.deepEqual(decision, g.decision, `${c.id}: gate decision differs from the frozen gate`);
 

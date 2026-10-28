@@ -32,6 +32,7 @@ const V3 = path.join(HERE, '..', '..', 'seed', 'v3');
 const S1 = path.join(V3, 'chaingate-check-1.schema.json');
 const S2 = path.join(V3, 'chaingate-check-2.schema.json');
 const S3 = path.join(V3, 'chaingate-check-3.schema.json');
+const S5 = path.join(V3, 'chaingate-check-5.schema.json');   // what 0.1.6 writes
 const FINDING = path.join(HERE, '..', 'fixtures', 'cft03', 'finding.schema.json');
 const HIST = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'fixtures', 'u05', 'historical-check-1.json'), 'utf8'));
 const HIST2 = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'fixtures', 'cft014', 'historical-check-2.json'), 'utf8'));
@@ -47,7 +48,7 @@ function validators() {
   const ajv = new Ctor({ strict: true, strictRequired: false, allErrors: true });
   ajv.addSchema(read(FINDING));
   return { v1: ajv.compile(read(S1)), v2: fs.existsSync(S2) ? ajv.compile(read(S2)) : null,
-    v3: fs.existsSync(S3) ? ajv.compile(read(S3)) : null };
+    v3: fs.existsSync(S3) ? ajv.compile(read(S3)) : null, v5: fs.existsSync(S5) ? ajv.compile(read(S5)) : null };
 }
 
 function pinnedRefusal(cfg, layout = '1.1') {
@@ -98,23 +99,29 @@ test('T-V3 /3 equals /2 with exactly the schema const changed and NOTE added to 
 });
 
 // ------------------------------------------------------------------------------------------------ records
-test('T-V3 0.1.4 writes /3 (E3): every synthetic golden case and the pinned refusals validate under /3 only',
+test('T-V3 0.1.4 wrote /3 (E3), 0.1.6 writes /5: every synthetic golden case and the pinned refusals validate under /5, and as /3 once relabelled',
   { skip: Ajv2020 ? false : 'ajv not installed (U-01 A9 pins it as a devDependency)' }, () => {
-    const { v1, v2, v3 } = validators();
-    assert.ok(v3, 'the /3 schema exists');
+    const { v1, v2, v3, v5 } = validators();
+    assert.ok(v3, 'the /3 schema exists'); assert.ok(v5, 'the /5 schema exists');
     const { dir, dbPath } = buildSyntheticSeed();
     const seed = R.openSeed(dbPath, { trust: R.TRUST_UNSIGNED_DEV });
     try {
       for (const c of syntheticCases()) {
         const rec = buildCheckRecord({ seed, policy: c.policy, domainVersionCount: 'from-packument',
           input: inputFromPackument(c.doc, c.doc.name, c.version), request: { package: c.doc.name, version: c.version }, tool: TOOL });
-        assert.equal(rec.schema, 'chaingate.check/3', c.id);
-        assert.ok(v3(rec), `${c.id}: ${JSON.stringify(v3.errors)}`);
-        assert.equal(v2(rec), false, `${c.id}: a /3 record is not a /2 record`);
-        assert.equal(v1(rec), false, `${c.id}: a /3 record is not a /1 record`);
+        assert.equal(rec.schema, 'chaingate.check/5', c.id);
+        assert.ok(v5(rec), `${c.id}: ${JSON.stringify(v5.errors)}`);
+        // a synthetic case whose strict row warns carries the re-tier member, and every one is `raised` (no row moved); without
+        // that member the same record labelled /3 is a /3 shape (the 0.1.4 format holds)
+        if ('retier' in rec.decision) assert.equal(rec.decision.retier.placement, 'raised', c.id);
+        const { retier, ...decision3 } = rec.decision;
+        const as3 = { ...rec, schema: 'chaingate.check/3', decision: decision3 };
+        assert.ok(v3(as3), `${c.id}: ${JSON.stringify(v3.errors)}`);
+        assert.equal(v2(as3), false, `${c.id}: a /3 record is not a /2 record`);
+        assert.equal(v1(as3), false, `${c.id}: a /3 record is not a /1 record`);
       }
     } finally { seed.close(); fs.rmSync(dir, { recursive: true, force: true }); }
-    for (const cfg of [LIVE, WARNCFG]) assert.ok(v3(pinnedRefusal(cfg)), JSON.stringify(v3.errors));
+    for (const cfg of [LIVE, WARNCFG]) assert.ok(v5(pinnedRefusal(cfg)), JSON.stringify(v5.errors));
   });
 
 test('T-V a refused /3 explanation names the deciding advisory in its STRUCTURED form, and the text says the same', () => {
@@ -128,7 +135,7 @@ test('T-V a refused /3 explanation names the deciding advisory in its STRUCTURED
   assert.deepEqual(live.explanation.text, [
     'p@1.3.0: BLOCK — REFUSED: no finding exists for this input',
     `  reason: ${reason}`,
-    '  evaluated disposition: BLOCK under cft-policy-1.2',   // E4
+    '  evaluated disposition: BLOCK under cft-policy-1.3',   // E4; 1.3 since 0.1.6
     '  decided by:',
     '    seed-v3:known-malicious-pin: recorded advisory ADV-P-130 pins p@1.3.0 (source synthetic-fixture)',
     `    seed-v3:input: ${reason}`,
@@ -152,8 +159,8 @@ test('T-2 D3 + E1/E4 the 0.1.4 explanation of each explain-golden case is the en
         input: inputFromPackument(c.doc, c.doc.name, c.version), request: { package: c.doc.name, version: c.version },
         tool: { name: 'chaingate', version: 'golden' } });
       const g = clone(EXPLAIN_GOLDEN.find((x) => x.id === id).explanation);
-      // U-05 D1/D3 took the 1.0 golden to 1.1; I1 E1/E4 take it on to 1.2. The explanation version stays 2.
-      const pol = (t) => t.replaceAll('cft-policy-1.0', 'cft-policy-1.2');
+      // U-05 D1/D3 took the 1.0 golden to 1.1; I1 E1/E4 take it on to 1.2, 0.1.6 to 1.3. The explanation version stays 2.
+      const pol = (t) => t.replaceAll('cft-policy-1.0', 'cft-policy-1.3');
       let want;
       if (g.structured.result === 'evaluated') {
         want = { text: g.text.map(pol), structured: JSON.parse(pol(JSON.stringify(g.structured))) };
@@ -164,7 +171,7 @@ test('T-2 D3 + E1/E4 the 0.1.4 explanation of each explain-golden case is the en
         const reason = g.structured.refusal;
         const [head] = g.text;
         want = {
-          text: [head, `  reason: ${reason}`, `  evaluated disposition: ${g.structured.disposition} under cft-policy-1.2`,
+          text: [head, `  reason: ${reason}`, `  evaluated disposition: ${g.structured.disposition} under cft-policy-1.3`,
             '  decided by:', `    seed-v3:input: ${reason}`, '  no finding was evaluated: this is NOT a clean result'],
           structured: { ...g.structured, explain_version: 'chaingate-explain-2',
             decided_by: [{ gate: 'seed-v3:input', detail: reason }] },
@@ -213,8 +220,12 @@ const evaluated1 = () => hist('allow-append');
 const refused1 = () => hist('refuse-missing-manifest');
 const refused2 = () => hist2('refused-pinned-live');
 const evaluated2 = () => hist2('evaluated-append-live');
-const refused3 = () => clone(pinnedRefusal(LIVE));
-const evaluated3 = () => {
+// 0.1.6 writes /5; a /3 record (0.1.4) is the same record relabelled with 0.1.4's policy id (no /5-only member is present)
+const as3 = (r) => { r.schema = 'chaingate.check/3'; r.decision.policy_version = 'cft-policy-1.2'; r.explanation = explain(r); return r; };
+const refused5 = () => clone(pinnedRefusal(LIVE));
+const refused3 = () => as3(refused5());
+const evaluated3 = () => as3(evaluated5());
+const evaluated5 = () => {
   const s = buildSeed({ layout: '1.1' });
   const seed = openFixtureSeed(s.dbPath);
   try {
@@ -245,9 +256,9 @@ const MUTATIONS = [
   ['/1 refused carrying decided_by', refused1, (r) => { r.explanation.structured.decided_by = []; }, /decided_by/],
 ];
 
-test('T-V the CI consumer accepts every supported combination (/1, /2, /3) and rejects every other by name', () => {
+test('T-V the CI consumer accepts every supported combination (/1, /2, /3, /5) and rejects every other by name', () => {
   for (const [label, make] of [['/1 evaluated', evaluated1], ['/1 refused', refused1], ['/2 evaluated', evaluated2], ['/2 refused', refused2],
-    ['/3 evaluated', evaluated3], ['/3 refused', refused3]]) {
+    ['/3 evaluated', evaluated3], ['/3 refused', refused3], ['/5 evaluated', evaluated5], ['/5 refused', refused5]]) {
     assert.deepEqual(validateRecord(make()), [], label);
   }
   for (const [label, make, mutate, names] of MUTATIONS) {
@@ -258,12 +269,12 @@ test('T-V the CI consumer accepts every supported combination (/1, /2, /3) and r
   }
 });
 
-test('T-V why --from explains every supported combination (/1, /2, /3) and refuses every other by name', () => {
+test('T-V why --from explains every supported combination (/1, /2, /3, /5) and refuses every other by name', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'u05-why-'));
   const save = (r, n) => { const f = path.join(dir, `${n}.json`); fs.writeFileSync(f, JSON.stringify(r)); return f; };
   try {
     for (const [label, make] of [['/1 evaluated', evaluated1], ['/1 refused', refused1], ['/2 evaluated', evaluated2], ['/2 refused', refused2],
-    ['/3 evaluated', evaluated3], ['/3 refused', refused3]]) {
+    ['/3 evaluated', evaluated3], ['/3 refused', refused3], ['/5 evaluated', evaluated5], ['/5 refused', refused5]]) {
       const rec = make();
       const out = explainSaved(save(rec, label.replace(/\W/g, '_')));
       assert.equal(out.error, undefined, `${label}: ${out.error}`);

@@ -13,7 +13,7 @@ test('G5-1 (D-D1, D-D2) the README and SECURITY.md describe 0.1.4: commands, rec
     assert.ok(readme.includes(`\`${c}\``), c);
   }
   assert.match(readme, /Fourteen commands/);
-  assert.match(readme, /chaingate\.check\/3/);
+  assert.match(readme, /chaingate\.check\/5/);   // the record this runtime writes (0.1.4: /3; since 0.1.6: /5)
   // 0.1.5: the rules are described in plain words, without their internal labels (operator 2026-10-25)
   assert.match(readme.replace(/\s+/g, ' '), /`chaingate check` \(the CI command\) evaluates the seed\. The rules on introduced install scripts, added dependencies and differing install scripts are reported by the proxy/);
   for (const k of ['an install script is introduced', 'an added dependency runs install scripts', 'install scripts differ', 'chaingate report', 'chaingate accept', 'chaingate pin', 'chaingate unpin', 'no-store']) {

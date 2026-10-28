@@ -138,7 +138,7 @@ test('A8 chaingate check carries the row in decision.results (/3 record)', () =>
   withSeed((seed) => {
     const rec = buildCheckRecord({ seed, policy: LIVE, domainVersionCount: DVC,
       input: inputFromPackument(GAP_DOC(), 'q', '1.5.0'), request: { package: 'q', version: '1.5.0' }, tool: TOOL });
-    assert.equal(rec.schema, 'chaingate.check/3');
+    assert.equal(rec.schema, 'chaingate.check/5');   // since 0.1.6
     assert.equal(rec.decision.results.filter(isStale).length, 1);
   });
 });

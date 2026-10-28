@@ -59,7 +59,7 @@ async function withProxy({ notices = {} } = {}, fn) {
   }
 }
 const tgz = (name, v) => `/${name}/-/${name}-${v}.tgz`;
-const PIN_REASON = 'seed-v3: cft-policy-1.2: seed-v3:known-malicious-pin: recorded advisory ADV-P-130';
+const PIN_REASON = 'seed-v3: cft-policy-1.3: seed-v3:known-malicious-pin: recorded advisory ADV-P-130';   // the runtime's policy (1.3 since 0.1.6)
 
 test('G2b-1 (A1, E13/E14) the BLOCK line and the 403 name the deciding fact, not the first non-empty detail', async () => {
   await withProxy({}, async ({ proxyUrl, logs }) => {

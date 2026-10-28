@@ -38,7 +38,8 @@ test('NS-1 roles: S0, S5, S6 and S7 are named runner gates, out of the contribut
   assert.deepEqual(classify([{ gate: S6G, result: 'WARN', detail: 'd' }, { gate: S7G, result: 'WARN', detail: 'd' }]).named, [S6G, S7G]);
   assert.deepEqual(S.withholdingChecks([{ gate: S6G, result: 'WARN', detail: 'd' }, { gate: S7G, result: 'WARN', detail: 'd' }]), [S6G, S7G]);
   assert.deepEqual(classify([{ gate: S7G, result: 'ALLOW', detail: 'no gain named vs 1.0.0' }]).named, [], 'an S7 gain not named is no named row');
-  assert.equal(POL.POLICY_CONTRACT_VERSION, 'cft-policy-1.2', 'policy identity unchanged (R7)');
+  // the static checks did not move the policy in 0.1.5; 0.1.6 moved it to 1.3 for the strict-row re-tier, nothing else
+  assert.equal(POL.POLICY_CONTRACT_VERSION, 'cft-policy-1.3', 'policy identity: 1.3 since 0.1.6');
 });
 
 test('NS-2 notice labels: S6 and S7 carry the CHECKS text byte for byte; S1-S4 have none', async () => {

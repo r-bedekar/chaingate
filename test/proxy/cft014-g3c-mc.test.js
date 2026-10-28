@@ -78,7 +78,9 @@ test('G3c-3 (D-M2, D-M4) the first download: bytes unchanged, no notice; then th
     assert.ok(logs.some((l) => l.startsWith('[gate] m@1.1.0: WARN named install-manifest-mismatch')), JSON.stringify(logs));
     const rep = JSON.parse((await get(`${base}/_chaingate/report`)).body.toString());
     const text = renderReport(rep, { source: 'proxy' }).text;
-    assert.ok(text.includes("m@1.1.0  NAMED WARNING: its tarball's install scripts differ from its registry entry"), text);
+    // since 0.1.6 the tarball package.json is what npm runs: its postinstall is the first install hook of m, so install-introduced
+    // names it too, beside MC
+    assert.ok(text.includes("m@1.1.0  NAMED WARNING: an install script appears that earlier releases did not have; its tarball's install scripts differ from its registry entry"), text);
     assert.ok(proxy.witnessDb.listNamedFactEvents().some((r) => r.kind === 'named-served' && r.version === '1.1.0'));
     // the matching version is ALLOW
     await get(`${base}/m/-/m-1.0.0.tgz`);
@@ -95,7 +97,8 @@ test('G3c-4/G3c-5 (D-M4, D-M5) the next download carries the notice without a se
     const rows = () => proxy.witnessDb.getDecisionHistory('m', '1.1.0').length;
     const n = rows();
     const t2 = await get(`${base}/m/-/m-1.1.0.tgz`);
-    assert.equal(t2.headers['npm-notice'], "chaingate: WARNING m@1.1.0: its tarball's install scripts differ from its registry entry. Details: chaingate why m@1.1.0");
+    // since 0.1.6: install-introduced follows the tarball package.json npm runs (a first postinstall), beside MC
+    assert.equal(t2.headers['npm-notice'], "chaingate: WARNING m@1.1.0: an install script appears that earlier releases did not have; its tarball's install scripts differ from its registry entry. Details: chaingate why m@1.1.0");
     await settle();
     // 0.1.5 static checks (deliberate change of expectation): MC's WARN is a named row, so it ARMS the next download's walk for the
     // static checks (design note §3; ruling 2026-10-13) -- exactly one more decision row; MC itself is not re-walked (its row rides along)

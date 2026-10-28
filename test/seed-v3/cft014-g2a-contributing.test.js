@@ -69,7 +69,7 @@ test('G2a-2 (E6/E10) the strict tier stays a WARN; the loose rule beside it is N
     const gr = gate.evaluate(inputFromPackument(docFor('q', [['1.5.0', after(1), hookedBig()]]), 'q', '1.5.0'));
     assert.equal(gr.result, 'WARN');
     const also = ` | also (contributing): ${ANY}: ${CONTRIB(2)}`;
-    assert.ok(gr.detail.startsWith(`cft-policy-1.2: ${SURFACE}: 2/4 witnesses broke, threshold 2`), gr.detail);
+    assert.ok(gr.detail.startsWith(`cft-policy-1.3: ${SURFACE}: 2/4 witnesses broke, threshold 2`), gr.detail);   // 1.3 since 0.1.6
     assert.ok(gr.detail.includes(also), gr.detail);
     assert.ok(gr.detail.indexOf(also) < gr.detail.indexOf(' [placement: '), 'after the bearing rows, before the suffixes');
   });
@@ -120,12 +120,15 @@ test('G2a-5 (E9) NOTE is valid in /3 records only: the /2 schema and the CI cons
     ajv.addSchema(JSON.parse(fs.readFileSync(path.join(HERE, '..', 'fixtures', 'cft03', 'finding.schema.json'), 'utf8')));
     const v2 = ajv.compile(JSON.parse(fs.readFileSync(path.join(V3, 'chaingate-check-2.schema.json'), 'utf8')));
     const v3 = ajv.compile(JSON.parse(fs.readFileSync(path.join(V3, 'chaingate-check-3.schema.json'), 'utf8')));
+    const v5 = ajv.compile(JSON.parse(fs.readFileSync(path.join(V3, 'chaingate-check-5.schema.json'), 'utf8')));
     withSeed((seed) => {
       const rec = buildCheckRecord({ seed, policy: LIVE, domainVersionCount: DVC,
         input: inputFromPackument(docFor('q', [['1.5.0', after(1), hooked()]]), 'q', '1.5.0'),
         request: { package: 'q', version: '1.5.0' }, tool: TOOL });
       assert.ok(rec.decision.results.some((x) => x.result === 'NOTE'), 'precondition: the record carries NOTE');
-      assert.ok(v3(rec), JSON.stringify(v3.errors));
+      assert.ok(v5(rec), JSON.stringify(v5.errors));   // since 0.1.6 the runtime writes /5
+      const { retier, ...decision } = rec.decision;   // the same record as 0.1.4 wrote it: /3, no re-tier member
+      assert.ok(v3({ ...rec, schema: 'chaingate.check/3', decision }), JSON.stringify(v3.errors));
     });
     const two = JSON.parse(JSON.stringify(HIST2.records.find((r) => r.id === 'evaluated-append-live').record));
     two.decision.results.push({ gate: ANY, result: 'NOTE', detail: 'x' });
@@ -134,7 +137,7 @@ test('G2a-5 (E9) NOTE is valid in /3 records only: the /2 schema and the CI cons
   });
 
 test('G2a-7 (C2) a contributing-only ALLOW clears a pin and an input BLOCK; the NOTE text carries no C2 marker', () => {
-  const detail = `cft-policy-1.2: seed-v3:known-malicious-pin: no recorded advisory pins this version | also (contributing): ${ANY}: ${CONTRIB(1)}`;
+  const detail = `cft-policy-1.3: seed-v3:known-malicious-pin: no recorded advisory pins this version | also (contributing): ${ANY}: ${CONTRIB(1)}`;
   assert.ok(clears(REASON.PIN, [{ gate: 'seed-v3', result: 'ALLOW', detail }]));
   assert.ok(clears(REASON.INPUT, [{ gate: 'seed-v3', result: 'ALLOW', detail }]));
   for (const marker of ['seed-v3:input', 'could not run', 'seed-v3:known-malicious-pin: recorded advisory']) {

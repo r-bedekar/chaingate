@@ -103,7 +103,7 @@ test('C2 roles: S8 and S9 are named runner gates with the CHECKS notice text byt
   for (const g of [S8G, S9G]) { assert.ok(!R.CONTRIBUTING_GATES.has(g), g); assert.equal(R.withRole({ gate: g, result: 'WARN', detail: 'd' }).result, 'WARN', g); }
   assert.equal(N.labelFor(S8G), S8_NOTICE); assert.equal(N.labelFor(S9G), S9_NOTICE);
   assert.deepEqual(S.withholdingChecks([{ gate: S8G, result: 'WARN', detail: 'd' }, { gate: S9G, result: 'WARN', detail: 'd' }]), [S8G, S9G]);
-  assert.equal(POL.POLICY_CONTRACT_VERSION, 'cft-policy-1.2', 'policy identity unchanged');
+  assert.equal(POL.POLICY_CONTRACT_VERSION, 'cft-policy-1.3', 'policy identity: 1.3 since 0.1.6 (the strict-row re-tier), not static checks 1.8');
 });
 
 // ------------------------------------------------------------------ member facts

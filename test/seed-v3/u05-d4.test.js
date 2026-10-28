@@ -36,7 +36,7 @@ for (const layout of ['1.0', '1.1']) {
         assert.equal(a.disposition, 'BLOCK', `a ${name}`);
         assert.ok(namingRow(a.results, 'ADV-P-130'), `a ${name} names ADV-P-130`);
         assert.equal(a.placement, 'append');
-        assert.equal(a.policy_version, 'cft-policy-1.2');
+        assert.equal(a.policy_version, 'cft-policy-1.3');   // 1.3 since 0.1.6
         const d = evalCase(seed, cfg, docFor('p', [['2.0.0', after()]]), '2.0.0');
         assert.equal(d.disposition, 'BLOCK', `d ${name}`);
         assert.ok(namingRow(d.results, 'ADV-P-200'));
@@ -56,7 +56,7 @@ for (const layout of ['1.0', '1.1']) {
           assert.ok(namingRow(d.results, 'ADV-P-130'), `${label} ${name}: names the advisory`);
           assert.equal(inputRow(d).result, cfg.on_unusable_input, `${label} ${name}: the input row keeps the input rule`);
           assert.ok(d.not_evaluated.some((m) => m.where === 'policy' && m.name === 'input'));
-          assert.equal(d.policy_version, 'cft-policy-1.2');
+          assert.equal(d.policy_version, 'cft-policy-1.3');   // 1.3 since 0.1.6
         }
       }
     });
@@ -177,7 +177,7 @@ test('T-P P1a a pin decides even when on_unusable_input is REFUSE_TO_DECIDE, and
     packageName: 'p', version: '1.3.0' });
   assert.equal(d.disposition, 'BLOCK');
   assert.deepEqual(d.undecided, ['on_unusable_input']);
-  assert.equal(d.policy_version, 'cft-policy-1.2');
+  assert.equal(d.policy_version, 'cft-policy-1.3');   // 1.3 since 0.1.6
 });
 
 test('T-G agreement: the gate detail, the gate decision and the check record carry the same deciding rows', () => {
@@ -187,7 +187,7 @@ test('T-G agreement: the gate detail, the gate decision and the check record car
     const gate = G.createSeedV3Gate({ seed, config: WARNCFG, domainVersionCount: DVC, onDecision: (d) => { dec = d; } });
     const gr = gate.evaluate(gateInput(doc, '1.3.0'));
     assert.equal(gr.result, 'BLOCK');
-    assert.match(gr.detail, /^cft-policy-1\.2: seed-v3:known-malicious-pin: recorded advisory ADV-P-130 pins p@1\.3\.0/);
+    assert.match(gr.detail, /^cft-policy-1\.3: seed-v3:known-malicious-pin: recorded advisory ADV-P-130 pins p@1\.3\.0/);   // 1.3 since 0.1.6
     const rec = buildCheckRecord({ seed, policy: WARNCFG, domainVersionCount: DVC,
       input: gateInput(doc, '1.3.0'), request: { package: 'p', version: '1.3.0' },
       tool: { name: 'chaingate', version: 'test' } });

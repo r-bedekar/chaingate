@@ -84,7 +84,7 @@ test('G2c-2 (D-R1, E19) /_chaingate/report lists exactly what was served and ref
     assert.equal(r.status, 200);
     assert.equal(r.json.service, 'chaingate-proxy');
     assert.equal(r.json.version, pkgVersion);
-    assert.equal(r.json.policy, 'cft-policy-1.2');
+    assert.equal(r.json.policy, 'cft-policy-1.3');   // since 0.1.6
     assert.match(r.json.seed.sha256, /^[0-9a-f]{64}$/);
     assert.equal(r.json.seed.history_cutoff, '2026-12-31T00:00:00Z');
     assert.ok(!Number.isNaN(Date.parse(r.json.started_at)));
@@ -100,8 +100,8 @@ test('G2c-2 (D-R1, E19) /_chaingate/report lists exactly what was served and ref
     assert.equal(q15.class, 'named');
     assert.equal(q15.coverage, 'checked');
     assert.deepEqual(q15.named, ['seed-v3:dac-trajectory:surface']);
-    assert.ok(q15.reason.startsWith('seed-v3: cft-policy-1.2: seed-v3:dac-trajectory:surface'), q15.reason);
-    assert.equal(q15.policy, 'cft-policy-1.2');
+    assert.ok(q15.reason.startsWith('seed-v3: cft-policy-1.3: seed-v3:dac-trajectory:surface'), q15.reason);
+    assert.equal(q15.policy, 'cft-policy-1.3');
     assert.equal(q15.notice, true);
     assert.equal(q15.k, '1.4.0', 'K: 1.4.5 was published 1 h before 1.5.0 and is not settled (G2c-5)');
 
@@ -132,11 +132,11 @@ test('G2c-3a (D-R2, E20) the disk record holds named-served, fact-refused and fa
     assert.deepEqual(rows.map(key).sort(), ['fact-refused p@1.3.0', 'fact-tag-moved p@1.3.0', 'named-served q@1.5.0'], JSON.stringify(rows));
     const named = rows.find((x) => x.kind === 'named-served');
     assert.equal(named.k_version, '1.4.0');
-    assert.equal(named.policy_version, 'cft-policy-1.2');
+    assert.equal(named.policy_version, 'cft-policy-1.3');
     assert.match(named.seed_sha256, /^[0-9a-f]{64}$/);
     assert.equal(named.install_key, 'npm-session:sessdisk1');
     assert.deepEqual(named.classes.named, ['seed-v3:dac-trajectory:surface']);
-    assert.ok(named.reason.startsWith('seed-v3: cft-policy-1.2: seed-v3:dac-trajectory:surface'));
+    assert.ok(named.reason.startsWith('seed-v3: cft-policy-1.3: seed-v3:dac-trajectory:surface'));
     const tagRow = rows.find((x) => x.kind === 'fact-tag-moved');
     // dated note 7.3: one row per withheld version, carrying its (capped) tag list
     assert.deepEqual([tagRow.classes.tags, tagRow.classes.facts], [[{ tag: 'latest', to: '1.2.0' }], ['seed-v3:pin']]);

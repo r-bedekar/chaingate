@@ -181,8 +181,8 @@ test('E3 MC\'s own WARN is a named row: it arms the NEXT download, which walks o
     assert.match(t2.headers['npm-notice'], /install scripts differ/, 'MC\'s notice on the second download, as before');
     assert.equal(proxy.witnessDb.getDecisionHistory('m', '1.1.0').length, n1 + 1, 'one more walk, armed by MC');
     const s1 = srow(proxy, 'm', '1.1.0', 'S1');
-    assert.equal(s1.result, 'SKIP'); assert.equal(s1.detail, 'not checked: s.js named by the tarball package.json only (not kept); armed by named row install-manifest-mismatch');   // wording set after the failing-first record: the runtime has no inventory, so it states what it knows
-    assert.equal(srow(proxy, 'm', '1.1.0', 'S2').detail, 'entry files carry no obfuscation marker pair (1 file read); armed by named row install-manifest-mismatch');
+    assert.equal(s1.result, 'SKIP'); assert.equal(s1.detail, 'not checked: s.js named by the tarball package.json only (not kept); armed by named rows install-introduced, install-manifest-mismatch');   // wording set after the failing-first record: the runtime has no inventory, so it states what it knows
+    assert.equal(srow(proxy, 'm', '1.1.0', 'S2').detail, 'entry files carry no obfuscation marker pair (1 file read); armed by named rows install-introduced, install-manifest-mismatch');
     assert.equal(rowsOf(proxy, 'm', '1.1.0').find((g) => g.gate === 'install-manifest-mismatch').result, 'WARN', 'MC\'s row rides along unchanged');
     const n2 = proxy.witnessDb.getDecisionHistory('m', '1.1.0').length;
     await get(`${base}/m/-/m-1.1.0.tgz`); await settle();

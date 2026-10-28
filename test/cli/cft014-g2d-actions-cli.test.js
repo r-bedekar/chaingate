@@ -85,7 +85,7 @@ test('G2d-1 (D-U2) accept: a named WARN is recorded with its named rows copied; 
       const adj = h.listAdjudications().filter((r) => r.action === 'accept');
       assert.equal(adj.length, 1);
       assert.deepEqual(adj[0].classes.named, ['seed-v3:dac-trajectory:surface']);
-      assert.equal(adj[0].policy_version, 'cft-policy-1.2');
+      assert.equal(adj[0].policy_version, 'cft-policy-1.3');   // since 0.1.6
     });
     const block = await cli(['accept', 'p@1.3.0'], env);
     assert.equal(block.code, 1);

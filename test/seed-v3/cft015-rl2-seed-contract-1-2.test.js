@@ -294,7 +294,8 @@ test('G3 a 1.1 seed reads and places exactly as before: one chain per major, a p
 });
 
 // ---- the check record (operator 2026-10-18): new-family-cold-start is a chaingate.check/4 value only, and a check against
-// a 1.2 seed writes /4 whether or not --tarball is given; /3 (0.1.4, published) is unchanged and never carries contract 1.2.
+// a 1.2 seed wrote /4 in 0.1.5 whether or not --tarball was given; /3 (0.1.4, published) is unchanged and never carries contract 1.2.
+// Since 0.1.6 every check writes /5 (/4 under cft-policy-1.3), for any seed contract.
 let Ajv2020 = null; try { Ajv2020 = createRequire(import.meta.url)('ajv/dist/2020.js'); } catch { /* not installed */ }
 const V3DIR = path.join(HERE, '..', '..', 'seed', 'v3');
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -305,7 +306,7 @@ const recordFor = (seed, version, published) => {
     request: { package: 'p', version }, tool: { name: 'chaingate', version: 'test' } });
 };
 
-test('K1 a check against a 1.2 seed writes chaingate.check/4, with or without a tarball; a new tag family is new-family-cold-start', () => {
+test('K1 a check against a 1.2 seed writes chaingate.check/5 (0.1.5: /4), with or without a tarball; a new tag family is new-family-cold-start', () => {
   const chains = [{ key: '2', family: 'release', rows: [['2.0.0', 1767225600]] },
     { key: '2', family: 'beta', rows: [['2.1.0-beta.1', 1767225700, 500]] }];
   const seed = R.openSeed(buildSeed(chains), DEV);
@@ -313,12 +314,12 @@ test('K1 a check against a 1.2 seed writes chaingate.check/4, with or without a 
     const cold = recordFor(seed, '2.2.0-rc.1', '2026-01-01T00:03:20.000Z');
     const app = recordFor(seed, '2.1.0', '2026-01-01T00:03:20.000Z');
     for (const r of [cold, app]) {
-      assert.equal(r.schema, 'chaingate.check/4'); assert.equal(r.seed.contract_version, 'cft-seed-v3-contract-1.2');
+      assert.equal(r.schema, 'chaingate.check/5'); assert.equal(r.seed.contract_version, 'cft-seed-v3-contract-1.2');
       assert.deepEqual(recordCompatibility(r), []); assert.deepEqual(validateRecord(r), [], 'the CI consumer accepts it');
     }
     assert.equal(cold.explanation.structured.placement.kind, 'new-family-cold-start');
     assert.equal(app.explanation.structured.placement.kind, 'append');
-    assert.equal(withTarball({ ...cold }, null).schema, 'chaingate.check/4');
+    assert.equal(withTarball({ ...cold }, null).schema, 'chaingate.check/5');
     // the same record labelled /3 is not one: /3 carries neither contract 1.2 nor the new placement
     const as3 = { ...cold, schema: 'chaingate.check/3' };
     assert.ok(recordCompatibility(as3).some((x) => /seed\.contract_version/.test(x)));
@@ -328,20 +329,23 @@ test('K1 a check against a 1.2 seed writes chaingate.check/4, with or without a 
     if (Ajv2020) {
       const Ctor = Ajv2020.default || Ajv2020; const ajv = new Ctor({ strict: true, strictRequired: false, allErrors: true });
       ajv.addSchema(readJson(path.join(HERE, '..', 'fixtures', 'cft03', 'finding.schema.json')));
+      const v5 = ajv.compile(readJson(path.join(V3DIR, 'chaingate-check-5.schema.json')));
       const v4 = ajv.compile(readJson(path.join(V3DIR, 'chaingate-check-4.schema.json')));
       const v3 = ajv.compile(readJson(path.join(V3DIR, 'chaingate-check-3.schema.json')));
-      assert.ok(v4(cold), JSON.stringify(v4.errors)); assert.ok(v4(app), JSON.stringify(v4.errors));
+      assert.ok(v5(cold), JSON.stringify(v5.errors)); assert.ok(v5(app), JSON.stringify(v5.errors));
+      // the 0.1.5 shape is unchanged: the same record labelled /4 (it carries no retier member) is a /4 shape
+      assert.ok(v4({ ...cold, schema: 'chaingate.check/4' }), JSON.stringify(v4.errors));
       assert.equal(v3({ ...cold, schema: 'chaingate.check/3' }), false, 'the /3 schema has no new-family-cold-start');
     }
   } finally { seed.close(); }
 });
 
-test('K2 a check against a 1.1 seed still writes chaingate.check/3', () => {
+test('K2 a check against a 1.1 seed writes chaingate.check/5 since 0.1.6 (0.1.5 wrote /3)', () => {
   const seed = R.openSeed(buildSeed([{ key: '2', family: 'release', rows: [['2.0.0', 1767225600]] }], [],
     { tables: SCHEMA_1_1, v11: true, meta: META_1_1, drop: DROP_1_2 }), DEV);
   try {
     const r = recordFor(seed, '2.1.0', '2026-01-01T00:03:20.000Z');
-    assert.equal(r.schema, 'chaingate.check/3'); assert.deepEqual(recordCompatibility(r), []); assert.deepEqual(validateRecord(r), []);
+    assert.equal(r.schema, 'chaingate.check/5'); assert.deepEqual(recordCompatibility(r), []); assert.deepEqual(validateRecord(r), []);
   } finally { seed.close(); }
 });
 
