@@ -244,12 +244,13 @@ test('RT8 through the gate on a seed: a state the registry shows since an older 
 let Ajv2020 = null; try { Ajv2020 = createRequire(import.meta.url)('ajv/dist/2020.js'); } catch { /* not installed */ }
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
-test('RT9 /5 equals /4 plus exactly the documented delta: the schema const and the optional decision.retier member', () => {
+test('RT9 /5 equals /4 plus exactly the documented delta: the schema const and the optional decision.retier and decision.pin members', () => {
   const want = read(path.join(V3, 'chaingate-check-4.schema.json')); const got = read(path.join(V3, 'chaingate-check-5.schema.json'));
   want.$id = 'https://chaingate.dev/schemas/chaingate-check-5.json';
   for (const shape of want.oneOf) shape.properties.schema.const = 'chaingate.check/5';
   want.$defs.decision.properties.retier = got.$defs.decision.properties.retier;
-  assert.ok(!want.$defs.decision.required.includes('retier'), 'optional');
+  want.$defs.decision.properties.pin = got.$defs.decision.properties.pin;
+  assert.ok(!want.$defs.decision.required.includes('retier') && !want.$defs.decision.required.includes('pin'), 'optional');
   want.title = got.title; want.description = got.description;
   assert.deepEqual(got, want);
   assert.ok(/^[\x20-\x7e\n]*$/.test(fs.readFileSync(path.join(V3, 'chaingate-check-5.schema.json'), 'utf8')), 'ASCII only');
