@@ -46,6 +46,7 @@ import { parseVersionsFromPackument } from './baseline.js';
 import { isOverrideRow } from './db.js';
 import { applicableFromRows, step, isActualEvaluation } from './decision-rule.js';
 import { classSignature, pendingFacts } from './row-class.js';
+import { reraise } from '../gates/retier-late.js';
 
 const ECOSYSTEM = 'npm';
 
@@ -278,6 +279,21 @@ export function createWitness({ db, runGates, config, logger }) {
           const isStatic = (g) => g && typeof g.gate === 'string' && g.gate.startsWith('static:');
           const staticPrev = newestFirst.map((r) => r.gates_fired.filter(isStatic)).find((xs) => xs.length);
           if (staticPrev && !isOverrideRow(gateResults) && !gateResults.some(isStatic)) gateResults.push(...staticPrev);
+          // Since 0.1.6: install-introduced as a download's walk re-read it against the tarball package.json rides into every
+          // re-evaluation (the runner reads only the registry entry); then the re-tier's late guards over what was carried
+          // (gates/retier-late.js), so a strict row that warned again after a download keeps warning.
+          if (!isOverrideRow(gateResults)) {
+            let lateChanged = false;
+            const iiAt = gateResults.findIndex((g) => g && g.gate === 'install-introduced');
+            const iiPrev = newestFirst.map((r) => r.gates_fired.find((g) => g && g.gate === 'install-introduced' && g.hooks_basis
+              && typeof g.hooks_basis.tarball === 'string')).find(Boolean);
+            if (iiPrev && iiAt >= 0 && !(gateResults[iiAt].hooks_basis && typeof gateResults[iiAt].hooks_basis.tarball === 'string')) {
+              gateResults[iiAt] = iiPrev; lateChanged = true;
+            }
+            const rr = reraise(gateResults);
+            if (rr) { gateResults[gateResults.findIndex((g) => g && g.gate === 'seed-v3')] = rr; lateChanged = true; }
+            if (lateChanged && disposition !== 'BLOCK') disposition = gateResults.some((g) => g && g.result === 'WARN') ? 'WARN' : 'ALLOW';
+          }
           if (n1h >= 0 && Array.isArray(gateResults[n1h].pending)) {
             // only a DETERMINATE judgement is kept: a not-evaluable SKIP is retried, not carried
             // the newest non-override row that HAS an N1h row (rows without the gate, e.g. 0.1.3's, are skipped)

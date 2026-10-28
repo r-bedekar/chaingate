@@ -28,10 +28,12 @@ export const REASON = Object.freeze({
 
 // Since 0.1.4 (cft-policy-1.2): 1.2 changed no clearance semantics, so it is listed beside 1.1 (a guard test checks
 // that the current identity is listed; a new identity must be added here deliberately, never by default).
-const POLICY_PREFIXES = Object.freeze(['cft-policy-1.0: ', 'cft-policy-1.1: ', 'cft-policy-1.2: ']);
+// Since 0.1.6 (cft-policy-1.3): the re-tier turns a strict WARN into a NOTE and never touches a BLOCK, so 1.3 changes no
+// clearance semantics either and is listed beside 1.2.
+const POLICY_PREFIXES = Object.freeze(['cft-policy-1.0: ', 'cft-policy-1.1: ', 'cft-policy-1.2: ', 'cft-policy-1.3: ']);
 // Under policy 1.0 "no recorded advisory pins this version" could be said of a pinned version, so only 1.1 and later
 // (1.2 keeps this) clear a pin.
-const PIN_CLEARING_PREFIXES = Object.freeze(['cft-policy-1.1: ', 'cft-policy-1.2: ']);
+const PIN_CLEARING_PREFIXES = Object.freeze(['cft-policy-1.1: ', 'cft-policy-1.2: ', 'cft-policy-1.3: ']);
 const INPUT_MARKERS = Object.freeze(['seed-v3:input', 'could not run']);
 const PIN_BLOCK_MARKER = 'seed-v3:known-malicious-pin: recorded advisory';
 const CONTENT_HASH_CLEARANCE = Object.freeze([/^integrity hash matches baseline/, /^shasum matches baseline/]);

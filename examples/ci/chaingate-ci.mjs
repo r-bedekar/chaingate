@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // chaingate-ci — one offline CI consumer of `chaingate.check/3` results (0.1.4), `/4` (0.1.5: /3 plus the optional tarball member) and of historical
 // `chaingate.check/2` (0.1.3) and `chaingate.check/1` results (0.1.2 and earlier). /4 is also what 0.1.5 writes against a seed of
-// contract 1.2, whose placement adds new-family-cold-start. Node standard library only.
+// contract 1.2, whose placement adds new-family-cold-start. `/5` (0.1.6, policy cft-policy-1.3) is /4 written for every check; its
+// decision may carry an optional `retier` member (a strict warning shown as a note when it is not new). Node standard library only.
 //
 //   node chaingate-ci.mjs --expected <manifest> --results <dir> --trusted-seed <sha256> [...]
 //                         [--trusted-seeds-file <file>] [--ignore-overrides] [--summary <file>]
@@ -62,7 +63,12 @@ const COMBINATIONS = {
   'chaingate.check/4': { explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.2',
     detection_contract_version: 'cft-detection-contract-1.0',
     seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] },
+  // chaingate.check/5 (0.1.6): /4 under cft-policy-1.3; the decision may carry an OPTIONAL `retier` member
+  'chaingate.check/5': { explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.3',
+    detection_contract_version: 'cft-detection-contract-1.0',
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] },
 };
+const SINCE_4 = ['chaingate.check/4', 'chaingate.check/5'];
 const SCHEMA_IDS = Object.keys(COMBINATIONS);
 const DISPOSITIONS = ['ALLOW', 'WARN', 'BLOCK'];
 const RESULT_VALUES = ['ALLOW', 'WARN', 'BLOCK', 'SKIP'];
@@ -199,6 +205,13 @@ const SPEC = {
   tarball_keep_list: { source: expect(T.oneOf(['registry manifest', 'tarball package.json']), 'registry manifest|tarball package.json'),
     candidates: expect((v) => Number.isInteger(v) && v >= 0, 'an integer >= 0') },
 };
+// /5: the decision's optional re-tier member.
+SPEC.retier = { version: expect(T.constant('retier-1.0'), '"retier-1.0"'),
+  placement: expect(T.oneOf(['recorded', 'raised']), 'recorded|raised'),
+  baseline: expect((v) => v === null || (typeof v === 'string' && v.length > 0 && v.length <= 256), 'a version or null'),
+  basis: expect((v) => v === null || ['same flavor', 'same release line', 'previous release'].includes(v), 'a basis or null'),
+  flags_dropped: expect((v) => T.strArray(v) && v.length <= 9, 'an array of at most 9 flag names'),
+  guards: expect(T.strArray, 'an array of guard names'), words: T.str };
 // /4: the same placement object, whose kind may also be new-family-cold-start.
 SPEC.placement_4 = { ...SPEC.placement, kind: expect(T.oneOf(PLACEMENTS_4), `one of ${PLACEMENTS_4.join('|')}`) };
 
@@ -217,7 +230,7 @@ export function validateRecord(rec) {
   }
   const allowed = SHAPES[rec.result];
   // /4: an evaluated or refused record MAY carry `tarball` (chaingate check --tarball); it is never required, never on a tool error
-  const optionalTop = rec.schema === 'chaingate.check/4' && rec.result !== 'tool_error' ? ['tarball'] : [];
+  const optionalTop = SINCE_4.includes(rec.schema) && rec.result !== 'tool_error' ? ['tarball'] : [];
   for (const k of allowed) if (!has(rec, k)) p.push(`missing member ${k} for result ${rec.result}`);
   for (const k of Object.keys(rec)) if (!allowed.includes(k) && !optionalTop.includes(k)) p.push(`member ${k} is not allowed for result ${rec.result}`);
   if (p.length) return p;
@@ -233,8 +246,10 @@ export function validateRecord(rec) {
 
   checkObject('seed', rec.seed, SPEC.seed, p);
   const d = rec.decision;
-  if (checkObject('decision', d, SPEC.decision, p)) {
-    const rowSpec = rec.schema === 'chaingate.check/3' || rec.schema === 'chaingate.check/4' ? SPEC.result_row_3 : SPEC.result_row;
+  const decisionSpec = rec.schema === 'chaingate.check/5' ? { ...SPEC.decision, retier: T.obj } : SPEC.decision;
+  if (checkObject('decision', d, decisionSpec, p, { optional: ['retier'] })) {
+    if (has(d, 'retier')) checkObject('decision.retier', d.retier, SPEC.retier, p);
+    const rowSpec = rec.schema === 'chaingate.check/3' || SINCE_4.includes(rec.schema) ? SPEC.result_row_3 : SPEC.result_row;
     if (Array.isArray(d.results)) d.results.forEach((r, i) => checkObject(`decision.results[${i}]`, r, rowSpec, p));
     if (Array.isArray(d.not_evaluated)) {
       d.not_evaluated.forEach((m, i) => checkObject(`decision.not_evaluated[${i}]`, m, SPEC.not_evaluated_row, p,
@@ -263,7 +278,7 @@ export function validateRecord(rec) {
 
   if (rec.result === 'evaluated') {
     if (checkObject('candidate', rec.candidate, SPEC.candidate, p) && isObj(rec.candidate.placement)) {
-      checkObject('candidate.placement', rec.candidate.placement, rec.schema === 'chaingate.check/4' ? SPEC.placement_4 : SPEC.placement, p);
+      checkObject('candidate.placement', rec.candidate.placement, SINCE_4.includes(rec.schema) ? SPEC.placement_4 : SPEC.placement, p);
     }
     if (!isObj(rec.finding)) p.push('finding must be an object');
     else {
@@ -300,7 +315,7 @@ function combinationProblems(rec) {
   if (rec.result === 'refused') {
     if (rec.schema === 'chaingate.check/1' && has(s, 'decided_by')) {
       p.push('explanation.structured.decided_by is not a member of a chaingate.check/1 refused explanation');
-    } else if (rec.schema === 'chaingate.check/2' || rec.schema === 'chaingate.check/3' || rec.schema === 'chaingate.check/4') {
+    } else if (rec.schema !== 'chaingate.check/1') {
       const deciding = rec.decision.results.filter((x) => x.result === rec.decision.disposition)
         .map((x) => JSON.stringify([x.gate, x.detail]));
       if (!Array.isArray(s.decided_by)) p.push(`explanation.structured.decided_by is missing (required in ${rec.schema})`);

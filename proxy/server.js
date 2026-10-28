@@ -35,7 +35,9 @@ import { judgeAtTarball } from './dependency-judge.js';
 import { dependencyCacheStats, setDependencyDoc } from '../gates/dependency-cache.js';
 // MC while the tarball streams
 import { createTarWalker } from './tar-walk.js';
-import { rememberManifestHooks, manifestHooksFor, manifestEntryFor, mcRow, recordLate, mcDeterminate, GATE as MC_GATE } from './manifest-check.js';
+import { rememberManifestHooks, manifestHooksFor, manifestEntryFor, mcRow, recordLate, mcDeterminate, hookDict, GATE as MC_GATE } from './manifest-check.js';
+import { tarballRow } from '../gates/install-introduced.js';
+import { reraise } from '../gates/retier-late.js';
 import { armedBy, keepListFor, staticRows, unarmedRows, noManifestRows, staticSettled, MAX_ARMED_WALKS, STATIC_WITHHOLD_CAP_BYTES,
   withholdingChecks, entryKeepFor, entryFactsOf, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, FACTS_LIMITS, makeBase64Share, createMemberTally,
   staticFactsOf } from './static-checks.js';
@@ -1270,14 +1272,28 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
             }
           };
           let lateRows = null;                                  // MC's row and the static rows (1.2 roles), computed once
-          const rowsOfWalk = () => lateRows ?? (lateRows = [mcRow(walk, manifestHooksFor(canonicalName, state.tarballVersion)),
+          // since 0.1.6: then install-introduced re-read against the tarball package.json npm runs, and the seed-v3 result when a
+          // late guard puts a re-tiered strict row back to WARN (gates/retier-late.js)
+          const withTarball = (rows) => {
+            const out = [...rows];
+            const pj = walk.ok ? parsedPackageJson(walk) : null;
+            const reg = manifestHooksFor(canonicalName, state.tarballVersion);
+            const prevII = walkLatest.gates_fired?.find?.((g) => g && g.gate === 'install-introduced');
+            const ii = pj && reg !== undefined ? tarballRow(prevII, hookDict(pj), reg) : null;
+            if (ii) out.push(ii);
+            const merged = [...(walkLatest.gates_fired || []).filter((g) => g && !out.some((r) => r.gate === g.gate)), ...out];
+            const rr = reraise(merged);
+            if (rr) out.push(rr);
+            return out;
+          };
+          const rowsOfWalk = () => lateRows ?? (lateRows = withTarball([mcRow(walk, manifestHooksFor(canonicalName, state.tarballVersion)),
             ...(staticWhy === 'armed' ? staticRows({ manifest: staticManifest, packageJson: parsedPackageJson(walk), walk, armed,
               predecessor: predecessorFacts(canonicalName, state.tarballVersion),
               // static-checks-1.8: S8 and S9 read the member facts the armed walk gathered
               ...(memberTally ? (({ members, over }) => ({ members, membersOver: over }))(memberTally.result()) : {}) })
               : staticWhy === 'no-manifest' ? noManifestRows(armed)
                 : staticWhy === 'ceiling' ? unarmedRows(`concurrency ceiling: ${MAX_ARMED_WALKS} armed walks in flight`)
-                  : unarmedRows('no named row, no identity-break, no entry-path-change, no coverage gap')).map(withRole)]);
+                  : unarmedRows('no named row, no identity-break, no entry-path-change, no coverage gap')).map(withRole)]));
           // 0.1.5: a held download is served or withheld only now, after the walk; withheld only for a named static WARN
           // the user has not accepted (while every check is contributing this never happens, and the held bytes are served)
           let staticHold = null;
@@ -1311,7 +1327,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
               const [row, ...sRows] = rowsOfWalk();
               // the late rows that are a NEW named WARN: MC's, and (since 0.1.5, S0 and S5) a named static check's
               const changed = (r) => { const prev = walkLatest.gates_fired?.find?.((g) => g && g.gate === r.gate); return !(prev && prev.result === r.result && prev.detail === r.detail); };
-              const lateNamed = [row, ...sRows].filter((r) => r.result === 'WARN' && (r.gate === MC_GATE || NAMED_RUNNER_GATES.includes(r.gate)) && changed(r));
+              const lateNamed = [row, ...sRows].filter((r) => r.result === 'WARN' && (r.gate === MC_GATE || r.gate === 'seed-v3' || NAMED_RUNNER_GATES.includes(r.gate)) && changed(r));
               const outcome = recordLate({ db: witnessDb, pkg: canonicalName, version: state.tarballVersion, latest: walkLatest, rows: [row, ...sRows] });
               if (outcome === 'wrote' && lateNamed.length) {
                 for (const r of lateNamed) {

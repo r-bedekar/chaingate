@@ -106,11 +106,21 @@ warning:
 - **Facts BLOCK.** These are a recorded advisory naming the exact version (from the seed), and content that differs from
   the version's recorded baseline (content hash).
 - **Named rules WARN.** Each one is a specific, counted reason:
-  - the seed's strict tier (a release-history break of 3+ of 5 groups, or 2+ package-wide signals);
+  - the seed's strict tier (a release-history break of 3+ of 5 groups, or 2+ package-wide signals). Since 0.1.6 it is
+    shown as a contributing note instead when nothing it found is new: every signal that broke already held on the
+    release this one follows (the latest earlier release with the same prerelease shape, else of the same release line,
+    else the previous release), and none of these holds: that state began less than 7 days before this release, the
+    install scripts npm runs differ from that release's, provenance it had is gone, a dependency was added or comes from
+    outside the registry, or part of the evidence could not be evaluated. Such a release is still read by the tarball
+    checks when it is downloaded; if any of them fires, or the tarball's `package.json` adds or changes an install
+    script, the warning comes back. `chaingate why` names the release it was compared with;
   - **an install script is introduced**: the release declares an install script (`preinstall`, `install` or
     `postinstall`, or a node-gyp build) when no version published at least 24 h earlier declared any (on a package's
     first day: no earlier version at all). A package's first version is not judged. A changed or additional install
-    script on a package that already had one is not this rule;
+    script on a package that already had one is not this rule. Since 0.1.6, once a download has read the tarball, the
+    rule follows the install scripts in the tarball's `package.json`, which is what npm runs: a script only the registry
+    entry declares (one renamed in the packed copy, for example) no longer counts, and one only the tarball declares
+    does. The differing-install-scripts rule below still warns on either;
   - **an added dependency runs install scripts**: the release adds a registry dependency (a name no earlier release
     depended on) whose resolved version runs install scripts. Git, URL and file dependencies are not judged. A range
     resolves to the highest matching version (npm may install the `latest` tag instead when it matches), a name in both
@@ -254,13 +264,17 @@ differing install scripts are reported by the proxy, not by `check`.
 
 Since 0.1.5, `chaingate check <pkg>@<ver> --packument <file> --tarball <file>` also reads that local archive offline --
 the install-script comparison and the tarball checks above, the keep list from the packument's manifest -- and reports
-their rows in the record's `tarball` member (`chaingate.check/4`, which is `/3` plus that one optional member). Offline
+their rows in the record's `tarball` member (0.1.5 wrote `chaingate.check/4`, which is `/3` plus that one optional
+member; since 0.1.6 every check writes `chaingate.check/5`, below). Offline
 there is no earlier version to compare, so the entry-file comparison says it is not applicable. Those rows never change
 the decision or the exit code in 0.1.5: a CI job that wants to gate on them reads `tarball.disposition`.
 
-A check against seed v3.2 or later also writes `chaingate.check/4`, with or without `--tarball`: only `/4` carries its
+In 0.1.5 a check against seed v3.2 or later also wrote `chaingate.check/4`, with or without `--tarball`: `/4` carries its
 placement `new-family-cold-start`, the first prerelease of a new tag (for example the first `-rc`), which has no earlier
-version of its own tag to compare against.
+version of its own tag to compare against. Since 0.1.6 every check writes `chaingate.check/5`: `/4` under the 0.1.6
+policy, whose decision carries a `retier` member when a strict-tier row warned before it was compared with the
+release this one follows (that release, how it was chosen, the signals that are not new, the guards that held, and
+`recorded` or `raised`).
 
 **What you see.** For a named warning, a refusal that rests on a fact (a recorded advisory or a content change), or a
 version your pin withholds, ChainGate sends npm a notice on the tarball response, and npm prints it. Other refusals (an
@@ -317,8 +331,8 @@ reading your installed package names through DNS rebinding.
 
 **ALLOW / WARN / BLOCK enforcement** with a persisted decision log, per-version
 overrides, and CI-friendly exit codes from `chaingate check` (0 / 2 / 3; 4 = tool error). `chaingate check --json`
-emits a versioned `chaingate.check/3` record (0.1.3 wrote `chaingate.check/2` and 0.1.2 and earlier
-`chaingate.check/1`; both are still read); `examples/ci/` has an offline CI consumer for them.
+emits a versioned `chaingate.check/5` record (0.1.5 wrote `/3` or `/4`, 0.1.4 `/3`, 0.1.3 `/2` and 0.1.2 and earlier
+`/1`; all are still read); `examples/ci/` has an offline CI consumer for them.
 
 **A failure never turns a BLOCK into permission.** A BLOCK stays in force until the check that issued it
 definitively clears it (for example, the content hash matches its first-seen value again, or the seed no longer
@@ -513,8 +527,7 @@ $ echo $?
 0
 ```
 
-Exit codes: 0 ALLOW, 2 WARN, 3 BLOCK, 4 tool error. `--json` gives the `chaingate.check/3` record, or
-`chaingate.check/4` with seed v3.2 or later (above). `check` evaluates the seed: the rules on introduced install
+Exit codes: 0 ALLOW, 2 WARN, 3 BLOCK, 4 tool error. `--json` gives the `chaingate.check/5` record (above). `check` evaluates the seed: the rules on introduced install
 scripts, added dependencies and differing install scripts are reported by the proxy (above).
 
 A version named in a recorded advisory is blocked even when the release cannot be evaluated (for example a

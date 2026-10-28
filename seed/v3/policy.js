@@ -50,9 +50,15 @@
 //
 // CFT-POLICY-1.2 (0.1.4). The identity moved before any 0.1.4 change to the decision record, with nothing else
 // changed; each later 0.1.4 change is marked cft-policy-1.2 below.
+//
+// CFT-POLICY-1.3 (0.1.6). One change: the RE-TIER of the strict rows. A strict row (NAMED_ROWS) that WARNs becomes a NOTE
+// when the gate's re-tier block (seed/v3/retier.js, computed from the registry document in hand) says `recorded`: every flag
+// that broke already held on the release this one follows, and no guard holds. Only WARN -> NOTE: a NOTE is never an ALLOW
+// row, no other row moves, and a BLOCK is never touched. Without a block (no registry document, a caller that passes none)
+// 1.3 decides exactly as 1.2. The finding is not changed.
 import K from './contract.js';
 
-const POLICY_CONTRACT_VERSION = 'cft-policy-1.2';
+const POLICY_CONTRACT_VERSION = 'cft-policy-1.3';
 const PIN_GATE = 'seed-v3:known-malicious-pin';
 // The seed contracts whose pins are keyed by package name (reader.js SEED_CONTRACT_1_1 and SEED_CONTRACT_1_2; the reader
 // requires the name column and its index for both). Literals here, not an import: policy.js imports nothing from the
@@ -144,6 +150,17 @@ function normaliseConfig(config = {}) {
 }
 
 const r = (gate, result, detail) => ({ gate, result, detail });
+
+/**
+ * cft-policy-1.3: the strict WARN rows, each turned into a NOTE when the re-tier block says `recorded`. Returns the rows and
+ * whether any strict row warned before the re-tier (the decision carries the block only then).
+ */
+function retierRows(results, retier) {
+  const strict = results.some((x) => NAMED_ROWS.includes(x.gate) && x.result === WARN);
+  if (!strict || !retier || retier.placement !== 'recorded') return { results, strict };
+  return { strict, results: results.map((x) => (NAMED_ROWS.includes(x.gate) && x.result === WARN
+    ? r(x.gate, NOTE, `${x.detail}; not new: ${retier.words} (a note, not a warning)`) : x)) };
+}
 
 const reasonOf = (err) => (err instanceof Error ? `${err.name}: ${err.message}` : String(err));
 const pinBlockRow = (pin, pkg, version) => r(PIN_GATE, BLOCK,
@@ -237,6 +254,8 @@ function staleSeedRow(st) {
  *   ctx.override   an override row (the gate runner's short-circuit), or null
  *   ctx.staleSeed  (cft-policy-1.2) the gate's gap count for an `append` placement, or null:
  *                  {checked: true, k, tip, versions} or {checked: false, tip}. A coverage fact, never an alert.
+ *   ctx.retier     (cft-policy-1.3) the gate's re-tier block (seed/v3/retier.js), or null: a strict WARN becomes a NOTE
+ *                  only when its placement is `recorded`.
  * @returns {object} a decision. `disposition` is null when policy declines to decide; it is never
  *   ALLOW merely because something could not be established.
  */
@@ -355,6 +374,10 @@ function decide(finding, ctx = {}) {
   const stale = staleSeedRow(ctx.staleSeed);
   if (stale) results.push(stale);
 
+  // 3c. RE-TIER (cft-policy-1.3, 0.1.6). Only a strict WARN can move, only to NOTE.
+  const rt = retierRows(results, ctx.retier ?? null);
+  results.splice(0, results.length, ...rt.results);
+
   // 4. INCOMPLETE EVIDENCE. Never folded into the disposition silently: it is a SKIP with the
   //    reasons named, it sets evidence_complete=false, and when NOTHING was evaluated the
   //    disposition itself is an open question rather than an ALLOW by default.
@@ -397,6 +420,7 @@ function decide(finding, ctx = {}) {
     evidence_complete: missing.length === 0 && policyMissing.length === 0,
     not_evaluated: [...missing, ...policyMissing],
     undecided,
+    ...(rt.strict && ctx.retier ? { retier: ctx.retier } : {}),
   };
 }
 

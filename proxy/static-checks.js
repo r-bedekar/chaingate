@@ -76,7 +76,7 @@ import { posix } from 'node:path';
 import { pyTruthy } from '../seed/v3/packument.js';
 import { DEFAULTS as WALK } from './tar-walk.js';
 import { classify } from '../witness/row-class.js';
-import { NAMED_RUNNER_GATES } from '../seed/v3/policy.js';
+import { NAMED_RUNNER_GATES, NAMED_ROWS } from '../seed/v3/policy.js';
 
 export const STATIC_CHECKS_VERSION = 'static-checks-1.8';
 /** The reason a file row states when its roles had a candidate on the keep list and no file was read (ruled 2026-10-14). */
@@ -983,6 +983,8 @@ export function armedBy(results) {
   if (cls.named.length) return `named row${cls.named.length > 1 ? 's' : ''} ${cls.named.join(', ')}`;
   if (cls.contributing.includes('identity-break')) return 'identity-break';
   if (cls.contributing.includes('entry-path-change')) return 'entry-path-change';      // operator ruling R1 2026-10-21
+  // since 0.1.6: a strict row the re-tier turned into a NOTE still arms the walk, so every re-tiered release is read
+  if (cls.contributing.some((g) => NAMED_ROWS.includes(g))) return 'a strict row shown as a note (not new against its baseline)';
   if (cls.coverage.includes('seed-v3:coverage')) return 'seed coverage WARN (nothing in the finding was evaluated)';
   return null;
 }

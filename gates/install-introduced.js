@@ -15,7 +15,7 @@ import { pyTruthy } from '../seed/v3/packument.js';
 export const SETTLED_MS = 24 * 3_600_000;
 const HOOKS = ['preinstall', 'install', 'postinstall'];
 const GATE = 'install-introduced';
-const result = (r, detail) => ({ gate: GATE, result: r, detail });
+const result = (r, detail, basis) => ({ gate: GATE, result: r, detail, ...(basis ? { hooks_basis: basis } : {}) });
 
 function hooksOf(manifest) {
   const s = manifest && typeof manifest === 'object' ? manifest.scripts : null;
@@ -82,7 +82,35 @@ export function evaluateL1(versions, times, version) {
   const cur = idx.hooks.get(version);
   const m = versions[version];
   const gyp = Boolean(m && typeof m === 'object' && pyTruthy(m.gypfile)) && !cur.includes('install') && !cur.includes('preinstall');
-  return { L1: cur.length > 0 && !ever, L1i: gyp && !ever, hooks: cur, used };
+  return { L1: cur.length > 0 && !ever, L1i: gyp && !ever, hooks: cur, used, ever, gyp };
+}
+
+/**
+ * Since 0.1.6: the row a download's walk makes when it read the tarball package.json. npm runs the tarball's install hooks,
+ * not the registry entry's, so where the two differ the row follows the tarball: hooks only the registry entry declares (pinst
+ * renames postinstall in the packed copy) no longer warn, and a first hook only the tarball declares does. `prev` is the
+ * decision-time row (its `hooks_basis` carries `ever` and `gyp`); `tarHooks` and `regHooks` are the two hook dicts. Returns
+ * the row to store, or null when the stored row carries no basis to re-read (a row an older runtime wrote, or a SKIP).
+ */
+export function tarballRow(prev, tarHooks, regHooks) {
+  const b = prev && prev.hooks_basis;
+  if (!b || typeof b.ever !== 'boolean' || typeof b.gyp !== 'boolean' || !['ALLOW', 'WARN', 'NOTE'].includes(prev.result)) return null;
+  if (b.tarball !== null && b.tarball !== undefined) return null;      // already re-read: a tarball is immutable per version
+  const keysOf = (d) => Object.keys(d).filter((k) => HOOKS.includes(k)).sort();
+  const t = keysOf(tarHooks); const g = keysOf(regHooks);
+  const same = t.length === g.length && t.every((k) => tarHooks[k] === regHooks[k]);
+  const kind = same ? 'same' : !t.length ? 'registry-only' : !g.length ? 'added' : 'changed';
+  const basis = { ever: b.ever, gyp: b.gyp, tarball: kind };
+  if (same) return null;                                                // nothing to re-read: the registry entry is what npm runs
+  const L1 = t.length > 0 && !b.ever;
+  const gypWarn = b.gyp && !b.ever && !t.includes('install') && !t.includes('preinstall');
+  if (L1) return result('WARN', `the tarball package.json npm runs declares ${t.join(', ')}; no earlier version had an install hook`, basis);
+  if (gypWarn) return result('WARN', 'gypfile present (an implicit node-gyp install) with no install/preinstall hook; no earlier version had an install hook', basis);
+  if (prev.result === 'WARN') {
+    return result('NOTE', `the registry entry declares ${g.join(', ') || 'no install hook'}; the tarball package.json npm runs declares ${t.join(', ') || 'none'}`, basis);
+  }
+  return { gate: GATE, result: prev.result, detail: `${prev.detail}; the tarball package.json npm runs declares ${t.join(', ') || 'no install hook'}`,
+    hooks_basis: basis };
 }
 
 // each hook named with its command -- publisher text, so sanitised (control and bidi characters
@@ -100,10 +128,12 @@ export default {
   evaluate(input) {
     const r = evaluateL1(input?.rawVersions, input?.rawTimes, input?.version);
     if (r.skip) return result('SKIP', `not evaluable: ${r.skip}`);
+    // since 0.1.6: what a download's walk needs to re-read this row against the tarball package.json (tarballRow)
+    const basis = { ever: r.ever, gyp: r.gyp, tarball: null };
     if (r.L1) {
-      return result('WARN', `${named(input.rawVersions[input.version], r.hooks)} present; no earlier version (${r.used}) had an install hook`);
+      return result('WARN', `${named(input.rawVersions[input.version], r.hooks)} present; no earlier version (${r.used}) had an install hook`, basis);
     }
-    if (r.L1i) return result('WARN', `gypfile present (an implicit node-gyp install) with no install/preinstall hook; no earlier version (${r.used}) had an install hook`);
-    return result('ALLOW', `no install hook introduced (${r.used})`);
+    if (r.L1i) return result('WARN', `gypfile present (an implicit node-gyp install) with no install/preinstall hook; no earlier version (${r.used}) had an install hook`, basis);
+    return result('ALLOW', `no install hook introduced (${r.used})`, basis);
   },
 };

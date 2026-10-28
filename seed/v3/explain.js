@@ -33,6 +33,7 @@ const EXPLAIN_VERSION_FOR_SCHEMA = Object.freeze({
   'chaingate.check/2': EXPLAIN_VERSION_2,
   'chaingate.check/3': EXPLAIN_VERSION_2,
   'chaingate.check/4': EXPLAIN_VERSION_2,   // 0.1.5: /3 plus the optional tarball member; the explanation is the seed decision's
+  'chaingate.check/5': EXPLAIN_VERSION_2,   // 0.1.6: /4 under cft-policy-1.3; a re-tiered strict row is a NOTE row like any other
 });
 
 const has = (o, k) => o !== null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k);

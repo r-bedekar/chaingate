@@ -68,6 +68,7 @@ import POL from './policy.js';
 import { emailDomain } from './normalize.js';
 import { resolvePublisherEmail } from './normalize-extra.js';
 import { RELEASE_FAMILY, HOLDING_DESCRIPTION, tagFamily } from './tag-family.js';
+import RT from './retier.js';
 
 const SEED_V3_GATE = 'seed-v3';
 const FROM_PACKUMENT = 'from-packument';
@@ -501,10 +502,17 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input
     });
     finding = seed.check(candidate);
     const staleSeed = staleSeedGap(seed, place, input, publishedS, version);
+    // Since 0.1.6 (cft-policy-1.3): the re-tier block, from the registry document in hand. A failure here is no refusal:
+    // without a block policy decides as 1.2 did, so the strict rows keep their WARN.
+    let retier = null;
+    try {
+      retier = RT.retierOf({ packageName: pkg, version, finding, placement: place, notEvaluated: POL.notEvaluated(finding, place),
+        rawVersions: input.rawVersions, rawTimes: input.rawTimes });
+    } catch { retier = null; }
     // The placement travels WITH the finding. Where Channel-A cannot be compared, policy records
     // the gate's own reason rather than the checker's `uncovered_package`, and keeps what does not
     // depend on placement: the DAC trajectory and an exact-version advisory pin.
-    decision = POL.decide(finding, { ...pinCtx, config, override: null, placement: place, staleSeed });
+    decision = POL.decide(finding, { ...pinCtx, config, override: null, placement: place, staleSeed, retier });
   } catch (e) {
     // A refusal from any layer is an UNUSABLE INPUT, and policy decides what that means — this
     // module does not get to turn it into an ALLOW. The pin found above survives it.
@@ -569,6 +577,8 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
       // The decision's rows, structured (closed vocabulary), so a reader classifies named / contributing / coverage
       // rows without parsing the detail text.
       rows: decision.results.map((x) => ({ gate: x.gate, result: x.result })),
+      // cft-policy-1.3: the re-tier, structured, when a strict row warned before it (a later download reads it)
+      ...(decision.retier ? { retier: RT.compact(decision.retier) } : {}),
       detail: `${decision.policy_version}: ${why}${also}`
         + (decision.placement ? ` [placement: ${decision.placement}]` : '')
         + (decision.evidence_complete ? '' : ` [evidence incomplete: ${decision.not_evaluated.length}`

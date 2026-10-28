@@ -1,5 +1,5 @@
-// Build one check record: `chaingate.check/3` since 0.1.4 (cft-policy-1.2), `/4` when it carries a tarball member or a
-// 1.2 seed, `/2` in 0.1.3, `/1` before.
+// Build one check record: `chaingate.check/5` since 0.1.6 (cft-policy-1.3; the decision may carry a `retier` member),
+// `/3` in 0.1.4 (cft-policy-1.2), `/4` in 0.1.5 when it carried a tarball member or a 1.2 seed, `/2` in 0.1.3, `/1` before.
 //
 // Three shapes, and an absent member is OMITTED, never null-filled:
 //   evaluated   seed, candidate, finding, decision, effective, explanation
@@ -16,9 +16,9 @@
 import { createHash } from 'node:crypto';
 import G from '../seed/v3/gate.js';
 import { explain } from '../seed/v3/explain.js';
+import RT from '../seed/v3/retier.js';
 
-export const CHECK_SCHEMA_ID = 'chaingate.check/3';
-const SEED_CONTRACT_1_2 = 'cft-seed-v3-contract-1.2';
+export const CHECK_SCHEMA_ID = 'chaingate.check/5';
 
 /**
  * The combinations a check record may carry, one per schema. 0.1.4 writes only /3; /2 records are
@@ -37,6 +37,10 @@ export const SUPPORTED_RECORDS = Object.freeze({
   // since 0.1.5: /4 = /3 plus the optional `tarball` member of `chaingate check --tarball`; the same combination
   // plus seed contract 1.2, whose rl2 placement adds new-family-cold-start
   'chaingate.check/4': Object.freeze({ explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.2',
+    detection_contract_version: 'cft-detection-contract-1.0',
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] }),
+  // since 0.1.6: /5 = /4 under cft-policy-1.3, written for every check; the decision may carry the `retier` member
+  'chaingate.check/5': Object.freeze({ explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.3',
     detection_contract_version: 'cft-detection-contract-1.0',
     seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] }),
 });
@@ -77,7 +81,7 @@ export function recordCompatibility(rec) {
     if (rec.schema === 'chaingate.check/1' && has) {
       p.push('explanation.structured.decided_by is not a member of a chaingate.check/1 refused explanation');
     }
-    if (rec.schema === 'chaingate.check/2' || rec.schema === 'chaingate.check/3' || rec.schema === 'chaingate.check/4') {
+    if (rec.schema !== 'chaingate.check/1') {
       const deciding = (Array.isArray(d.results) ? d.results : []).filter((x) => x && x.result === d.disposition)
         .map((x) => ({ gate: x.gate, detail: x.detail }));
       if (!has || !Array.isArray(s.decided_by)) p.push('explanation.structured.decided_by is missing');
@@ -193,8 +197,7 @@ export function buildCheckRecord({ seed, bundleId = null, policy, domainVersionC
   const rec = common(tool, request);
   rec.result = finding ? RESULT.EVALUATED : RESULT.REFUSED;
   rec.seed = seedIdentity(seed, bundleId);
-  // /3 (0.1.4, published) carries neither seed contract 1.2 nor its placement new-family-cold-start: a 1.2 seed writes /4
-  if (rec.seed.contract_version === SEED_CONTRACT_1_2) rec.schema = CHECK_SCHEMA_ID_TARBALL;
+  // /5 (0.1.6) reads every seed contract this runtime reads, 1.2 and its placement new-family-cold-start included
   if (finding) {
     rec.candidate = {
       candidate_digest: finding.candidate.candidate_digest,
@@ -210,14 +213,16 @@ export function buildCheckRecord({ seed, bundleId = null, policy, domainVersionC
     results: decision.results,
     evidence_complete: decision.evidence_complete,
     not_evaluated: decision.not_evaluated,
+    // since 0.1.6: present only when a strict row warned before the re-tier
+    ...(decision.retier ? { retier: RT.compact(decision.retier) } : {}),
   };
   rec.effective = effectiveFrom(decision.disposition, override);
   rec.explanation = explain(rec);
   return rec;
 }
 
-/** Since 0.1.5: the `tarball` member of `chaingate check --tarball` makes the record a /4 (as a 1.2 seed does); decision and effective stay as evaluated. */
-export const CHECK_SCHEMA_ID_TARBALL = 'chaingate.check/4';
+/** The `tarball` member of `chaingate check --tarball` (0.1.5: a /4; since 0.1.6 a /5 may carry it); decision and effective stay as evaluated. */
+export const CHECK_SCHEMA_ID_TARBALL = 'chaingate.check/5';
 export function withTarball(rec, tarball) {
   if (!rec || rec.result === RESULT.TOOL_ERROR) return rec;
   rec.schema = CHECK_SCHEMA_ID_TARBALL;
