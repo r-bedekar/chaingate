@@ -1,7 +1,7 @@
 // U-03.1 — upstream HTTP hardening for @cgsec/chaingate 0.1.1.
 //
 // The proxy's upstream traffic (packuments, tarballs, background dependency lookups and the raw
-// fallback) goes through proxy/registry.js, which uses an Agent from the pinned undici 6.28.1 with
+// fallback) goes through proxy/registry.js, which uses an Agent from the pinned undici (8.x since 0.1.6) with
 // keep-alive disabled (`pipelining: 0`). These tests drive that path against a hostile loopback
 // upstream and assert what the npm client receives, what the witness store and the dependency cache
 // record, and how upstream sockets are actually used:
@@ -486,15 +486,15 @@ test('every upstream request in the proxy goes through the one pinned-client cal
   const reg = readFileSync(join(ROOT, 'proxy', 'registry.js'), 'utf8');
   assert.equal((reg.match(/^\s*return await request\(/gm) ?? []).length, 1, 'registry.js has exactly one request() call');
   assert.equal((reg.match(/\brequest\(url/g) ?? []).length, 1);
-  assert.match(reg, /new Agent\(\{ pipelining: 0 \}\)/);
+  assert.match(reg, /new Agent\(\{ pipelining: 0 \}\)\.compose\(interceptors\.redirect\(\)\)/);
   assert.match(reg, /dispatcher: upstreamAgent/);
 });
 
-test('the installed undici is the exact pinned version, at or above 6.28.1', () => {
+test('the installed undici is the exact pinned version, an 8.x at or above 8.4.1 (the upstream close fix)', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   const pinned = pkg.dependencies.undici;
   assert.ok(semver.valid(pinned), `undici is pinned to an exact version (got ${pinned})`);
-  assert.ok(semver.gte(pinned, '6.28.1') && semver.lt(pinned, '7.0.0'), `pin ${pinned} is a patched 6.x`);
+  assert.ok(semver.gte(pinned, '8.4.1') && semver.lt(pinned, '9.0.0'), `pin ${pinned} is a patched 8.x`);
   const req = createRequire(join(ROOT, 'proxy', 'registry.js'));
   const resolved = JSON.parse(readFileSync(req.resolve('undici/package.json'), 'utf8')).version;
   assert.equal(resolved, pinned, 'proxy/registry.js resolves exactly the pinned undici');

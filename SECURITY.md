@@ -237,7 +237,8 @@ measures below remove one connection-reuse condition. They do not
 make an untrusted registry trustworthy.
 
 - **Pinned HTTP client.** All upstream requests use an Agent from the
-  pinned `undici` (exactly 6.28.1 since 0.1.1). These are packuments
+  pinned `undici` (an exact 8.x version since 0.1.6; an exact 6.x
+  version from 0.1.1 to 0.1.5). These are packuments
   (including the metadata request the proxy makes to evaluate a version
   before serving a tarball it has not evaluated in this run),
   tarballs, background dependency lookups and the raw upstream
@@ -250,6 +251,16 @@ make an untrusted registry trustworthy.
   default. Without that, the pinned version would never handle
   upstream traffic. The process-wide default itself is left
   unchanged.
+- **Upstream close during a slow download.** With undici 6, a
+  registry that closed the connection while the proxy was still
+  waiting to pass a download on to a slow or departed npm client could
+  stop the proxy process with an internal assertion (upstream undici
+  issue 5360). undici 8.4.1 and later end such a response normally;
+  0.1.6 moved to undici 8 for this fix, which is why it needs Node.js
+  22.19.0 or later on Node 22. Redirects (at most 2 for packuments and
+  tarballs, none for attestation bundles) are followed by undici's
+  redirect interceptor, which drops `authorization` and cookies when a
+  redirect leaves the origin, as undici 6 did.
 - **No upstream connection reuse.** Keep-alive is disabled
   (`pipelining: 0`). Every upstream request uses its own connection,
   sends `connection: close`, and the connection is closed after the

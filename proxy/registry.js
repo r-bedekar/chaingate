@@ -1,4 +1,4 @@
-import { request, Agent, errors as undiciErrors } from 'undici';
+import { request, Agent, interceptors, errors as undiciErrors } from 'undici';
 
 // Upstream traffic goes through an Agent from the pinned undici. Without an explicit dispatcher,
 // request() uses the process-wide global dispatcher, and on Node 22 importing `node:http` installs
@@ -11,7 +11,11 @@ import { request, Agent, errors as undiciErrors } from 'undici';
 // on reused sockets (test/proxy/u031-upstream-hardening.test.js). Packuments, tarballs, background
 // dependency lookups and the raw fallback all come through upstreamRequest() and share this Agent.
 // The global dispatcher is left alone.
-const upstreamAgent = new Agent({ pipelining: 0 });
+//
+// Redirects are followed by undici's redirect interceptor, which reads each request's `maxRedirections`
+// (undici 7 and later reject that option on a plain dispatcher). It drops `authorization` and cookies
+// when a redirect leaves the origin, as the request option did in undici 6.
+const upstreamAgent = new Agent({ pipelining: 0 }).compose(interceptors.redirect());
 
 const RELAY_REQUEST_HEADERS = ['authorization', 'if-none-match', 'if-modified-since'];
 const RELAY_RESPONSE_HEADERS = [

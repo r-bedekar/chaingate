@@ -90,12 +90,12 @@ export default async function doctor(args) {
   const paths = resolvePaths(opts.scope);
   const checks = [];
 
-  // ── the SQLite native module: every database below needs it, and npm may have skipped its build ──
+  // ── the SQLite native module: every database below needs it, and this system may have no ready-built part ──
   const sqlite = probeNativeSqlite();
   checks.push(sqlite.ok
     ? { name: 'native-sqlite', pass: true, detail: `better-sqlite3 ${sqlite.version} loads` }
     : { name: 'native-sqlite', pass: false,
-      detail: sqlite.kind === 'abi' ? 'built for a different Node.js version (fix below)' : 'native part not installed (fix below)',
+      detail: sqlite.kind === 'missing' ? 'no ready-built native part for this system (fix below)' : 'native part did not load (fix below)',
       help: nativeSqliteHelp(sqlite.kind, sqlite.version) });
 
   // ── the ACTIVE v3 bundle and the policy in force ────────────────────────
