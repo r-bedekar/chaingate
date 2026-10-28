@@ -8,7 +8,7 @@ A v3 seed is never downloaded automatically: you pass it to `chaingate init --se
 
 ## seed-v3.2-full: signed v3 detection seed (current)
 
-**Status:** published as the GitHub pre-release
+**Status:** published as the GitHub release
 [seed-v3.2-full](https://github.com/r-bedekar/chaingate/releases/tag/seed-v3.2-full), for
 `@cgsec/chaingate` 0.1.5 or later. 0.1.4 and earlier cannot read it.
 
@@ -17,6 +17,10 @@ A v3 seed is never downloaded automatically: you pass it to `chaingate init --se
   installs in `authenticated` mode.
 - **Git record.** The signed annotated tag `seed-v3.2-full` points at the signed marker commit
   `d508535b6d788d610fd28c00a627b2fcefee612f`, whose `SEED-RELEASE.md` records the seed, key, record and asset digests.
+  The marker names the 0.1.5 release candidate the seed was first qualified on (tarball sha256
+  `d97036f41e4c68843cc64e76de24c8a010280ef60da999ca5a9b08e56796c5d8`), which was not published. The seed was then
+  qualified again, unchanged, on the published 0.1.5 (tarball sha256
+  `a8c362ca4a142c7c1b7741b9cbd8ce11259a516c1d1b90397a10b5160ece6d7e`).
 - **Compressed only.** The database is larger than a single GitHub release asset can be, so it is published as
   `chaingate-seed-v3.db.gz`. The `.sha256` and `.sig` files are over the decompressed database.
 
