@@ -121,6 +121,19 @@ function openActiveSeed(env) {
   return { seed, config, policy };
 }
 
+/**
+ * Since 0.1.6: the pins feed overlay of the witness DB the proxy for this scope uses, as a lookup for the gate (the proxy and
+ * `check` see the same pins). No database: no overlay. A read that fails throws, and the gate records a failed pin lookup.
+ */
+function overlayFor(witnessDbPath) {
+  if (!witnessDbPath || !existsSync(witnessDbPath)) return null;
+  return (name, version) => {
+    let db;
+    try { db = openWitnessDB(witnessDbPath, { readonly: true }); return db.advisoryPinFor(name, version); }
+    finally { try { db?.close(); } catch { /* already closed */ } }
+  };
+}
+
 /** The exact-version override, if any, from the witness DB the proxy for this scope uses. */
 function lookupOverride(witnessDbPath, name, version) {
   if (!witnessDbPath || !existsSync(witnessDbPath)) return null;
@@ -201,6 +214,7 @@ export async function runCheck({ name, version, packument, tarball = null, scope
       seed, bundleId: senv.CHAINGATE_SEED_V3 ? null : (active.config.seedV3BundleId ?? null), policy: active.policy,
       domainVersionCount: active.config.domainVersionCount,
       input: inputFromPackument(doc, name, version), request, override, tool: TOOL,
+      pinOverlay: overlayFor(active.config.witnessDbPath),
     });
     if (tarball) {
       const versions = doc.versions && typeof doc.versions === 'object' && !Array.isArray(doc.versions) ? doc.versions : {};

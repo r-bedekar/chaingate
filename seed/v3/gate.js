@@ -461,7 +461,7 @@ function validateEvaluationConfig({ config = {}, domainVersionCount } = {}) {
  * @returns {{decision: object, finding: object|null, placement: object|null}} `finding` and
  *   `placement` are null exactly when the decision is a refusal.
  */
-function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input = {}) {
+function evaluateCandidate(seed, { config = {}, domainVersionCount, pinOverlay = null } = {}, input = {}) {
   const pkg = input.packageName;
   const version = input.version;
   const manifest = input.rawManifest;
@@ -469,7 +469,7 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input
   // The advisory pin FIRST (cft-policy-1.1). It names this exact version and needs neither a manifest, a
   // placement nor a finding, so it is looked up before anything that can fail and carried into every decision below:
   // a refusal can no longer discard it. A lookup that throws is carried as a recorded failure, never as "no pin".
-  const looked = POL.lookupPin(seed, pkg, version);
+  const looked = POL.lookupPin(seed, pkg, version, pinOverlay);   // since 0.1.6: the pins feed overlay after the seed
   const pinCtx = { pin: looked.pin, pinLookupError: looked.error };
 
   // A missing manifest is an UNUSABLE INPUT, which is policy's question and not this module's.
@@ -535,12 +535,12 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount } = {}, input
  *                    exactly one GateResult, because that is the shape the gate runner aggregates.
  * @returns {{name: string, evaluate: (input: object) => {gate, result, detail}}}
  */
-function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = null } = {}) {
+function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = null, pinOverlay = null } = {}) {
   if (!seed) throw new Error('createSeedV3Gate: seed is required');
   const normalised = validateEvaluationConfig({ config, domainVersionCount });
 
   function evaluate(input) {
-    return resultFrom(evaluateCandidate(seed, { config, domainVersionCount }, input).decision,
+    return resultFrom(evaluateCandidate(seed, { config, domainVersionCount, pinOverlay }, input).decision,
       onDecision);
   }
 
@@ -579,6 +579,8 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
       rows: decision.results.map((x) => ({ gate: x.gate, result: x.result })),
       // cft-policy-1.3: the re-tier, structured, when a strict row warned before it (a later download reads it)
       ...(decision.retier ? { retier: RT.compact(decision.retier) } : {}),
+      // since 0.1.6: which kind of pin decided, when it came from the pins feed (the notice words it)
+      ...(decision.pin ? { pin: decision.pin } : {}),
       detail: `${decision.policy_version}: ${why}${also}`
         + (decision.placement ? ` [placement: ${decision.placement}]` : '')
         + (decision.evidence_complete ? '' : ` [evidence incomplete: ${decision.not_evaluated.length}`
@@ -613,7 +615,7 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
     } else if (identity.overridden === true) {
       note = `advisory not consulted on a failure path: an exact-version override exists for ${pkg}@${version}`;
     } else {
-      looked = POL.lookupPin(seed, pkg, version);
+      looked = POL.lookupPin(seed, pkg, version, pinOverlay);
       if (looked.error) {
         note = `advisory pin lookup FAILED for ${pkg}@${version} (${looked.error.message}); the input rule decides`;
       } else if (!looked.pin) note = `no recorded advisory pins ${pkg}@${version}`;
@@ -626,6 +628,7 @@ function createSeedV3Gate({ seed, config = {}, domainVersionCount, onDecision = 
     // The failure path carries its structured rows too, so a 1.2 failure decision's facts are
     // read from rows, never from the error text.
     return { gate: SEED_V3_GATE, result: decision.disposition, rows: decision.results.map((x) => ({ gate: x.gate, result: x.result })),
+      ...(decision.pin ? { pin: decision.pin } : {}),
       detail: `${decision.policy_version}: the seed-v3 path could not run (${error.message})`
         + (pinned ? ` | ${pinned.gate}: ${pinned.detail}` : '') + (note ? ` | ${note}` : '') };
   }

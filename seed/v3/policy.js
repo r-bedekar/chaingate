@@ -163,8 +163,22 @@ function retierRows(results, retier) {
 }
 
 const reasonOf = (err) => (err instanceof Error ? `${err.name}: ${err.message}` : String(err));
-const pinBlockRow = (pin, pkg, version) => r(PIN_GATE, BLOCK,
-  `recorded advisory ${pin.advisory_id} pins ${pkg}@${version}${pin.source ? ` (source ${pin.source})` : ''}`);
+// Since 0.1.6: a pin from the pins feed overlay (`origin: 'feed'`) is feed text, so its ids are bounded to a closed character set.
+// Its row keeps the words "recorded advisory" (the decision rule recognises a pin by them) and names the feed record.
+const feedText = (x) => (typeof x === 'string' ? x.replace(/[^A-Za-z0-9._:/-]/g, '').slice(0, 80) : '');
+const PIN_SOURCES = Object.freeze(['osv', 'ghsa', 'chaingate-analyst']);
+/** The decision's `pin` member for a feed pin (null for a seed pin, which the record's rows already say everything about). */
+const pinMember = (pin) => (pin && pin.origin === 'feed' ? { origin: 'feed', source: PIN_SOURCES.includes(pin.source) ? pin.source : 'other',
+  advisory_id: feedText(pin.advisory_id) || null, record_id: feedText(pin.record_id) || null } : null);
+function pinBlockRow(pin, pkg, version) {
+  if (pin.origin !== 'feed') {
+    return r(PIN_GATE, BLOCK, `recorded advisory ${pin.advisory_id} pins ${pkg}@${version}${pin.source ? ` (source ${pin.source})` : ''}`);
+  }
+  const m = pinMember(pin);
+  const what = m.advisory_id ?? `(ChainGate analyst record ${m.record_id})`;
+  return r(PIN_GATE, BLOCK, `recorded advisory ${what} pins ${pkg}@${version} (source ${m.source}); ChainGate pins feed`
+    + `${m.advisory_id && m.record_id ? `, record ${m.record_id}` : ''}`);
+}
 const pinFailedRow = (err) => r(PIN_GATE, SKIP,
   `advisory pin lookup FAILED (${reasonOf(err)}): whether an advisory names this version is NOT known`);
 const pinLookupMissing = (err) => ({ where: 'policy', name: 'pin_lookup', reason: reasonOf(err) });
@@ -277,6 +291,8 @@ function decide(finding, ctx = {}) {
     seed: finding ? finding.seed : null,
     override: null,
     undecided: [],
+    // since 0.1.6: which kind of pin decided (present only for a pins feed pin)
+    ...(!override && pinMember(pin) ? { pin: pinMember(pin) } : {}),
   };
 
   // As in the gate runner, an override short-circuits to ALLOW and nothing else runs. Kept verbatim, including that it
@@ -446,12 +462,16 @@ function pinFor(seed, packageName, version) {
  * caller accepted under its configured trust mode. Never throws: a failure is RETURNED, so it can be recorded.
  * @returns {{pin: object|null, error: Error|null, attempted: boolean}}
  */
-function lookupPin(seed, packageName, version) {
+function lookupPin(seed, packageName, version, overlay = null) {
   if (typeof packageName !== 'string' || !packageName || typeof version !== 'string' || !version) {
     return { pin: null, error: null, attempted: false };
   }
   try {
-    return { pin: pinFor(seed, packageName, version), error: null, attempted: true };
+    const seedPin = pinFor(seed, packageName, version);
+    if (seedPin) return { pin: { ...seedPin, origin: 'seed' }, error: null, attempted: true };
+    // since 0.1.6: the pins feed overlay, read after the seed; a throw is a FAILED lookup like the seed's own
+    const feedPin = typeof overlay === 'function' ? overlay(packageName, version) : null;
+    return { pin: feedPin ? { ...feedPin, origin: 'feed' } : null, error: null, attempted: true };
   } catch (e) {
     return { pin: null, error: e instanceof Error ? e : new Error(String(e)), attempted: true };
   }

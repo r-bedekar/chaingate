@@ -27,7 +27,7 @@ import { createEvaluationTracker, EvaluationBusy } from './evaluation-tracker.js
 import { createLogBoundary } from './log-boundary.js';
 // The deciding reason, the row classes, and ChainGate's npm-notice.
 import { classify as classifyRows, decidingReason, factsFromBits, pendingFacts, policyPrefix, servedClass } from '../witness/row-class.js';
-import { buildNotice, pinNotice, sanitizeUpstreamNotice, identity, NOTICE_CACHE_CONTROL } from './notice.js';
+import { buildNotice, factLabels, pinNotice, sanitizeUpstreamNotice, identity, NOTICE_CACHE_CONTROL } from './notice.js';
 // The user's pins (a live serving overlay) and acceptances.
 import { createPinSet, withheldBy } from '../witness/pins.js';
 // N1h judged at tarball time, bounded; the dependency cache's stats on /self
@@ -435,7 +435,8 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log,
           if (!facts.length) continue;
           const tag = /^[A-Za-z0-9._-]{1,64}$/.test(String(d.tag)) ? d.tag : 'a dist-tag';
           const to = d.to == null ? 'dropped' : (identity('x', String(d.to)) ? `moved to ${d.to}` : 'moved');
-          tagNotice = buildNotice({ kind: 'BLOCKED', pkg: packageName, version: d.from, labels: facts,
+          const dd = decisions.get(d.from);
+          tagNotice = buildNotice({ kind: 'BLOCKED', pkg: packageName, version: d.from, labels: factLabels(facts, dd?.held?.rows ?? dd?.results),
             tail: `(dist-tag ${tag} ${to})` });
           break;
         }
@@ -800,7 +801,9 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           on_no_evidence: config.policyOnNoEvidence,
         };
         seedV3Gate = createSeedV3Gate({
-          seed: seedV3, config: policyConfig, domainVersionCount: config.domainVersionCount });
+          seed: seedV3, config: policyConfig, domainVersionCount: config.domainVersionCount,
+          // since 0.1.6: the pins feed overlay in the witness store, read after the seed's own pins
+          pinOverlay: (p, v) => (witnessDb ? witnessDb.advisoryPinFor(p, v) : null) });
         log.info?.(`[seed-v3] ${config.seedV3Path} opened (trust=${config.seedV3Trust}`
           + `${seedV3.report?.authenticated ? ` anchor=${CHAINGATE_SEED_PUBKEY_FINGERPRINT}` : ''}, `
           + `snapshot=${seedV3.meta.corpus_snapshot_digest?.slice(0, 12)}, `
@@ -1095,7 +1098,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           noteInstall(req, { kind: 'refused', package: canonicalName, version: blocked.version, facts, status: 403, reason, policy },
             facts.length ? { kind: 'fact-refused', package_name: canonicalName, version: blocked.version, classes: { facts },
               reason, policy_version: policy } : null);
-          const notice = facts.length ? buildNotice({ kind: 'BLOCKED', pkg: canonicalName, version: blocked.version, labels: facts }) : null;
+          const notice = facts.length ? buildNotice({ kind: 'BLOCKED', pkg: canonicalName, version: blocked.version,
+            labels: factLabels(facts, blocked.gates) }) : null;
           writeJson(res, 403, { error: 'blocked_by_chaingate', ...blocked }, notice ? { 'npm-notice': notice } : {});
           return;
         }

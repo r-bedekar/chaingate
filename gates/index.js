@@ -60,7 +60,7 @@ import dependencyHooks from './dependency-hooks.js';
 import sizeJumpProvenance from './size-jump-provenance.js';
 import identityBreak from './identity-break.js';
 import entryPathChange from './entry-path-change.js';
-import { withRole, validRows, validDeps, validNotes, validRetier, validHooksBasis } from './row-class.js';
+import { withRole, validRows, validDeps, validNotes, validRetier, validHooksBasis, validPin } from './row-class.js';
 
 // NOTE (cft-policy-1.2, 0.1.4): a row value meaning "a contributing signal fired"; aggregate() ignores it.
 const VALID_RESULTS = new Set(['ALLOW', 'SKIP', 'WARN', 'BLOCK', 'NOTE']);
@@ -167,6 +167,7 @@ function normalizeResult(moduleName, raw, mod = null, identity = null, { askOnEr
   const unjudgeable = validNotes(raw.unjudgeable);
   const retier = validRetier(raw.retier);   // since 0.1.6: the seed-v3 re-tier, kept only when valid
   const hooksBasis = validHooksBasis(raw.hooks_basis);   // since 0.1.6: install-introduced's basis for the tarball re-read
+  const pin = validPin(raw.pin);   // since 0.1.6: a pins feed pin on the seed-v3 result
   return {
     gate: typeof raw.gate === 'string' && raw.gate ? raw.gate : moduleName,
     result: raw.result,
@@ -177,6 +178,7 @@ function normalizeResult(moduleName, raw, mod = null, identity = null, { askOnEr
     ...(unjudgeable ? { unjudgeable } : {}),
     ...(retier ? { retier } : {}),
     ...(hooksBasis ? { hooks_basis: hooksBasis } : {}),
+    ...(pin ? { pin } : {}),
   };
 }
 

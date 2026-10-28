@@ -78,7 +78,15 @@ export function validHooksBasis(x) {
   return { ever: x.ever, gyp: x.gyp, tarball: x.tarball };
 }
 
+/** Since 0.1.6: the seed-v3 result's `pin` member (a pins feed pin), validated, or null. */
+export function validPin(x) {
+  const id = (v) => v === null || (typeof v === 'string' && /^[A-Za-z0-9._:/-]{1,80}$/.test(v));
+  if (!x || typeof x !== 'object' || x.origin !== 'feed' || !['osv', 'ghsa', 'chaingate-analyst', 'other'].includes(x.source)) return null;
+  if (!id(x.advisory_id) || !id(x.record_id) || (x.advisory_id === null && x.record_id === null)) return null;
+  return { origin: 'feed', source: x.source, advisory_id: x.advisory_id, record_id: x.record_id };
+}
+
 /** Since 0.1.6: the seed-v3 result's compact re-tier block (seed/v3/retier.js), validated, or null. */
 export const validRetier = (x) => RT.validCompact(x);
 
-export default { ROLE_POLICY, CONTRIBUTING_GATES, withRole, validRows, validDeps, validNotes, validRetier, validHooksBasis, MAX_ROWS };
+export default { ROLE_POLICY, CONTRIBUTING_GATES, withRole, validRows, validDeps, validNotes, validRetier, validHooksBasis, validPin, MAX_ROWS };

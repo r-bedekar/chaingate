@@ -19,6 +19,7 @@ const LABELS = Object.freeze({
   'seed-v3:channel-a:critical': 'release-history break vs the seed (3+ of 5 groups)',
   'seed-v3:dac-trajectory:surface': 'release-history break vs the seed (2+ package-wide signals)',
   'seed-v3:pin': 'a recorded advisory names this version',
+  'seed-v3:pin-analyst': 'a ChainGate analyst record names this version',                        // since 0.1.6 (pins feed)
   'content-hash': 'its content differs from the recorded baseline',
   'install-introduced': 'an install script appears that earlier releases did not have',          // since 0.1.4
   'dependency-hooks': 'it adds a dependency that runs install scripts',                           // since 0.1.4
@@ -42,6 +43,15 @@ const validId = (pkg, version) => typeof pkg === 'string' && pkg.length <= 214 &
 /** The closed-vocabulary label of one classification key, or null (shared with `chaingate report`). */
 export function labelFor(key) {
   return Object.hasOwn(LABELS, key) ? LABELS[key] : null;
+}
+
+/**
+ * Since 0.1.6: the fact labels of a BLOCK, with the pin worded by its kind: a pin from the pins feed whose source is a ChainGate
+ * analyst record says so; every other pin keeps "a recorded advisory". `results` are the decision's gate results.
+ */
+export function factLabels(facts, results) {
+  const analyst = (Array.isArray(results) ? results : []).some((g) => g && g.gate === 'seed-v3' && g.pin && g.pin.source === 'chaingate-analyst');
+  return (Array.isArray(facts) ? facts : []).map((f) => (f === 'seed-v3:pin' && analyst ? 'seed-v3:pin-analyst' : f));
 }
 
 /** A validated `pkg@version`, or null. */
@@ -77,4 +87,4 @@ export function sanitizeUpstreamNotice(value) {
   return `registry: ${printable(v).slice(0, UPSTREAM_MAX)}`;
 }
 
-export default { buildNotice, pinNotice, sanitizeUpstreamNotice, identity, labelFor, NOTICE_CACHE_CONTROL, NOTICE_MAX_BYTES };
+export default { buildNotice, factLabels, pinNotice, sanitizeUpstreamNotice, identity, labelFor, NOTICE_CACHE_CONTROL, NOTICE_MAX_BYTES };

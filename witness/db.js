@@ -206,6 +206,27 @@ CREATE TABLE IF NOT EXISTS entry_facts (
 );
 CREATE INDEX IF NOT EXISTS idx_efv_pkg_order ON entry_fact_versions(package_name, id DESC);
 CREATE INDEX IF NOT EXISTS idx_ef_version    ON entry_facts(version_id);
+-- Since 0.1.6: the advisory pins of the last accepted pins feed cut, read after the seed's own pins. A cut replaces them
+-- whole, in one transaction; advisory_id is null for a record with no public advisory (a ChainGate analyst record).
+CREATE TABLE IF NOT EXISTS advisory_pins (
+    package_name  TEXT NOT NULL,
+    version       TEXT NOT NULL,
+    record_id     TEXT NOT NULL,
+    advisory_id   TEXT,
+    source        TEXT NOT NULL,
+    evidence_json TEXT,
+    added_at      TEXT,
+    feed_cut_at   TEXT NOT NULL,
+    feed_digest   TEXT NOT NULL,
+    PRIMARY KEY (package_name, version, record_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS advisory_pins_feed (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    cut_at      TEXT NOT NULL,
+    digest      TEXT NOT NULL,
+    rows        INTEGER NOT NULL,
+    accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
 
 CREATE INDEX IF NOT EXISTS idx_versions_pkg      ON versions(package_id);
 CREATE INDEX IF NOT EXISTS idx_versions_pub_at   ON versions(package_id, published_at DESC);
@@ -673,6 +694,50 @@ export class WitnessDB {
   listAcceptances() {
     const st = this._acceptStmts();
     return st ? st.list.all().map((r) => decodeJsonField(r, 'named', [])) : [];
+  }
+
+  _advisoryPinStmts() {
+    return this._tableStmts('advisory_pins', () => ({
+      get: this.db.prepare('SELECT package_name, version, record_id, advisory_id, source, evidence_json, added_at, feed_cut_at '
+        + 'FROM advisory_pins WHERE package_name = ? AND version = ? ORDER BY advisory_id IS NULL, advisory_id, record_id LIMIT 1'),
+      clear: this.db.prepare('DELETE FROM advisory_pins'),
+      insert: this.db.prepare('INSERT INTO advisory_pins (package_name, version, record_id, advisory_id, source, evidence_json, added_at, '
+        + 'feed_cut_at, feed_digest) VALUES (@package_name, @version, @record_id, @advisory_id, @source, @evidence_json, @added_at, '
+        + '@feed_cut_at, @feed_digest)'),
+      feed: this.db.prepare('SELECT cut_at, digest, rows, accepted_at FROM advisory_pins_feed WHERE id = 1'),
+      setFeed: this.db.prepare(`INSERT INTO advisory_pins_feed (id, cut_at, digest, rows) VALUES (1, @cut_at, @digest, @rows)
+        ON CONFLICT(id) DO UPDATE SET cut_at = excluded.cut_at, digest = excluded.digest, rows = excluded.rows,
+          accepted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`),
+    }));
+  }
+
+  /** Since 0.1.6: the overlay pin for an exact version (an advisory id first), or null; null when the table does not exist. */
+  advisoryPinFor(packageName, version) {
+    const st = this._advisoryPinStmts();
+    return st ? (st.get.get(packageName, version) ?? null) : null;
+  }
+
+  /** Since 0.1.6: the accepted pins feed cut ({ cut_at, digest, rows, accepted_at }), or null before the first. */
+  advisoryPinsFeed() {
+    const st = this._advisoryPinStmts();
+    return st ? (st.feed.get() ?? null) : null;
+  }
+
+  /**
+   * Since 0.1.6: replace the overlay with one accepted cut, whole, in ONE transaction: a failure part way leaves the previous cut
+   * as it was. rows: [{ package_name, version, record_id, advisory_id, source, evidence_json, added_at }].
+   */
+  replaceAdvisoryPins({ cutAt, digest, rows }) {
+    const st = this._advisoryPinStmts();
+    if (!st) throw new Error('advisory_pins is not in this witness database (open it read-write once to apply the schema)');
+    this.db.transaction(() => {
+      st.clear.run();
+      for (const r of rows) {
+        st.insert.run({ package_name: r.package_name, version: r.version, record_id: r.record_id, advisory_id: r.advisory_id ?? null,
+          source: r.source, evidence_json: r.evidence_json ?? null, added_at: r.added_at ?? null, feed_cut_at: cutAt, feed_digest: digest });
+      }
+      st.setFeed.run({ cut_at: cutAt, digest, rows: rows.length });
+    })();
   }
 
   listPins() {

@@ -184,9 +184,9 @@ export function toolErrorRecord({ tool, request, code, message }) {
  *   a.tool               { name, version }
  */
 export function buildCheckRecord({ seed, bundleId = null, policy, domainVersionCount, input, request,
-  override = null, tool }) {
+  override = null, tool, pinOverlay = null }) {
   const normalised = G.validateEvaluationConfig({ config: policy, domainVersionCount });
-  const { decision, finding, placement } = G.evaluateCandidate(seed, { config: policy, domainVersionCount },
+  const { decision, finding, placement } = G.evaluateCandidate(seed, { config: policy, domainVersionCount, pinOverlay },
     input);
   if (decision.disposition === null) {
     // Unreachable: validateEvaluationConfig refuses an unresolved policy. Named rather than assumed,
@@ -215,6 +215,8 @@ export function buildCheckRecord({ seed, bundleId = null, policy, domainVersionC
     not_evaluated: decision.not_evaluated,
     // since 0.1.6: present only when a strict row warned before the re-tier
     ...(decision.retier ? { retier: RT.compact(decision.retier) } : {}),
+    // since 0.1.6: present only when a pins feed pin decided
+    ...(decision.pin ? { pin: decision.pin } : {}),
   };
   rec.effective = effectiveFrom(decision.disposition, override);
   rec.explanation = explain(rec);

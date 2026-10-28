@@ -2,7 +2,8 @@
 // chaingate-ci — one offline CI consumer of `chaingate.check/3` results (0.1.4), `/4` (0.1.5: /3 plus the optional tarball member) and of historical
 // `chaingate.check/2` (0.1.3) and `chaingate.check/1` results (0.1.2 and earlier). /4 is also what 0.1.5 writes against a seed of
 // contract 1.2, whose placement adds new-family-cold-start. `/5` (0.1.6, policy cft-policy-1.3) is /4 written for every check; its
-// decision may carry an optional `retier` member (a strict warning shown as a note when it is not new). Node standard library only.
+// decision may carry an optional `retier` member (a strict warning shown as a note when it is not new) and an optional `pin`
+// member (a pin from the pins feed decided). Node standard library only.
 //
 //   node chaingate-ci.mjs --expected <manifest> --results <dir> --trusted-seed <sha256> [...]
 //                         [--trusted-seeds-file <file>] [--ignore-overrides] [--summary <file>]
@@ -212,6 +213,10 @@ SPEC.retier = { version: expect(T.constant('retier-1.0'), '"retier-1.0"'),
   basis: expect((v) => v === null || ['same flavor', 'same release line', 'previous release'].includes(v), 'a basis or null'),
   flags_dropped: expect((v) => T.strArray(v) && v.length <= 9, 'an array of at most 9 flag names'),
   guards: expect(T.strArray, 'an array of guard names'), words: T.str };
+// /5: the decision's optional pin member, when a pin from the pins feed decided.
+const feedId = (v) => v === null || (typeof v === 'string' && /^[A-Za-z0-9._:/-]{1,80}$/.test(v));
+SPEC.pin = { origin: expect(T.constant('feed'), '"feed"'), source: expect(T.oneOf(['osv', 'ghsa', 'chaingate-analyst', 'other']), 'osv|ghsa|chaingate-analyst|other'),
+  advisory_id: expect(feedId, 'an id or null'), record_id: expect(feedId, 'an id or null') };
 // /4: the same placement object, whose kind may also be new-family-cold-start.
 SPEC.placement_4 = { ...SPEC.placement, kind: expect(T.oneOf(PLACEMENTS_4), `one of ${PLACEMENTS_4.join('|')}`) };
 
@@ -246,9 +251,10 @@ export function validateRecord(rec) {
 
   checkObject('seed', rec.seed, SPEC.seed, p);
   const d = rec.decision;
-  const decisionSpec = rec.schema === 'chaingate.check/5' ? { ...SPEC.decision, retier: T.obj } : SPEC.decision;
-  if (checkObject('decision', d, decisionSpec, p, { optional: ['retier'] })) {
+  const decisionSpec = rec.schema === 'chaingate.check/5' ? { ...SPEC.decision, retier: T.obj, pin: T.obj } : SPEC.decision;
+  if (checkObject('decision', d, decisionSpec, p, { optional: ['retier', 'pin'] })) {
     if (has(d, 'retier')) checkObject('decision.retier', d.retier, SPEC.retier, p);
+    if (has(d, 'pin')) checkObject('decision.pin', d.pin, SPEC.pin, p);
     const rowSpec = rec.schema === 'chaingate.check/3' || SINCE_4.includes(rec.schema) ? SPEC.result_row_3 : SPEC.result_row;
     if (Array.isArray(d.results)) d.results.forEach((r, i) => checkObject(`decision.results[${i}]`, r, rowSpec, p));
     if (Array.isArray(d.not_evaluated)) {
