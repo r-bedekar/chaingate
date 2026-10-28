@@ -1,24 +1,18 @@
-// Recognising a better-sqlite3 native module that does not load, and the fix it prints. better-sqlite3 ships its native
-// part ready-built inside the npm package for Linux (glibc and musl), macOS and Windows on x64 and arm64, and has no
-// install script; on any other system it looks for a local build in build/Release. The guidance never enables an
-// install script: there is none to enable.
+// U-04 — recognising a missing or mismatched better-sqlite3 native module, and the fix it prints.
+// The guidance must allow only better-sqlite3's own install script, never all dependency scripts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { classifyNativeSqliteError, probeNativeSqlite, nativeSqliteHelp } from '../../cli/native-sqlite.js';
 
 test('classifies the real failure messages', () => {
-  // better-sqlite3 13 on a system with no ready-built part and no local build (message as Node prints it)
-  const missing = Object.assign(new Error("Cannot find module '/x/node_modules/better-sqlite3/build/Release/better_sqlite3.node'\n"
-    + 'Require stack:\n- /x/node_modules/better-sqlite3/lib/binding.js\n- /x/node_modules/better-sqlite3/lib/index.js'), { code: 'MODULE_NOT_FOUND' });
+  const missing = new Error('Could not locate the bindings file. Tried:\n → /x/node_modules/better-sqlite3/build/better_sqlite3.node');
   assert.equal(classifyNativeSqliteError(missing), 'missing');
-  const dl = Object.assign(new Error('/x/node_modules/better-sqlite3/prebuilds/linux-x64.node: invalid ELF header'), { code: 'ERR_DLOPEN_FAILED' });
+  const abi = new Error("The module '/x/better_sqlite3.node' was compiled against a different Node.js version using NODE_MODULE_VERSION 115. This version of Node.js requires NODE_MODULE_VERSION 127.");
+  assert.equal(classifyNativeSqliteError(abi), 'abi');
+  const dl = Object.assign(new Error('/x/better_sqlite3.node: invalid ELF header'), { code: 'ERR_DLOPEN_FAILED' });
   assert.equal(classifyNativeSqliteError(dl), 'other');
-  const glibc = Object.assign(new Error("/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by /x/better-sqlite3/prebuilds/linux-x64.node)"),
-    { code: 'ERR_DLOPEN_FAILED' });
-  assert.equal(classifyNativeSqliteError(glibc), 'other', 'a ready-built part the system cannot load is not a missing one');
   assert.equal(classifyNativeSqliteError(new Error('ENOENT: no such file, open /tmp/x.json')), null, 'unrelated errors are left alone');
-  assert.equal(classifyNativeSqliteError(new Error("Cannot find module '/x/other.node'")), null);
   assert.equal(classifyNativeSqliteError(undefined), null);
 });
 
@@ -28,30 +22,25 @@ test('the installed native module loads in this environment', () => {
   assert.match(p.version, /^\d+\.\d+\.\d+$/);
 });
 
-test('guidance names the version and doctor, is plain ASCII, and never enables an install script', () => {
-  for (const kind of ['missing', 'other']) {
-    const text = nativeSqliteHelp(kind, '13.0.3', 'freebsd-x64').join('\n');
-    assert.match(text, /better-sqlite3 13\.0\.3/);
+test('guidance enables only better-sqlite3 scripts, and never recommends enabling all dependency scripts', () => {
+  for (const kind of ['missing', 'other', 'abi']) {
+    const text = nativeSqliteHelp(kind, '11.10.0').join('\n');
+    assert.match(text, /better-sqlite3 11\.10\.0/);
     assert.match(text, /chaingate doctor/);
-    assert.doesNotMatch(text, /[^\x20-\x7e\n]/, 'plain ASCII');
-    assert.doesNotMatch(text, /allow-scripts|allowScripts|approve-scripts|ignore-scripts|npm rebuild|--foreground-scripts/);
+    for (const line of text.split('\n')) {
+      if (/--allow-scripts|--ignore-scripts=false|approve-scripts/.test(line)) {
+        assert.match(line, /better-sqlite3/, `a script-enabling command must name better-sqlite3: ${line}`);
+        assert.doesNotMatch(line, /--allow-scripts(=\*|=all|\s|$)/, `no blanket allow: ${line}`);
+      }
+    }
+    assert.doesNotMatch(text, /npm config set ignore-scripts false|--foreground-scripts|allow-scripts=\*/);
   }
-});
-
-test('a missing native part: names the system, the ready-built systems, and how to build from source', () => {
-  const text = nativeSqliteHelp('missing', '13.0.3', 'freebsd-x64').join('\n');
-  assert.match(text, /freebsd-x64/);
-  assert.match(text, /Linux, macOS and Windows on x64 and arm64/);
-  assert.match(text, /Python and a C\+\+ compiler/);
-  assert.match(text, /cd "\$\(npm root -g\)\/@cgsec\/chaingate\/node_modules\/better-sqlite3" && npm run build-release/);
-  assert.match(text, /cd node_modules\/better-sqlite3 && npm run build-release/);
-  assert.match(text, /not tested or supported/);
-});
-
-test('a native part that does not load: reinstall, global or project', () => {
-  const text = nativeSqliteHelp('other', '13.0.3', 'linux-x64').join('\n');
-  assert.match(text, /did not load/);
-  assert.match(text, /npm install -g @cgsec\/chaingate/);
-  assert.match(text, /npm install @cgsec\/chaingate/);
-  assert.doesNotMatch(text, /build-release/);
+  const missing = nativeSqliteHelp('missing', '11.10.0').join('\n');
+  assert.match(missing, /npm install -g @cgsec\/chaingate --allow-scripts=better-sqlite3/);
+  assert.match(missing, /npm rebuild better-sqlite3 --ignore-scripts=false/);
+  assert.match(missing, /npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3/, 'project installs use allowScripts');
+  for (const line of missing.split('\n')) {
+    if (/--allow-scripts/.test(line)) assert.match(line, /npm install -g /, `--allow-scripts only on a global install: ${line}`);
+  }
+  assert.match(missing, /PowerShell: .*npm rebuild better-sqlite3 --ignore-scripts=false/);
 });

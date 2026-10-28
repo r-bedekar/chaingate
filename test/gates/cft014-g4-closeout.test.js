@@ -32,11 +32,11 @@ test('G4-2 (D-C2) doctor counts failed checks only; skipped checks are never fai
   assert.equal(failedCount(checks), 2);
 });
 
-test('G4-3 (D-C3, 0.1.6) the README says the SQLite module needs no install script approval, and no longer asks for one', () => {
+test('G4-3 (D-C3) the README names both npm approval commands with the version they were checked on', () => {
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  assert.match(readme, /installing ChainGate runs no install script/);
-  assert.match(readme, /npm run build-release/);
-  assert.doesNotMatch(readme, /approve-scripts better-sqlite3|install-scripts approve better-sqlite3|--allow-scripts=better-sqlite3|allowScripts\.better-sqlite3/);
+  assert.ok(readme.includes('npm approve-scripts better-sqlite3'));
+  assert.ok(readme.includes('npm install-scripts approve better-sqlite3'));
+  assert.match(readme, /npm 11\.19\.0/);
 });
 
 test('G4-4 (D-C4) review-counterexamples leaves no cft04-cx- folder behind', () => {

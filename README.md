@@ -405,24 +405,35 @@ TAMPER. The first install that touches each package afterwards records a current
 that npm's metadata still lists, except a BLOCK that is reached again, which keeps its stored row (rows are only
 appended).
 
-**The SQLite module has a native part.** `better-sqlite3` ships it ready-built inside its npm package for Linux,
-macOS and Windows on x64 and arm64, so installing ChainGate runs no install script. It needs no script approval and
-works with `ignore-scripts=true` in your npm configuration. On another system the native part must be built from
-source, which needs Python and a C++ compiler; `chaingate doctor` reports a missing part as `native-sqlite` and prints
-the command:
+**The SQLite module has a native part.** It is installed by `better-sqlite3`'s own install script,
+which downloads a prebuilt binary. npm 12 blocks dependency install scripts unless you approve them.
+npm 11 runs them, but warns about any that `allowScripts` does not list. With `ignore-scripts=true` in
+your npm configuration they never run. If the script did not run, ChainGate installs but cannot open
+its database; `chaingate doctor` reports this as `native-sqlite` and prints the fix. Approve only
+that one package's script:
 
 ```bash
-# global install
-cd "$(npm root -g)/@cgsec/chaingate/node_modules/better-sqlite3" && npm run build-release
-# project install, in the project directory
-cd node_modules/better-sqlite3 && npm run build-release
+# global install (npm 11 and 12)
+npm install -g @cgsec/chaingate --allow-scripts=better-sqlite3
+
+# project install: approve in package.json before installing ...
+npm pkg set allowScripts.better-sqlite3=true --json && npm install @cgsec/chaingate
+# ... or install first, then approve and build it
+npm install @cgsec/chaingate && npm approve-scripts better-sqlite3 && npm rebuild better-sqlite3
+# (npm 11.19.0 also names it npm install-scripts approve better-sqlite3; checked on 11.19.0, absent from 10.9.7)
+
+# with ignore-scripts=true in your npm configuration: rebuild just that package
+cd "$(npm root -g)/@cgsec/chaingate" && npm rebuild better-sqlite3 --ignore-scripts=false
 ```
 
-Such systems are not tested or supported.
+`--allow-scripts` works for global installs only. npm rejects it for project installs, which use
+`allowScripts` in your own `package.json` instead. The `allowScripts` entry in ChainGate's own
+`package.json` applies only when developing ChainGate itself and grants nothing in your project. Do
+not enable every dependency's scripts to fix this.
 
 **Supported platforms.** ChainGate is tested on Linux x64 (Ubuntu 24.04), macOS 15 on arm64 and x64, and Windows
 Server 2022 and Windows 10 on x64, with Node.js 22 and 24 and npm 10, 11 and 12. Anything else is untested and not
-supported. The SQLite module's native part comes ready-built inside the npm package, with no Python or compiler.
+supported. The SQLite module installs from its official prebuilt binary, with no Python or compiler.
 
 Not tested on Windows:
 - **A real full disk.** Free-space handling there was exercised only by a simulated free-space figure and injected
@@ -434,6 +445,9 @@ Not tested on Windows:
 - If PowerShell refuses to run `npm` or `chaingate` ("running scripts is disabled on this system"),
   type `npm.cmd` and `chaingate.cmd` instead. The Command Prompt uses the `.cmd` launchers
   automatically. You do not need to change the execution policy.
+- Approve the SQLite script in the install command, so npm does not warn about it or skip it:
+  `npm.cmd install -g @cgsec/chaingate --allow-scripts=better-sqlite3`. To approve it once for all
+  your global installs: `npm.cmd config set allow-scripts=better-sqlite3 --location=user`.
 - Start ChainGate with your v3 seed:
   `chaingate.cmd init --seed C:\path\to\chaingate-seed-v3.db.gz`. On a new install,
   `init` without `--seed` downloads the older legacy witness seed instead (see below).

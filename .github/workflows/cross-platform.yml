@@ -8,8 +8,8 @@
 #   * unit        — the repository test suite. Tests that need the private seed or corpus inputs
 #                   (seed_export, the rc3 release candidate) skip here; the job lists every skip.
 #                   This is COMPATIBILITY coverage, distinct from the full local qualification.
-#   * acceptance  — installs the packed tarball the way users do (global; project; project with
-#                   --ignore-scripts, none of which needs install script approval) and runs the
+#   * acceptance  — installs the packed tarball the way users do (global; project with allowScripts
+#                   approval before install; project approval after install) and runs the
 #                   acceptance script in `--mode hosted`. Hosted runners may be elevated (Windows
 #                   runners are administrators), so this is NOT standard-account acceptance; that is
 #                   a separate `--mode standard` run on a normal account.
@@ -46,9 +46,9 @@ jobs:
       - name: record versions
         shell: bash
         run: echo "os=$RUNNER_OS arch=$RUNNER_ARCH node=$(node -v) npm=$(npm -v)" | tee versions.txt
-      - name: install dependencies (no package in the tree has an install script)
+      - name: install dependencies (allowScripts in package.json approves only better-sqlite3)
         run: npm ci --no-audit --no-fund
-      - name: native SQLite loads, and is the ready-built binary from the npm package (fail fast instead of hanging the suite)
+      - name: native SQLite loads, and is the official prebuild (fail fast instead of hanging the suite)
         run: |
           node -e "const D=require('better-sqlite3'); const d=new D(':memory:'); d.prepare('select 1').get(); d.close(); console.log('better-sqlite3', require('better-sqlite3/package.json').version, 'loads')"
           node test/acceptance/check-native.mjs .
@@ -109,28 +109,33 @@ jobs:
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
           node test/acceptance/make-fixtures.mjs "$RUNNER_TEMP/fixtures"
-      - name: global install (no script approval)
+      - name: global install (scripts allowed for better-sqlite3 only, where npm has allow-scripts)
         shell: bash
         run: |
           T="$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)"
-          npm install -g "$T" --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
+          if [ "$(npm config get allow-scripts)" != "undefined" ]; then
+            npm install -g "$T" --allow-scripts=better-sqlite3 --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
+          else
+            # this npm has no allow-scripts setting and runs install scripts; no retry
+            npm install -g "$T" --foreground-scripts 2>&1 | tee "$RUNNER_TEMP/global-install.log"; st=${PIPESTATUS[0]}
+          fi
           [ "$st" = 0 ] || exit $st
-          # no package in the tree has an install script: npm must neither list one nor ask for approval
-          if grep -E 'install-scripts|allow-scripts|approve-scripts' "$RUNNER_TEMP/global-install.log"; then echo 'npm lists an install script'; exit 1; fi
-      - name: the installed native module is the ready-built binary from the npm package (no Python or compiler)
+          # the package itself must not declare install scripts (npm would warn every user)
+          if grep -E 'install-scripts' "$RUNNER_TEMP/global-install.log" | grep -F '@cgsec/chaingate'; then echo 'npm lists an install script of @cgsec/chaingate'; exit 1; fi
+      - name: the installed native module is the official prebuild (no Python or compiler fallback)
         shell: bash
         run: node test/acceptance/check-native.mjs "$(npm root -g)/@cgsec/chaingate" "$RUNNER_TEMP/global-install.log"
       - name: acceptance, global install
         shell: bash
         run: node test/acceptance/acceptance.mjs --mode hosted --launcher global --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-global.json"
-      - name: acceptance, project install (no script approval)
+      - name: acceptance, project install, allowScripts approved before install
         if: success() || failure()
         shell: bash
-        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-scripts default --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-default.json"
-      - name: acceptance, project install with --ignore-scripts
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-approval before --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-before.json"
+      - name: acceptance, project install, approval after install (npm approve-scripts + rebuild)
         if: success() || failure()
         shell: bash
-        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-scripts ignore --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-ignore.json"
+        run: node test/acceptance/acceptance.mjs --mode hosted --launcher local --project-approval after --package "$(ls "$RUNNER_TEMP"/cgsec-chaingate-*.tgz)" --fixtures "$RUNNER_TEMP/fixtures" --report "$RUNNER_TEMP/acceptance-local-after.json"
       - name: reports
         if: always()
         uses: actions/upload-artifact@v4
