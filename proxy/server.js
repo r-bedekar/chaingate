@@ -1050,6 +1050,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           // identity, not against a path: a symlink before and after an update has the same path
           // over different bytes.
           sha256: seedV3.report?.content_sha256 ?? null,
+          // since 0.1.6, a seed cache: the digest of the root it is read under (no file digest: imports change the file)
+          seed_cache_root: seedV3.shards?.root.digest ?? null,
           trust: config.seedV3Trust,
           authenticated: Boolean(seedV3.report?.authenticated),
           schema_version: seedV3.meta?.schema_version ?? null,

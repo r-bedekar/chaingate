@@ -7,6 +7,7 @@
 // stops at the size the root names. Verifying and importing are seed/v3/shards.js; this module only fetches and records.
 import { createPublicKey } from 'node:crypto';
 import fs from 'node:fs';
+import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
 import { PINS_LIMITS } from '../witness/pins-feed.js';
@@ -126,4 +127,57 @@ export async function fetchBuckets({ get, cachePath, buckets, seedKey = SEED_KEY
   return { imported: imported.sort(byI), failed: failed.sort(byI) };
 }
 
-export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath };
+const LOCKFILE_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * The package names a project's lockfile lists (npm-shrinkwrap.json, else package-lock.json; lockfile versions 1 to 3), sorted
+ * and unique; [] when there is none or it cannot be read. Only names are taken, to know which buckets to fetch.
+ */
+export function lockfileNames(dir) {
+  for (const f of ['npm-shrinkwrap.json', 'package-lock.json']) {
+    const p = join(dir, f);
+    let doc;
+    try {
+      if (!fs.statSync(p).isFile() || fs.statSync(p).size > LOCKFILE_MAX_BYTES) continue;
+      doc = JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch { continue; }
+    const names = new Set();
+    if (doc && typeof doc.packages === 'object' && doc.packages) {
+      for (const k of Object.keys(doc.packages)) {
+        const at = k.lastIndexOf('node_modules/');
+        if (at >= 0) names.add(k.slice(at + 'node_modules/'.length));
+      }
+    } else {
+      const walk = (deps) => {
+        for (const [n, d] of Object.entries(deps ?? {})) { names.add(n); if (d && typeof d === 'object') walk(d.dependencies); }
+      };
+      if (doc && typeof doc.dependencies === 'object') walk(doc.dependencies);
+    }
+    return [...names].filter((n) => n.length > 0 && n.length <= 214).sort();
+  }
+  return [];
+}
+
+/**
+ * `init`: make the cache ready to read: the root, the buckets of `names`, and at least one bucket in all (a bucket brings the
+ * seed's tables). Resolves to { ok: true, root_digest, cut_at, held, failed } or { ok: false, why }; never rejects.
+ */
+export async function setUpSeedCache({ get, cachePath, names = [], seedKey = SEED_KEY, now = Date.now(), bits = SH.BUCKET_BITS,
+  feedKeys = null }) {
+  try {
+    fs.mkdirSync(dirname(cachePath), { recursive: true });
+    const r = await refreshRoot({ get, cachePath, seedKey, now, bits, feedKeys });
+    const need = bucketsFor(cachePath, names, { bits });
+    const f = await fetchBuckets({ get, cachePath, buckets: need, seedKey, bits });
+    let held = readCache(cachePath, (db) => [...heldOf(db)].sort((a, b) => a - b));
+    if (!held.length) {
+      const one = await fetchBuckets({ get, cachePath, buckets: [0], seedKey, bits });
+      if (!one.imported.length) return { ok: false, why: one.failed[0]?.why ?? 'no bucket could be fetched' };
+      held = [0];
+    }
+    const digest = readCache(cachePath, (db) => db.prepare('SELECT digest FROM shard_root WHERE id = 1').pluck().get());
+    return { ok: true, root_digest: digest, cut_at: r.cut_at, held, failed: f.failed };
+  } catch (e) { return { ok: false, why: String(e?.why ?? e?.message ?? e).slice(0, 300) }; }
+}
+
+export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath, lockfileNames, setUpSeedCache };

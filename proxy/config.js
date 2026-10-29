@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { readConfigStrict, validateConfig, requireCompletePolicy,
   ConfigUnreadable } from '../config-store.js';
 import { resolveActiveBundle, verifyBundleDir } from '../cli/seed-bundle.js';
+import { seedCachePathOf } from '../cli/paths.js';
 
 const DEFAULTS = {
   port: 6173,
@@ -89,7 +90,7 @@ function readPersisted(env) {
   const staticWalkWaitMs = valid ? valid.staticWalkWaitMs : null;                            // 0.1.6; null = the proxy's default
   // 0.1.6: the seed cache host, or null (no configuration, or `seed_cache: false`), and where the cache lives
   const seedCacheUrl = valid?.seedCache.enabled ? valid.seedCache.url : null;
-  const seedCachePath = join(base, 'seed-cache', 'chaingate-seed.db');
+  const seedCachePath = seedCachePathOf(base);
   const empty = { source: cfg ? file : null, base, seedV3Path: null, seedV3Trust: null,
     seedV3BundleDir: null, seedV3BundleId: null, seedV3Expected: null,
     policyOnUnusableInput: null, policyOnNoEvidence: null,

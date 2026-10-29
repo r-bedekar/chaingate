@@ -12,6 +12,9 @@ import {
   SEED_V3_SIG_FILENAME,
 } from './constants.js';
 
+/** 0.1.6: the seed cache (buckets of the seed under a signed root), which the proxy reads in place of a full seed. */
+export const seedCachePathOf = (base) => join(base, 'seed-cache', 'chaingate-seed.db');
+
 /**
  * Resolve all ChainGate paths relative to a base directory.
  * @param {'user'|'project'} [scope='user']
@@ -37,5 +40,6 @@ export function resolvePaths(scope = 'user', projectDir = process.cwd(), env = p
     seedV3: join(base, SEED_V3_FILENAME),
     seedV3Sha256: join(base, SEED_V3_SHA256_FILENAME),
     seedV3Sig: join(base, SEED_V3_SIG_FILENAME),
+    seedCache: seedCachePathOf(base),
   };
 }

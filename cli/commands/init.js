@@ -5,6 +5,7 @@ import { npmrcPath, readCurrentRegistry, applyChaingateBlock, findScopedRegistri
 import { readPid, readPidRecord, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
   isAlive } from '../proxy-control.js';
 import { fetchSeedBundle } from '../seed-download.js';
+import { shardSource, setUpSeedCache, lockfileNames } from '../seed-shards.js';
 import { verifySeed, verifyStagedSeed } from '../../witness/seed_verify.js';
 import { installLegacySeed, readInstallMarker, downloadedSeed, reportLegacyInstall,
   LegacyInstallRefused } from '../legacy-seed.js';
@@ -44,7 +45,7 @@ export function restartAllowed(outcome) {
  * seed-mutation lock, after recovery and cleanup, and returns `{ exit }` to stop init, or what a
  * started proxy must report back.
  */
-async function installSeeds(opts, paths, deps, lock) {
+export async function installSeeds(opts, paths, deps, lock) {
   // 3a. A v3 detection seed is installed BESIDE the witness database, never over it: it is
   //     evidence, it is opened read-only, and the runtime keeps writing its own state elsewhere.
   //     Everything needed to start later is recorded in config.json, so no environment is required.
@@ -165,6 +166,39 @@ async function installSeeds(opts, paths, deps, lock) {
   //    * an existing witness database is refreshed only when asked (`--seed <legacy db> --force`, or `update-seed`):
   //      in place, in one transaction, keeping local decisions and overrides (cli/legacy-seed.js).
   if (v3Installed) return { intended, v3Installed };
+
+  // 3b. Since 0.1.6, the seed cache: with no --seed and the cache on (the published host unless `seed_cache` is false), the root
+  //     and the buckets of this project's lockfile are fetched, and the proxy reads the cache in place of a full seed. A host
+  //     that cannot serve one yet is said and the steps below run as before.
+  if (!opts.seedPath && !opts.noSeed) {
+    let existing = null; let sc = null;
+    try { existing = readConfigStrict(paths.configFile) || {}; sc = validateConfig(existing, paths.configFile).seedCache; } catch (err) {
+      console.error(fmt.fail(err.message));
+      console.error('  Nothing was installed and .npmrc was not touched.');
+      return { exit: EXIT.ERROR };
+    }
+    if (sc.enabled) {
+      console.log(`Fetching the seed cache from ${sc.url} ...`);
+      const t = deps.seedCache ?? {};
+      const r = await setUpSeedCache({ get: t.get ?? shardSource(sc.url), cachePath: paths.seedCache,
+        names: lockfileNames(deps.projectDir ?? process.cwd()), ...(t.seedKey ? { seedKey: t.seedKey } : {}),
+        ...(t.bits ? { bits: t.bits } : {}), ...(t.now ? { now: t.now } : {}) });
+      if (r.ok) {
+        const policy = { ...DEFAULT_POLICY, ...(existing.policy || {}) };
+        writeConfig(paths.configFile, { ...existing, policy });
+        console.log(fmt.ok(`seed cache ready: root of ${r.cut_at}, ${r.held.length} bucket(s) held; the rest are fetched as packages need them`));
+        if (r.failed.length) console.log(fmt.warn(`  ${r.failed.length} bucket(s) could not be fetched now and are fetched when needed`));
+        console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
+          + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
+        if (!existsSync(paths.witnessDb)) {
+          const db = openWitnessDB(paths.witnessDb); db.applySchema(); db.close();
+          console.log(fmt.ok('Witness database created (writable, separate from the seed)'));
+        }
+        return { intended: { seed_cache_root: r.root_digest, trust: 'authenticated', policy }, v3Installed: true };
+      }
+      console.log(fmt.warn(`The seed cache is not available yet (${r.why}); continuing as before.`));
+    }
+  }
   let v3Active = null; let v3Broken = null;
   // resolved, not just named: a link to a bundle that is gone is a BROKEN activation, not an absent one
   try { v3Active = resolveActiveBundle(paths.base)?.id ?? null; } catch (err) {
@@ -447,6 +481,14 @@ export default async function init(args, deps = {}) {
     const got = self?.seed_v3;
     if (!got) return ['no v3 seed loaded'];
     const out = [];
+    if (intended.seed_cache_root) {
+      // a seed cache: the root it was set up under, and the policy
+      if (got.seed_cache_root !== intended.seed_cache_root) out.push(`seed cache root ${String(got.seed_cache_root).slice(0, 16)}... != ${intended.seed_cache_root.slice(0, 16)}...`);
+      for (const k of Object.keys(POLICY_VALUES)) {
+        if (got.policy?.[k] !== intended.policy[k]) out.push(`policy ${k} ${got.policy?.[k]} != ${intended.policy[k]}`);
+      }
+      return out;
+    }
     if (got.sha256 !== intended.sha256) {
       out.push(`seed digest ${String(got.sha256).slice(0, 16)}... != `
         + `${intended.sha256.slice(0, 16)}...`);
