@@ -173,8 +173,8 @@ seconds (`"static_walk_wait_ms"` in `config.json`, 0 to 60,000; at most half the
 is served unread, recorded as "not checked: walk budget exceeded" and read at its next download. The reading adds no
 latency on typical packages and at most that wait per download on heavy ones: over 500 synthetic packages at npm's
 16 connections, typical tarballs (about 90 KiB) never waited and the install took 6 s; tarballs of 4.6 MB of mostly
-base64 text waited 3.4 s at the median (4.6 s at most), and every one was read. The proxy's memory rose by about 70
-MiB on the typical install and about 290 MiB at most on the heavy one. Each version's wait is recorded with its facts
+base64 text waited 2.1 s at the median (2.8 s at most), and every one was read. The proxy's memory rose by about 70
+MiB on the typical install and about 215 MiB at most on the heavy one. Each version's wait is recorded with its facts
 (`walk_wait_ms`). The walk keeps the bodies of the files the registry manifest points npm at -- the install-hook targets, `main`, up to 4 `bin`
 targets; at most 6 files of 1 MiB each -- and checks them. It warns when:
 - an install-hook command fetches code (curl, wget, Invoke-WebRequest, certutil -urlcache, bitsadmin) and executes or
