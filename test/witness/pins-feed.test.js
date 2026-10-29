@@ -93,6 +93,13 @@ test('PF1 the key manifest: signed by the seed key, each key carrying its own id
   throwsRefused(() => verifyKeyManifest(long.bytes, long.sig, { seedKey: SEED.publicKey }), /over 90 days/);
   const shards = manifest([pinsEntry(PINS, T0, 30, 'shards')]);
   throwsRefused(() => verifyKeyManifest(shards.bytes, shards.sig, { seedKey: SEED.publicKey }), /names no pins key/);
+  // one list for both keys, as published: each reader takes its own role; any key over 90 days refuses the list for both
+  const SHK = newKey();
+  const both = manifest([pinsEntry(), pinsEntry(SHK, T0, 90, 'shards')]);
+  assert.deepEqual(verifyKeyManifest(both.bytes, both.sig, { seedKey: SEED.publicKey }).map((k) => k.key_id), [PINS.id]);
+  assert.deepEqual(verifyKeyManifest(both.bytes, both.sig, { seedKey: SEED.publicKey, role: 'shards' }).map((k) => k.key_id), [SHK.id]);
+  const longShards = manifest([pinsEntry(), pinsEntry(SHK, T0, 91, 'shards')]);
+  throwsRefused(() => verifyKeyManifest(longShards.bytes, longShards.sig, { seedKey: SEED.publicKey }), /over 90 days/);
   const other = Buffer.from(canon({ key_manifest_version: 'pins-keys-9', keys: [pinsEntry()] }));
   throwsRefused(() => verifyKeyManifest(other, cryptoSign(null, other, SEED.privateKey), { seedKey: SEED.publicKey }), /not pins-keys-1.0/);
 });
