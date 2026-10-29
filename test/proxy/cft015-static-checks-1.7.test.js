@@ -76,7 +76,7 @@ const NET_NEG = ["const n = require('net'); n.isIP(x);", "const t = require('tls
 // ------------------------------------------------------------------ identity and vocabulary
 test('B0 identity: static-checks-1.7; BOUND_CALLS and BOUND_LIMITS are recon\'s; boundModuleCall is exported', async () => {
   const S = await SC();
-  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8');   // declared: 1.8 adds S8 and S9 (cft015-static-checks-1.8)
+  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8.1');   // declared: 1.8 adds S8 and S9 (cft015-static-checks-1.8)
   assert.deepEqual(JSON.parse(JSON.stringify(S.BOUND_CALLS)), {
     'http-request': [{ mod: 'https?|http2', fns: 'request|get' }],
     'net-connect': [{ mod: 'net', fns: 'connect|createConnection' }, { mod: 'tls', fns: 'connect' }, { mod: 'dgram', fns: 'createSocket' }],

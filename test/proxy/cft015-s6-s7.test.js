@@ -206,7 +206,12 @@ test('S67-U7 S7 NOT_CHECKED: a refused predecessor archive, unreadable stored fa
   r = s7(pred('1.0.0', [readEntry('main', 'index.js', NOFACTS)]), walkOf([{ path: 'index.js', buf: Buffer.from('a\0b') }]));
   assert.equal(r.result, 'SKIP'); assert.match(r.detail, /^not checked: current main index\.js was not read \(binary/);
   r = s7(pred('1.0.0', [readEntry('main', 'index.js', NOFACTS)], { static_checks_version: 'static-checks-0.9' }));
-  assert.equal(r.result, 'SKIP'); assert.equal(r.detail, 'not checked: predecessor 1.0.0: its facts were stored by static-checks-0.9, not static-checks-1.8; armed by x');
+  assert.equal(r.result, 'SKIP'); assert.equal(r.detail, 'not checked: predecessor 1.0.0: its facts were stored by static-checks-0.9, not static-checks-1.8.1; armed by x');
+  // since 0.1.6: 1.8.1 changes a fact field only, so facts stored by 1.8 are compared; 1.7's are not
+  r = s7(pred('1.0.0', [readEntry('main', 'index.js', NOFACTS)], { static_checks_version: 'static-checks-1.8' }));
+  assert.notEqual(r.result, 'SKIP', r.detail);
+  r = s7(pred('1.0.0', [readEntry('main', 'index.js', NOFACTS)], { static_checks_version: 'static-checks-1.7' }));
+  assert.equal(r.result, 'SKIP'); assert.match(r.detail, /stored by static-checks-1\.7, not static-checks-1\.8\.1/);
 });
 
 // ------------------------------------------------------------------ end to end: the predecessor is the last version this proxy served

@@ -1,0 +1,20 @@
+{
+ "static_checks_version": "static-checks-1.8.1",
+ "source": "recon v6.22 static-checks.mjs (sealed investigations/recon/v6.22, manifest RECON-v6.22.SHA256SUMS b5ac4924, static-checks.mjs d6e243d7), branch g10-c2-recon-v6.22",
+ "change": "facts only, from static-checks-1.8: a run's distinct_chars is counted over at most its first FACTS_LIMITS.distinctCharsBytes (65536); base64 and hex runs and a hex-escape run's digits; chars and magic unchanged; every run of at most 64 KiB gives the 1.8 value; every regex, marker list, row rule, gate, class, role and notice unchanged",
+ "facts_limits": {
+  "windowBytes": 2097152,
+  "b64MinRun": 400,
+  "hexEscapeMinRun": 60,
+  "magicBytes": 16,
+  "diversityRef": 16,
+  "listed": 20,
+  "distinctCharsBytes": 65536
+ },
+ "encoded_runs": {
+  "b64_run": "[A-Za-z0-9+/]{400,}={0,2}",
+  "hex_escape_run": "(?:\\\\x[0-9a-fA-F]{2}){60,}",
+  "distinct_chars_basis": "distinct chars, first 64 KiB of each run"
+ },
+ "facts_note": "shadow facts (operator ruling R11, 2026-10-24): no outcome, tier or notice depends on them; a fact is read against the file, never a verdict"
+}

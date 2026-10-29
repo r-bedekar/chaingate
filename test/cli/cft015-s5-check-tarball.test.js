@@ -108,7 +108,7 @@ test('R1 without --tarball the record is today\'s /5 (0.1.5: /3), member for mem
     assert.deepEqual(rest, plainRest, 'every other member is byte-identical to the /3 record');
     assert.equal(tarball.source.kind, 'tarball-file'); assert.equal(tarball.source.path, w.tb);
     assert.equal(tarball.source.sha256, createHash('sha256').update(fs.readFileSync(w.tb)).digest('hex')); assert.equal(tarball.source.bytes, fs.statSync(w.tb).size);
-    assert.equal(tarball.static_checks_version, 'static-checks-1.8');   // declared: recon's static-checks-1.5 mirrored (R5, R9), then 1.6 facts only (R11), 1.7 bound-module sinks, 1.8 S8 and S9
+    assert.equal(tarball.static_checks_version, 'static-checks-1.8.1');   // declared: recon's static-checks-1.5 mirrored (R5, R9), then 1.6 facts only (R11), 1.7 bound-module sinks, 1.8 S8 and S9
     assert.deepEqual(tarball.walk, { ok: true });
     assert.deepEqual(tarball.keep_list, { source: 'registry manifest', candidates: 5 });
     assert.deepEqual(tarball.rows.map((x) => x.gate), ['install-manifest-mismatch', 'static:S0-shell-fetch-in-hook', 'static:S1-loader-in-hook-target', 'static:S2-obfuscated-entry', 'static:S3-secret-harvest-with-sink', 'static:S4-wallet-swap-hook', 'static:S5-oversized-hook-target',
