@@ -72,10 +72,11 @@ function readPersisted(env) {
   const valid = cfg ? validateConfig(cfg, file) : null;
   const caps = valid ? valid.caps : { entries: null, bytes: null };
   const staticWithhold = valid ? valid.staticWithhold : false;      // 0.1.5; applies with or without a v3 seed
+  const pinsFeedUrl = valid?.pinsFeed.enabled ? valid.pinsFeed.url : null;                 // 0.1.6
   const empty = { source: cfg ? file : null, base, seedV3Path: null, seedV3Trust: null,
     seedV3BundleDir: null, seedV3BundleId: null, seedV3Expected: null,
     policyOnUnusableInput: null, policyOnNoEvidence: null,
-    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold };
+    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold, pinsFeedUrl };
   if (!active) return empty;
 
   // The bundle says what it is; it is verified through the PINNED directory.
@@ -100,6 +101,7 @@ function readPersisted(env) {
     unstoredBlockCapEntries: caps.entries,
     unstoredBlockCapBytes: caps.bytes,
     staticWithhold,
+    pinsFeedUrl,
   };
 }
 
@@ -142,6 +144,8 @@ export function loadConfig(env = process.env, overrides = {}) {
     unstoredBlockCapBytes: env.CHAINGATE_UNSTORED_BLOCK_CAP_BYTES || persisted.unstoredBlockCapBytes,
     // 0.1.5: hold an armed download (up to 8 MiB) while the static checks read it; persisted only, off by default
     staticWithhold: persisted.staticWithhold === true,
+    // 0.1.6: the pins feed base URL, or null (none configured, or `pins_feed: false`); persisted only
+    pinsFeedUrl: persisted.pinsFeedUrl ?? null,
     configSource: persisted.source,
     chaingateBase: persisted.base,
   };

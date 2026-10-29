@@ -7,6 +7,8 @@ import { describeStorage } from '../storage-check.js';
 import { openWitnessDB } from '../../witness/db.js';
 import { resolveActiveBundle, bundleFiles, ActivationBroken, readActivationIntent } from '../seed-bundle.js';
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
+import { readConfigStrict, validateConfig } from '../../config-store.js';
+import { describePinsFeed } from '../pins-feed.js';
 
 function parseArgs(args) {
   const opts = { scope: 'user', json: false };
@@ -61,6 +63,12 @@ export default async function status(args) {
     const recent = db.getRecentDecisions(5);
     const seedVersion = db.getSeedMetadata('seed_version');
     const seedExported = db.getSeedMetadata('exported_at');
+    // Since 0.1.6: the pins feed, from what the store recorded; a configuration that cannot be read shows as not configured
+    // here (`chaingate doctor` reports it).
+    let pinsUrl = null;
+    try { pinsUrl = validateConfig(readConfigStrict(paths.configFile) || {}, paths.configFile).pinsFeed; } catch { /* doctor says */ }
+    const pinsFeed = db.advisoryPinsFeed(); const pinsFetch = db.advisoryPinsFetch();
+    const pins = describePinsFeed({ url: pinsUrl?.enabled ? pinsUrl.url : null, feed: pinsFeed, fetch: pinsFetch });
     // The proxy process: three-state liveness, and what it says about itself. Its
     // in-memory BLOCK count is the PROCESS's state; the decision totals above are what the database holds.
     const pidRecord = readPidRecord(paths.pidFile);
@@ -78,6 +86,7 @@ export default async function status(args) {
         recent,
         seed: { version: seedVersion, exported_at: seedExported },
         seed_v3: seedV3,
+        pins_feed: { state: pins.state, url: pinsUrl?.enabled ? pinsUrl.url : null, cut: pinsFeed, last_fetch: pinsFetch },
         proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST,
           pid_state: pidRecord?.state ?? 'none', responding: Boolean(self),
           storage: self?.storage ?? null, unstored_blocks: self?.unstored_blocks ?? null, self },
@@ -111,6 +120,7 @@ export default async function status(args) {
       ['Detection seed (v3):', v3Line],
       ...(intent.state === 'pending' ? [['', fmt.yellow('an interrupted activation is pending; the next seed command recovers it')]] : []),
       ...(intent.state === 'invalid' ? [['', fmt.red(`the activation intent is not valid (${intent.why}); see \`chaingate doctor\``)]] : []),
+      ['Pins feed:', pins.notice ? fmt.yellow(pins.text) : pins.state === 'off' ? fmt.dim(pins.text) : pins.text],
       ['Legacy witness seed:', seedLine],
       ['Proxy:', proxyStatus],
       ...(storageText && storageState !== 'healthy' && storageState !== 'no_evidence'

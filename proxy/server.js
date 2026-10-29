@@ -15,6 +15,7 @@ import {
   UpstreamError,
 } from './registry.js';
 import { openWitnessDB } from '../witness/db.js';
+import { refreshPins, urlSource, PINS_REFRESH_MS } from '../cli/pins-feed.js';
 import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
@@ -1527,15 +1528,38 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     Promise.resolve().then(() => handler(req, res)).catch((err) => finalGuard(res, err));
   });
   let logTick = null;
+  // Since 0.1.6: the pins feed, fetched at start and hourly while a seed is in use and a feed URL is configured (a test
+  // passes `pinsFeedGet` and `pinsSeedKey`). One fetch at a time; a feed problem is one log line and the kept cut keeps serving.
+  const pinsGet = (seedV3 && witnessDb) ? (config.pinsFeedGet ?? (config.pinsFeedUrl ? urlSource(config.pinsFeedUrl) : null)) : null;
+  let pinsTimer = null;
+  let pinsBusy = null;
+  const refreshPinsFeed = () => {
+    if (!pinsGet) return Promise.resolve(null);
+    pinsBusy ??= refreshPins({ get: pinsGet, db: witnessDb, ...(config.pinsSeedKey ? { seedKey: config.pinsSeedKey } : {}) })
+      .then((r) => {
+        if (r.outcome === 'accepted') log.info?.(`[pins] pins feed cut ${r.cut_at} accepted: ${r.rows} versions`);
+        else if (r.outcome === 'held') log.warn(`[pins] pins feed cut ${r.cut_at} held: ${r.why}. Take it with: chaingate update-pins --accept-cut ${r.digest}`);
+        else if (r.outcome !== 'same') log.warn(`[pins] pins feed ${r.outcome}: ${r.why}; the kept cut keeps serving`);
+        return r;
+      }, (err) => { log.warn(`[pins] the pins feed result could not be recorded: ${err.message}`); return null; })
+      .finally(() => { pinsBusy = null; });
+    return pinsBusy;
+  };
   server.on('listening', () => {
     if (logTick) return;
     logTick = setInterval(() => { try { log.tick(); } catch { /* reporting only */ } }, 60_000);
     logTick.unref?.();
+    if (pinsGet && !pinsTimer) {
+      refreshPinsFeed();
+      pinsTimer = setInterval(refreshPinsFeed, PINS_REFRESH_MS);
+      pinsTimer.unref?.();
+    }
   });
   server.config = config;
   server.witness = witness;
   server.witnessDb = witnessDb;
   server.seedV3 = seedV3;
+  server.refreshPinsFeed = refreshPinsFeed;
   server.depCache = depCache;
   server.depFetcher = depFetcher;
   const origClose = server.close.bind(server);
@@ -1545,6 +1569,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     // queue aborts, promise resolves.
     const finish = () => {
       if (logTick) { clearInterval(logTick); logTick = null; }
+      if (pinsTimer) { clearInterval(pinsTimer); pinsTimer = null; }
       log.tick();                                            // the last suppression summary, if any
       origClose(() => {
         try { witness?.close(); } catch { /* already closed */ }
@@ -1552,8 +1577,12 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         if (cb) cb();
       });
     };
+    // a pins fetch in flight finishes (or fails) before the store closes
+    const pinsDone = pinsBusy ? pinsBusy.catch(() => {}) : null;
     if (depFetcher) {
-      depFetcher.stop().then(finish, finish);
+      Promise.all([depFetcher.stop(), pinsDone]).then(finish, finish);
+    } else if (pinsDone) {
+      pinsDone.then(finish, finish);
     } else {
       finish();
     }

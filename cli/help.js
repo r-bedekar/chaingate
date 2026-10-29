@@ -8,6 +8,10 @@ export const COMMAND_HELP = Object.freeze({
   'update-seed': 'chaingate update-seed [--force] [--scope user|project]\n'
     + '  chaingate update-seed --seed <path> [--unsigned-development] [--scope user|project]\n'
     + '  chaingate update-seed --rollback [--scope user|project]',
+  'update-pins': 'chaingate update-pins [--json] [--scope user|project]\n'
+    + '  chaingate update-pins --file <dir> [--json] [--scope user|project]\n'
+    + '  chaingate update-pins --accept-cut <sha256> [--file <dir>] [--scope user|project]\n'
+    + '  Exit codes: 0=current, 2=a cut is held (see --accept-cut), 1=refused or unreadable',
   why: 'chaingate why <package>@<version> --packument <file> [--json] [--scope user|project]\n'
     + '  chaingate why --from <check.json> [--json]\n'
     + '  chaingate why <package>@<version> --cached [--json]   (legacy row, UNBOUND, exit 4)\n'
