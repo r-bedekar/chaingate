@@ -31,6 +31,8 @@ const LINEAGE_ID_STRIDE_1_3 = 4096;
 const RL2_CONTRACTS = Object.freeze([SEED_CONTRACT_1_2, SEED_CONTRACT_1_3]);
 const SUPPORTED_SEED_CONTRACT_VERSIONS = [SEED_CONTRACT_1_0, SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, SEED_CONTRACT_1_3];
 const PIPEKEY_CHANNEL_A = 'infra5d-1.2+fu2final+norm1+sizeshrink+pipekey1';
+// since 0.1.6: the Channel-A stamp of a 1.3 seed, grouped by tag family 0.3 (the prerelease's platform tokens join its family)
+const PLATFAM_CHANNEL_A = `${PIPEKEY_CHANNEL_A}+platfam1`;
 // This reader's own literals for what a 1.2 seed must declare, as the seed side's reader.py and versions.py pin them. The
 // stub instant and the tag-family definition decide predecessors, so a seed built under others would disagree with the gate.
 const RL2_IDENTIFIERS = Object.freeze({
@@ -39,11 +41,18 @@ const RL2_IDENTIFIERS = Object.freeze({
   storage_layout: 'wr1/noeidx/p8k/pinname1/xlink1',
   tag_family_fixture: '{"sha256":"f4be8bc5ab9eaeb5a59eef8c4f206483cfc545a3aba8e90437fde21c542a7061","version":"lineage-tag-family-cases-0.2"}',
 });
+// A 1.3 seed: the same, under its own lineage pair (tag family 0.3). Each contract is read only under its own pair.
+const RL2_IDENTIFIERS_1_3 = Object.freeze({
+  ...RL2_IDENTIFIERS,
+  lineage_rule_version: 'fu2-final+e1e4e5+pipekey1+stubpred1+platfam1',
+  tag_family_fixture: '{"sha256":"82f551e75df644954b7813dc6fcb804369f67e0c565b3e318ccf31d8971ffe37","version":"lineage-tag-family-cases-0.3"}',
+});
+const CHANNEL_A_BY_CONTRACT = Object.freeze({ [SEED_CONTRACT_1_2]: PIPEKEY_CHANNEL_A, [SEED_CONTRACT_1_3]: PLATFAM_CHANNEL_A });
 const CROSS_LINK_COLUMNS = ['lineage_id', 'ord', 'pred_lineage_id', 'pred_ord', 'pred_version', 'pred_size_bytes', 'pred_tool_key'];
 const IMPLEMENTED_DETECTION_CONTRACT = K.CONTRACT_VERSION;
 const REQUIRED_TABLES = ['seed_metadata', 'packages', 'lineages', 'lineage_state', 'spine', 'events'];
 const SUPPORTED_RULE_VERSIONS = {
-  channel_a: ['infra5d-1.2+fu2final+norm1+sizeshrink', PIPEKEY_CHANNEL_A],
+  channel_a: ['infra5d-1.2+fu2final+norm1+sizeshrink', PIPEKEY_CHANNEL_A, PLATFAM_CHANNEL_A],
   dac_trajectory: ['dac-trajectory-1.0'],
 };
 const REQUIRED_BINDING_KEYS = ['schema_version', 'contract_version', 'corpus_snapshot_digest',
@@ -301,9 +310,10 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
     if (RL2_CONTRACTS.includes(raw.contract_version)) {
       const bad = rl2LayoutProblem(db, tables);
       checks.rl2_layout = bad === null ? true : `seed declares ${raw.contract_version} but ${bad}`;
-      for (const [k, want] of Object.entries(RL2_IDENTIFIERS)) {
+      const ids = raw.contract_version === SEED_CONTRACT_1_3 ? RL2_IDENTIFIERS_1_3 : RL2_IDENTIFIERS;
+      for (const [k, want] of Object.entries(ids)) {
         checks[k] = raw[k] === want ? true
-          : `seed declares ${raw.contract_version} with ${k}=${JSON.stringify(raw[k] ?? null)}; this reader reads 1.2 and 1.3 only under ${want}`;
+          : `seed declares ${raw.contract_version} with ${k}=${JSON.stringify(raw[k] ?? null)}; this reader reads it only under ${want}`;
       }
     }
     if (raw.contract_version === SEED_CONTRACT_1_3) {
@@ -329,10 +339,13 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
           + `(supported: ${JSON.stringify(SUPPORTED_RULE_VERSIONS)})`;
       } else if (extra.length) {
         checks.rule_versions = `seed carries rule families this reader does not implement: ${JSON.stringify(extra)}`;
-      } else if ((rv.channel_a === PIPEKEY_CHANNEL_A) !== RL2_CONTRACTS.includes(raw.contract_version)) {
-        // no inference: the pipeline-key rule and the 1.2 layout come together or the seed is refused
+      } else if (rv.channel_a !== (CHANNEL_A_BY_CONTRACT[raw.contract_version] ?? rv.channel_a)
+        || (!RL2_CONTRACTS.includes(raw.contract_version) && Object.values(CHANNEL_A_BY_CONTRACT).includes(rv.channel_a))) {
+        // no inference: the pipeline-key rule and the rl2 layout come together, each contract under its own stamp, or the seed is
+        // refused
         checks.rule_versions = `channel_a=${JSON.stringify(rv.channel_a)} with contract_version=${JSON.stringify(raw.contract_version)}: `
-          + `${PIPEKEY_CHANNEL_A} is read only from a ${SEED_CONTRACT_1_2} or ${SEED_CONTRACT_1_3} seed, and such a seed only under it`;
+          + `a ${SEED_CONTRACT_1_2} seed is read only under ${PIPEKEY_CHANNEL_A}, a ${SEED_CONTRACT_1_3} seed only under `
+          + `${PLATFAM_CHANNEL_A}, and neither rule from any other contract`;
       } else checks.rule_versions = true;
     }
     // EXPERIMENTAL read layout (read-layout.js): checked only when the seed declares one; a legacy seed's report is unchanged
@@ -489,7 +502,7 @@ function openSeed(dbPath, opts = {}) {
 
 export {
   SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0, SEED_CONTRACT_1_1,
-  SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS,
+  SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, PLATFAM_CHANNEL_A, RL2_IDENTIFIERS, RL2_IDENTIFIERS_1_3, CROSS_LINK_COLUMNS,
   IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS, REQUIRED_BINDING_KEYS,
   TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES,
   CANDIDATE_SPEC, CANDIDATE_REQUIRED, PROVIDER_CLASSES,
@@ -501,7 +514,7 @@ export {
 // A default export as well: the consumer is used both as `import R from` and
 // `import { verify } from`, and the runtime package is ESM.
 export default { SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0,
-  SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS, IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
+  SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, PLATFAM_CHANNEL_A, RL2_IDENTIFIERS, RL2_IDENTIFIERS_1_3, CROSS_LINK_COLUMNS, IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
   REQUIRED_BINDING_KEYS, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES, CANDIDATE_SPEC,
   CANDIDATE_REQUIRED, PROVIDER_CLASSES, SeedRefused, CandidateRejected, sha256File,
   validateField, candidateFromMapping, verify, verifySignature, Seed, openSeed
