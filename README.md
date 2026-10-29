@@ -35,8 +35,8 @@ it to the developer at install time.
 
 ChainGate records what each package looked like before. It warns on a short list of named rules: for
 axios@1.14.1, that the release adds a dependency that runs install scripts. The other changes are
-recorded as detail. ChainGate reads a package's code only when a download is already suspect, and then
-only the files npm will run, so it complements code analysis rather than replacing it.
+recorded as detail. ChainGate reads only the files npm will run, on each version's first download, and checks them
+for a short list of named patterns, so it complements code analysis rather than replacing it.
 
 ## The Idea
 
@@ -163,10 +163,11 @@ Some named rules are checked when npm downloads the tarball:
   download that reaches ChainGate carries the notice, but npm installs a tarball it already holds from its own cache
   without asking ChainGate, so this machine may never print it.
 
-**Tarball checks (0.1.5).** When a download is already suspect, ChainGate also reads the files npm will run. A
-download is suspect when its version carries a named warning, a publisher break, an entry point change, or the seed's
-coverage warning (nothing in the finding could be evaluated: a package the seed has never seen). The same walk then
-keeps the bodies of the files the registry manifest points npm at -- the install-hook targets, `main`, up to 4 `bin`
+**Tarball checks (0.1.5; every download since 0.1.6).** ChainGate also reads the files npm will run. Since 0.1.6 it
+does so on every version's first download (0.1.5 read them only when the version already carried a named warning, a
+publisher break, an entry point change, or the seed's coverage warning; each row still names which of these it was, or
+"every download"). At most 16 downloads are read at once; past that a download is served, recorded as "not checked:
+not armed (concurrency ceiling)" and read at its next download. The walk keeps the bodies of the files the registry manifest points npm at -- the install-hook targets, `main`, up to 4 `bin`
 targets; at most 6 files of 1 MiB each -- and checks them. It warns when:
 - an install-hook command fetches code (curl, wget, Invoke-WebRequest, certutil -urlcache, bitsadmin) and executes or
   decodes it (a pipe into a shell or interpreter, powershell -enc, base64 -d, eval, iex), or runs a network tool (curl,
@@ -217,13 +218,13 @@ warning on their own:
 
 The download that reveals a tarball warning has already been served, so `chaingate report` lists it at once and the
 next download that reaches ChainGate carries the npm notice. A row names the markers that matched, the file and its
-size -- never the file's content. A download that was not suspect records "not armed"; a file that is binary, over the
-cap, absent, or named only by the tarball's own `package.json` is "not checked" and says so; a check that found no
-eligible file to read says "no eligible file in the tarball". A tarball whose download was armed is examined once: the
-outcome rides every later record of that version.
+size -- never the file's content. A file that is binary, over the cap, absent, or named only by the tarball's own
+`package.json` is "not checked" and says so; a check that found no eligible file to read says "no eligible file in the
+tarball". A tarball is examined once: the outcome rides every later record of that version. A version 0.1.5 recorded
+as "not armed" is read at its next download.
 
-**Holding a suspect download until it is checked (optional).** With the `static_withhold` setting on
-(`"static_withhold": true` in ChainGate's `config.json`), the proxy holds a suspect download in memory, up to 8 MiB,
+**Holding a download until it is checked (optional).** With the `static_withhold` setting on
+(`"static_withhold": true` in ChainGate's `config.json`), the proxy holds a download it reads in memory, up to 8 MiB,
 while the tarball checks read it. If one of the six tarball warnings fires, npm receives HTTP 403
 `withheld_by_static_check`, naming the check and `chaingate why <pkg>@<ver>`, and the package is not installed. The
 recorded decision stays WARN: withholding is a choice about serving, not a different verdict. A download over 8 MiB is
@@ -239,7 +240,7 @@ once, after its first download's rows are final:
 - where a size change against the version served before came from: documentation, source maps, declaration files, a
   second module format, or other files.
 
-For a suspect download, the tarball checks also record:
+For each download they read, the tarball checks also record:
 - each long base64 or hex run in a file: its length, how many different characters it uses, and what its decoded first
   bytes are (WebAssembly, PNG, gzip or a web font);
 - for a hook target over the 1 MiB cap, which the walk reads through once without keeping it: the share of the file in
@@ -251,6 +252,8 @@ For a suspect download, the tarball checks also record:
 - a tarball with no network, file, process, environment, execution or encoding use at all;
 - after the download, whether the registry's provenance record names the same source repository as the package metadata
   (the record's signature is not checked), or whether the version served before had provenance and this one has none.
+  This one costs a request to the registry, so it is made only for a version that already carries one of the 0.1.5
+  reasons above.
 
 `chaingate why <pkg>@<ver>` prints them under "Recorded facts" and "Static check facts", `chaingate report --json`
 carries them, and the report text names a version with a notable fact.
@@ -699,8 +702,8 @@ Also planned: more calibration, PyPI support, and plugins for Artifactory and Ne
 
 A release warns only on a named rule. A takeover that changes the publisher, the provenance, the dependencies or the
 code, but trips no named rule, gets no warning unless the seed's strict tier marks the release. The files npm will run
-are read only when a download is already suspect, so a takeover through the same CI/CD workflow, as the same
-publisher, that changes only the code looks normal. Code analysis is needed for those cases.
+are read on every download, but only for the named patterns above, so a takeover through the same CI/CD workflow, as
+the same publisher, that changes only the code in some other way looks normal. Code analysis is needed for those cases.
 
 ## Architecture
 

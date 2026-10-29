@@ -39,7 +39,7 @@ import { createTarWalker } from './tar-walk.js';
 import { rememberManifestHooks, manifestHooksFor, manifestEntryFor, mcRow, recordLate, mcDeterminate, hookDict, GATE as MC_GATE } from './manifest-check.js';
 import { tarballRow } from '../gates/install-introduced.js';
 import { reraise } from '../gates/retier-late.js';
-import { armedBy, keepListFor, staticRows, unarmedRows, noManifestRows, staticSettled, MAX_ARMED_WALKS, STATIC_WITHHOLD_CAP_BYTES,
+import { armedBy, walkReason, keepListFor, staticRows, unarmedRows, noManifestRows, staticSettled, MAX_ARMED_WALKS, STATIC_WITHHOLD_CAP_BYTES,
   withholdingChecks, entryKeepFor, entryFactsOf, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, FACTS_LIMITS, makeBase64Share, createMemberTally,
   staticFactsOf } from './static-checks.js';
 import { withRole } from '../gates/row-class.js';
@@ -1085,8 +1085,8 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
           let final = true;
           try {
             const app = witnessDb.getApplicableDecision(canonicalName, version, { overrideLive: false });
-            // 0.1.5 static checks: a version whose armed static walk is still due needs the manifest too (the keep list's source)
-            final = Boolean(app.block) || (mcDeterminate(app.latest) && !(armedBy(app.latest?.gates_fired) && !staticSettled(app.latest)))
+            // a version whose static walk is still due needs the manifest too (the keep list's source); since 0.1.6 every version's is
+            final = Boolean(app.block) || (mcDeterminate(app.latest) && staticSettled(app.latest))
               || Boolean(pinSet && withheldBy(pinSet.forPackage(canonicalName), canonicalName, version));
           } catch { final = true; }
           if (!final) {
@@ -1209,13 +1209,13 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         const current = state.applicable?.latest?.gates_fired?.some?.((g) => g && g.gate === 'install-introduced');
         const walkLatest = upstream.statusCode === 200 && state.tarballVersion != null && !state.override && witnessDb
           && current && !(state.c1 && !state.c1.ok) ? state.applicable.latest : null;
-        // 0.1.5 static checks: the keep list is ARMED by a named WARN row, the identity-break NOTE, the
-        // entry-path-change NOTE or the seed's coverage WARN, from the registry manifest remembered with the
-        // hook map; a settled static outcome is never walked for again (tarballs are immutable per version), a "not armed" / "no
-        // manifest" / ceiling outcome is retried when a later download is armed. The walk stays on a copy of the stream; the download
-        // is never held.
-        const armed = walkLatest ? armedBy(walkLatest.gates_fired) : null;
-        const staticDue = Boolean(walkLatest && armed && !staticSettled(walkLatest));
+        // Static checks: since 0.1.6 EVERY download's keep list is walked, from the registry manifest remembered with the hook map;
+        // the rows name what armed it (a named WARN row, the identity-break NOTE, the entry-path-change NOTE, the seed's coverage
+        // WARN) or "every download". A settled static outcome is never walked for again (tarballs are immutable per version); a "no
+        // manifest" or ceiling outcome, or 0.1.5's "not armed", is retried at the next download. The walk stays on a copy of the
+        // stream; the download is held only with the static_withhold switch.
+        const armed = walkLatest ? walkReason(walkLatest.gates_fired) : null;
+        const staticDue = Boolean(walkLatest && !staticSettled(walkLatest));
         let keepOpts = {}; let staticWhy = null; let armedSlot = false; let staticManifest;
         if (walkLatest && (!mcDeterminate(walkLatest) || staticDue) && armed) {
           staticManifest = manifestEntryFor(canonicalName, state.tarballVersion);
@@ -1309,8 +1309,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
               // static-checks-1.8: S8 and S9 read the member facts the armed walk gathered
               ...(memberTally ? (({ members, over }) => ({ members, membersOver: over }))(memberTally.result()) : {}) })
               : staticWhy === 'no-manifest' ? noManifestRows(armed)
-                : staticWhy === 'ceiling' ? unarmedRows(`concurrency ceiling: ${MAX_ARMED_WALKS} armed walks in flight`)
-                  : unarmedRows('no named row, no identity-break, no entry-path-change, no coverage gap')).map(withRole)]));
+                : unarmedRows(`concurrency ceiling: ${MAX_ARMED_WALKS} armed walks in flight`)).map(withRole)]));
           // 0.1.5: a held download is served or withheld only now, after the walk; withheld only for a named static WARN
           // the user has not accepted (while every check is contributing this never happens, and the held bytes are served)
           let staticHold = null;
@@ -1400,8 +1399,9 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
                 named: named(state.tarballVersion) ?? [] });
               witnessDb.recordShadowFacts(canonicalName, state.tarballVersion, facts);
               // an armed version's repository claim, once, after its response is finished: the one attestation bundle fetch,
-              // bounded in time, bytes and fetches in flight; a failure is recorded as NOT_FETCHED with its reason
-              if (staticWhy === 'armed' && !witnessDb.repoClaimFor(canonicalName, state.tarballVersion)) {
+              // bounded in time, bytes and fetches in flight; a failure is recorded as NOT_FETCHED with its reason. Since 0.1.6 every
+              // download is walked, but only a version a recorded row arms costs this outbound fetch, as in 0.1.5
+              if (staticWhy === 'armed' && armedBy(walkLatest.gates_fired) && !witnessDb.repoClaimFor(canonicalName, state.tarballVersion)) {
                 await settled(res);
                 if (res.writableFinished) {
                   const t2 = performance.now();
@@ -1420,8 +1420,11 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
                 }
               }
             }
-            const sx = facts ? witnessDb.staticFactsFor(canonicalName, state.tarballVersion) : null;   // static-checks-1.6, armed versions only
-            const rc = facts ? witnessDb.repoClaimFor(canonicalName, state.tarballVersion) : null;      // the repository claim, armed versions only
+            // static-checks-1.6: every walked version has them since 0.1.6 (`why` shows them); the report event carries them only for a
+            // version a recorded row arms (a named static WARN included), as in 0.1.5, so a large install's report is not every package
+            const sx = facts && armedBy(witnessDb.getLatestDecision(canonicalName, state.tarballVersion)?.gates_fired)
+              ? witnessDb.staticFactsFor(canonicalName, state.tarballVersion) : null;
+            const rc = facts ? witnessDb.repoClaimFor(canonicalName, state.tarballVersion) : null;      // the repository claim, armed versions only (a row arms)
             if (facts) noteInstall(req, { kind: 'facts', package: canonicalName, version: state.tarballVersion, facts, ...(sx ? { static_facts: sx } : {}),
               ...(rc ? { repo_claim: rc } : {}) });
           } catch (err) {

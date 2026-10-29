@@ -98,14 +98,15 @@ export const CHECKS = Object.freeze([
   { id: 'S9', gate: 'static:S9-hidden-script-in-gyp-build', cls: 'hidden-script-in-gyp-build', roles: null, notice: 'its native build file runs a package script during install and hides the output' },   // v6.17 (operator 2026-10-27, step 0b)
 ]);
 export const STATIC_GATES = Object.freeze(CHECKS.map((c) => c.gate));
-/** Armed keep-list walks at once (design note §3 budget: ≤ 6 MiB each); beyond it a download gets the MC-only walk, stated and retried. */
-export const MAX_ARMED_WALKS = 4;
+/** Armed keep-list walks at once (design note §3 budget: ≤ 6 MiB each); beyond it a download gets the MC-only walk, stated and retried.
+ *  Since 0.1.6 every download is walked, so the ceiling is npm's own default of 16 connections (about 96 MiB kept at most). */
+export const MAX_ARMED_WALKS = 16;
 /** 0.1.5 (R4): walks that keep only the main and bin bodies for the entry facts, at once (at most 6 x 1 MiB each); beyond it the
  *  version's facts are stored at a later download. */
 export const MAX_FACTS_WALKS = 8;
 /** 0.1.5 (#15): with the per-user `static_withhold` switch on, an armed download is held in memory up to this many bytes while the
  *  static checks read it (design note section 8 item 2); past it the download is served and recorded as today. With the ceiling
- *  above, at most MAX_ARMED_WALKS x 8 MiB are held at once. */
+ *  above, at most MAX_ARMED_WALKS x 8 MiB are held at once. Since 0.1.6 every walked download is held while the switch is on. */
 export const STATIC_WITHHOLD_CAP_BYTES = 8 * 1024 * 1024;
 /**
  * 0.1.5 (#15): the static checks that withhold a held download: a static row whose result is WARN and whose gate the policy NAMES.
@@ -988,6 +989,8 @@ export function armedBy(results) {
   if (cls.coverage.includes('seed-v3:coverage')) return 'seed coverage WARN (nothing in the finding was evaluated)';
   return null;
 }
+/** Since 0.1.6: every download is walked. The rows name what armed the walk, or "every download" when no recorded row did. */
+export const walkReason = (results) => armedBy(results) ?? 'every download';
 const RETRY_PREFIXES = ['not checked: not armed', 'not checked: no registry manifest at hand'];
 /** The ten rows of a walk that was not armed (or could not be: the concurrency ceiling), with the reason; retried when a later download is armed. */
 export const unarmedRows = (why) => CHECKS.map((c) => ({ gate: c.gate, result: 'SKIP', detail: clipDetail(`not checked: not armed (${why})`) }));
@@ -1004,5 +1007,5 @@ export function staticSettled(latest) {
 
 export default { FACTS_LIMITS, FACTS_NOTE, DECODED_MAGIC, magicOf, B64_RUN, HEX_ESCAPE_RUN, encodedRuns, makeBase64Share, EXCLUDED_PATH, DYNAMIC_CODE,
   AGENT_CONFIG_NAMES, AGENT_HOME_DIR, AGENT_XDG_DIR, WRITE_MARKERS, SHELL_REDIRECT, SHELL_SCRIPT, agentConfigWrite, IO_CLASSES, IO_TOKENS, memberFacts, staticFacts,
-  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, unarmedRows, noManifestRows, staticSettled,
+  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, walkReason, unarmedRows, noManifestRows, staticSettled,
   S8_LIMITS, NATIVE_MAGIC, NATIVE_SOURCE, BINDING_GYP, ADDON_FILE, ADDON_LOADS, nativeKind, xorText, GYP_LIMITS, GYP_FILE, GYP_QUIET, GYP_SCRIPT, gypExpansions, gypBuild, hiddenGypScript, addonDropper };
