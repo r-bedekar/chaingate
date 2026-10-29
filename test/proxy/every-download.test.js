@@ -13,6 +13,7 @@ import { createProxyServer } from '../../proxy/server.js';
 import { resetDependencyCache } from '../../gates/dependency-cache.js';
 import { forgetManifestHooks } from '../../proxy/manifest-check.js';
 import * as S from '../../proxy/static-checks.js';
+import { validateConfig, ConfigUnreadable } from '../../config-store.js';
 
 const H = 3_600_000; const T0 = Date.parse('2026-03-01T00:00:00Z'); const at = (h) => new Date(T0 + h * H).toISOString();
 function hdr(name, size) {
@@ -37,11 +38,22 @@ const TARBALLS = {
   '/p/-/p-1.1.0.tgz': tgz({ 'package.json': JSON.stringify(P.versions['1.1.0']), 'index.js': BENIGN }),
   '/h/-/h-1.1.0.tgz': tgz({ 'package.json': JSON.stringify(HK.versions['1.1.0']), 'index.js': BENIGN }),
 };
+// s0..s15: like p; their tarballs are HELD by the upstream after the first bytes until release(), so each keeps a walk slot busy
+for (let i = 0; i < 16; i += 1) {
+  const d = doc(`s${i}`); DOCS[`/s${i}`] = d;
+  TARBALLS[`/s${i}/-/s${i}-1.1.0.tgz`] = tgz({ 'package.json': JSON.stringify(d.versions['1.1.0']), 'index.js': BENIGN });
+}
+let release = () => {}; let released = Promise.resolve();
+const holdSlots = () => { released = new Promise((r) => { release = r; }); };
 async function withProxy(config, fn) {
   resetDependencyCache(); forgetManifestHooks();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg016-every-'));
-  const upstream = http.createServer((req, res) => {
+  const upstream = http.createServer(async (req, res) => {
     const u = decodeURIComponent(req.url.split('?')[0]);
+    if (TARBALLS[u] && /^\/s\d+\//.test(u)) {
+      res.writeHead(200, { 'content-type': 'application/octet-stream' }); res.write(TARBALLS[u].subarray(0, 20));
+      await released; res.end(TARBALLS[u].subarray(20)); return;
+    }
     if (TARBALLS[u]) { res.writeHead(200, { 'content-type': 'application/octet-stream' }); res.end(TARBALLS[u]); return; }
     if (DOCS[u]) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(DOCS[u])); return; }
     res.writeHead(404, { 'content-type': 'application/json' }); res.end('{}');
@@ -126,4 +138,64 @@ test('ED5 a record that says "not checked: not armed" (written by 0.1.5) is not 
   const ceiling = S.unarmedRows(`concurrency ceiling: ${S.MAX_ARMED_WALKS} armed walks in flight`);
   assert.match(ceiling[0].detail, /^not checked: not armed \(concurrency ceiling: 16 armed walks in flight\)/);
   assert.equal(S.staticSettled({ gates_fired: ceiling }), false);
+});
+
+test('ED6 a download that found no walk slot within the bound says so, and is read at its next download', () => {
+  const rows = S.budgetRows(10_000);
+  assert.deepEqual(rows.map((r) => r.gate), S.STATIC_GATES);
+  for (const r of rows) { assert.equal(r.result, 'SKIP'); assert.equal(r.detail, 'not checked: walk budget exceeded (waited 10 s)'); }
+  assert.equal(S.budgetRows(300)[0].detail, 'not checked: walk budget exceeded (waited 0.3 s)');
+  assert.equal(S.staticSettled({ gates_fired: rows }), false);
+});
+
+test('ED7 static_walk_wait_ms: 10 s by default, a whole number of milliseconds up to 60,000', () => {
+  assert.equal(validateConfig({}).staticWalkWaitMs, 10_000);
+  assert.equal(validateConfig({ static_walk_wait_ms: 0 }).staticWalkWaitMs, 0);
+  assert.equal(validateConfig({ static_walk_wait_ms: 60_000 }).staticWalkWaitMs, 60_000);
+  for (const bad of [-1, 60_001, 1.5, '10000', true]) assert.throws(() => validateConfig({ static_walk_wait_ms: bad }), ConfigUnreadable, String(bad));
+});
+
+// 16 downloads whose upstream is held keep every walk slot busy; the 17th waits for one
+async function fillSlots(base) {
+  holdSlots();
+  for (let i = 0; i < 16; i += 1) await get(`${base}/s${i}`);
+  const reqs = [];
+  for (let i = 0; i < 16; i += 1) {
+    reqs.push(new Promise((resolve) => { const r = http.get(`${base}/s${i}/-/s${i}-1.1.0.tgz`, { agent: false }, (res) => { res.on('data', () => {}); res.on('end', resolve); }); r.on('error', resolve); }));
+  }
+  await new Promise((r) => setTimeout(r, 300));
+  return reqs;
+}
+
+test('ED8 with every slot busy a download waits for one (bounded) and is walked; the wait is recorded beside facts_ms', async () => {
+  await withProxy({}, async ({ base, proxy }) => {
+    const busy = await fillSlots(base);
+    await get(`${base}/p`);
+    const t0 = Date.now();
+    const pr = get(`${base}/p/-/p-1.1.0.tgz`);
+    setTimeout(() => release(), 600);
+    const r = await pr; assert.equal(r.status, 200);
+    assert.ok(Date.now() - t0 >= 500, 'it waited for a slot');
+    await Promise.all(busy);
+    const rows = await staticEventually(proxy, 'p', '1.1.0');
+    for (const x of rows) assert.match(x.detail, /armed by every download$/, `${x.gate}: ${x.detail}`);
+    const w = proxy.witnessDb.db.prepare("SELECT walk_wait_ms FROM entry_fact_versions WHERE package_name = 'p'").get();
+    assert.ok(w && w.walk_wait_ms >= 400, JSON.stringify(w));
+  });
+});
+
+test('ED9 past the bound the download is served unwalked, says "walk budget exceeded", and its next download reads it', async () => {
+  await withProxy({ staticWalkWaitMs: 300 }, async ({ base, proxy }) => {
+    const busy = await fillSlots(base);
+    await get(`${base}/p`);
+    const r = await get(`${base}/p/-/p-1.1.0.tgz`); assert.equal(r.status, 200);
+    assert.ok(r.body.equals(TARBALLS['/p/-/p-1.1.0.tgz']), 'served whole');
+    const rows = await staticEventually(proxy, 'p', '1.1.0');
+    for (const x of rows) assert.match(x.detail, /^not checked: walk budget exceeded \(waited 0\.3 s\)/, `${x.gate}: ${x.detail}`);
+    release(); await Promise.all(busy);
+    await get(`${base}/p/-/p-1.1.0.tgz`);
+    const until = Date.now() + 5000; let again = staticOf(proxy, 'p', '1.1.0');
+    while (again.some((x) => /walk budget/.test(x.detail)) && Date.now() < until) { await new Promise((z) => setTimeout(z, 50)); again = staticOf(proxy, 'p', '1.1.0'); }
+    for (const x of again) assert.match(x.detail, /armed by every download$/, `${x.gate}: ${x.detail}`);
+  });
 });
