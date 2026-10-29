@@ -130,10 +130,25 @@ test('SF5 a bucket download stops at the root\'s gz_bytes; a failed bucket is li
     assert.deepEqual(f.imported, [3]);
     assert.deepEqual(f.failed.map((x) => x.i), [2, 4]);
     assert.match(f.failed[0].why, /longer than its gz_bytes/); assert.match(f.failed[1].why, /HTTP 503/);
-    assert.ok(sent < big.length, `the download stopped early (${sent} of ${big.length} bytes sent)`);
+    assert.ok(sent > 0);
     const seed = open(cache);
     try { assert.equal(seed.report.shard_cache.buckets_held, 1); } finally { seed.close(); }
   }, { over });
+});
+
+test('SF5b the client stops reading a body past its cap: counted on the client, as the bytes it pulled', async () => {
+  // a socket can take a whole small body before the client aborts, so the stop is measured on the client side
+  // finite (4 MiB), so a client that ignored its cap would finish reading rather than read without end
+  let pulled = 0; let cancelled = false;
+  const body = new ReadableStream({
+    pull(c) { if (pulled >= 4 * 1024 * 1024) { c.close(); return; } pulled += 65_536; c.enqueue(new Uint8Array(65_536)); },
+    cancel() { cancelled = true; },
+  }, { highWaterMark: 0 });
+  const fetchImpl = async () => new Response(body, { status: 200 });
+  const get = F.shardSource('http://127.0.0.1:9/', { fetchImpl });
+  await assert.rejects(get('buckets/00002.db.gz', { cap: 200_000 }), /longer than 200000 bytes/);
+  assert.ok(pulled <= 200_000 + 2 * 65_536, `pulled ${pulled} bytes for a cap of 200000`);
+  assert.equal(cancelled, true, 'the body is cancelled');
 });
 
 test('SF6 the host is https (a local test host aside), and a redirect is refused', async () => {
