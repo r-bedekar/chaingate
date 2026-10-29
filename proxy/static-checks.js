@@ -78,7 +78,7 @@ import { DEFAULTS as WALK } from './tar-walk.js';
 import { classify } from '../witness/row-class.js';
 import { NAMED_RUNNER_GATES, NAMED_ROWS } from '../seed/v3/policy.js';
 
-export const STATIC_CHECKS_VERSION = 'static-checks-1.8';
+export const STATIC_CHECKS_VERSION = 'static-checks-1.8.1';
 /** The reason a file row states when its roles had a candidate on the keep list and no file was read (ruled 2026-10-14). */
 export const NOTHING_READ = 'no eligible file in the tarball';
 export const LIMITS = Object.freeze({ maxKeep: WALK.maxKeep, maxKeepBytes: WALK.maxKeepBytes, maxBin: 4, maxHookTargets: 3, s1MaxBytes: 8192,
@@ -516,13 +516,15 @@ export function capabilityDelta({ predecessor, current } = {}) {
 }
 /** R3 runtime basis: the predecessor is the last version this proxy served (witness.db entry facts, R4). */
 export const S7_BASIS = 'the version this proxy served before';
+/** Since 0.1.6: stored entry facts S7 compares. 1.8.1 changes a fact field nothing decides on, so facts stored by 1.8 stay comparable. */
+export const S7_COMPARABLE_VERSIONS = Object.freeze(['static-checks-1.8', STATIC_CHECKS_VERSION]);
 /** The predecessor argument of capabilityDelta from a witness.db predecessorEntryFacts record (null: cold start; 'unreadable': a storage error). */
 function s7Predecessor(rec) {
   if (rec === 'unreadable') return { version: null, basis: S7_BASIS, status: 'NOT_CHECKED', reason: 'the stored entry facts of earlier versions could not be read' };
   if (!rec) return { version: null, basis: S7_BASIS, reason: 'no earlier version served by this proxy' };
   const version = shownName(rec.version);
   if (rec.walk !== 'read') return { version, basis: S7_BASIS, status: 'NOT_CHECKED', reason: `its archive was refused (${shownName(rec.reason ?? 'no reason stored')})` };
-  if (typeof rec.static_checks_version === 'string' && rec.static_checks_version !== STATIC_CHECKS_VERSION) {
+  if (typeof rec.static_checks_version === 'string' && !S7_COMPARABLE_VERSIONS.includes(rec.static_checks_version)) {
     return { version, basis: S7_BASIS, status: 'NOT_CHECKED', reason: `its facts were stored by ${shownName(rec.static_checks_version)}, not ${STATIC_CHECKS_VERSION}` };
   }
   return { version, basis: S7_BASIS, summary: entrySummaryOf(rec) };
@@ -770,7 +772,7 @@ export function addonDropper({ hooks = [], files = [], members = undefined } = {
 // ---- static-checks-1.6: shadow facts (operator ruling R11), recon v6.14's code as written (paths through factsClip, the head through LIMITS)
 /** Facts only (R11): read from every member of the flagged archive (its first windowBytes, the pattern scan's window) and, for rule 7,
  *  from the whole body of a hook target. diversityRef is the consult's 16-character reference, counted, never a gate. */
-export const FACTS_LIMITS = Object.freeze({ windowBytes: 2 << 20, b64MinRun: 400, hexEscapeMinRun: 60, magicBytes: 16, diversityRef: 16, listed: 20 });
+export const FACTS_LIMITS = Object.freeze({ windowBytes: 2 << 20, b64MinRun: 400, hexEscapeMinRun: 60, magicBytes: 16, diversityRef: 16, listed: 20, distinctCharsBytes: 65536 });   // 1.8.1: distinctCharsBytes
 export const FACTS_NOTE = 'shadow facts (operator ruling R11, 2026-10-24): no outcome, tier or notice depends on them; a fact is read against the file, never a verdict';
 /** Rules 6 and 7: the magic numbers read at the start of decoded bytes (name, hex prefix). Anything else is null, never a guess. */
 export const DECODED_MAGIC = Object.freeze([['wasm', '0061736d'], ['png', '89504e470d0a1a0a'], ['gzip', '1f8b'], ['woff', '774f4646'], ['woff2', '774f4632']].map((x) => Object.freeze(x)));
@@ -786,17 +788,18 @@ export const B64_RUN = /[A-Za-z0-9+/]{400,}={0,2}/g;
 export const HEX_ESCAPE_RUN = /(?:\\x[0-9a-fA-F]{2}){60,}/g;
 const B64_MAGIC_CHARS = Math.ceil(FACTS_LIMITS.magicBytes / 3) * 4;   // 24 base64 characters decode to the first 18 bytes
 /** Rule 6, pure: every encoded run in a text, in text order: { kind: base64 | hex | hex-escape, chars (base64 padding included; a
- *  hex-escape run's hex digits), distinct_chars (padding and the \x framing excluded), magic (of the decoded first bytes, or null) }. */
+ *  hex-escape run's hex digits), distinct_chars (padding and the \x framing excluded; 1.8.1: over at most the run's first distinctCharsBytes,
+ *  64 KiB: base64 and hex alphabets saturate within a few hundred bytes), magic (of the decoded first bytes, or null) }. */
 export function encodedRuns(text) {
   const s = typeof text === 'string' ? text : ''; const out = []; const M = FACTS_LIMITS.magicBytes;
   for (const m of s.matchAll(B64_RUN)) {
     const body = m[0].replace(/=+$/, ''); const hex = /^[0-9a-f]+$/.test(body);
     const head = hex ? Buffer.from(body.slice(0, M * 2), 'hex') : Buffer.from(body.slice(0, B64_MAGIC_CHARS), 'base64');
-    out.push({ at: m.index, kind: hex ? 'hex' : 'base64', chars: m[0].length, distinct_chars: new Set(body).size, magic: magicOf(head) });
+    out.push({ at: m.index, kind: hex ? 'hex' : 'base64', chars: m[0].length, distinct_chars: new Set(body.slice(0, FACTS_LIMITS.distinctCharsBytes)).size, magic: magicOf(head) });   // 1.8.1: first 64 KiB
   }
   for (const m of s.matchAll(HEX_ESCAPE_RUN)) {
     const digits = m[0].replace(/\\x/g, '');
-    out.push({ at: m.index, kind: 'hex-escape', chars: digits.length, distinct_chars: new Set(digits).size, magic: magicOf(Buffer.from(digits.slice(0, M * 2), 'hex')) });
+    out.push({ at: m.index, kind: 'hex-escape', chars: digits.length, distinct_chars: new Set(digits.slice(0, FACTS_LIMITS.distinctCharsBytes)).size, magic: magicOf(Buffer.from(digits.slice(0, M * 2), 'hex')) });   // 1.8.1
   }
   return out.sort((a, b) => a.at - b.at).map(({ at, ...x }) => x);   // eslint-disable-line no-unused-vars
 }
@@ -893,7 +896,7 @@ export function staticFacts({ members, hooks = [], keepList: kl = null, archiveC
   const ms = members.filter((m) => m && typeof m === 'object'); const klRoles = kl && typeof kl.roles === 'object' && kl.roles ? kl.roles : {};
   const hs = (Array.isArray(hooks) ? hooks : []).filter((h) => h && typeof h.cmd === 'string' && h.cmd);
   // rule 6
-  const er = { runs: 0, files: 0, by_kind: Object.fromEntries(RUN_KINDS.map((k) => [k, 0])), by_magic: Object.fromEntries(MAGIC_NAMES.map((k) => [k, 0])), under_diversity_ref: 0, diversity_ref: L.diversityRef, listed: [] };
+  const er = { runs: 0, files: 0, by_kind: Object.fromEntries(RUN_KINDS.map((k) => [k, 0])), by_magic: Object.fromEntries(MAGIC_NAMES.map((k) => [k, 0])), under_diversity_ref: 0, diversity_ref: L.diversityRef, distinct_chars_basis: 'distinct chars, first 64 KiB of each run', listed: [] };   // 1.8.1
   for (const m of ms) {
     if (!m.runs_total) continue; er.files += 1; er.runs += m.runs_total; er.under_diversity_ref += m.run_counts?.under_diversity_ref ?? 0;
     for (const k of RUN_KINDS) er.by_kind[k] += m.run_counts?.by_kind?.[k] ?? 0; for (const k of MAGIC_NAMES) er.by_magic[k] += m.run_counts?.by_magic?.[k] ?? 0;
