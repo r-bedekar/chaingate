@@ -16,6 +16,8 @@ import {
 } from './registry.js';
 import { openWitnessDB } from '../witness/db.js';
 import { refreshPins, urlSource, PINS_REFRESH_MS } from '../cli/pins-feed.js';
+import { shardSource } from '../cli/seed-shards.js';
+import { createSeedCache, DEFAULT_SEED_CACHE_WAIT_MS, SEED_CACHE_REFRESH_MS } from './seed-cache.js';
 import { DepCache } from '../witness/dep-cache.js';
 import { createWitness } from '../witness/store.js';
 import { createGateRunner, DEFAULT_GATE_MODULES } from '../gates/index.js';
@@ -358,6 +360,8 @@ async function observeAndSendPackument(res, upstream, witness, packageName, log,
   if (parsed && witness) {
     // Only the observation itself is guarded here. Reporting it comes after: a failure while
     // reporting used to land in this catch and let fallback decisions replace the ones just returned.
+    // since 0.1.6: a seed cache fetches this package's bucket first, waiting a bounded time (never throws)
+    if (ctx.seedCache) await ctx.seedCache.need(packageName);
     try {
       observed = witness.observePackument(packageName, parsed);
     } catch (err) {
@@ -810,7 +814,9 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         // `authenticated` could never actually authenticate: the reader refuses that combination,
         // and any signature present went unchecked. The anchor is the same embedded literal the
         // CLI verifies bundles with, so startup and `chaingate init` agree about what is trusted.
-        seedV3 = openSeed(config.seedV3Path, { trust, pubkey: CHAINGATE_SEED_PUBKEY_B64 });
+        // since 0.1.6 the path may be a seed cache, checked on its signed root (tests pass their own key, bits and clock)
+        seedV3 = openSeed(config.seedV3Path, { trust, pubkey: config.seedCacheKey ?? CHAINGATE_SEED_PUBKEY_B64,
+          ...(config.seedCacheBits ? { shardBits: config.seedCacheBits } : {}), ...(config.seedCacheNow ? { now: config.seedCacheNow } : {}) });
         // UNRESOLVED ENFORCEMENT POLICY MUST NOT BECOME PERMISSION. An unset choice makes policy
         // decline, the gate can only answer SKIP, SKIP does not count, and the package installs --
         // so silence permitted. A proxy that ENFORCES must be told what these cases mean.
@@ -899,7 +905,16 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   const tracker = witness ? createEvaluationTracker(hooks.c1 ?? {}) : null;
   // The user's pins, read live (PRAGMA data_version), last good set kept on a read failure
   const pinSet = witnessDb ? createPinSet(witnessDb, { log }) : null;
-  const ctx = { unstored, failuresBlock, lookupErrorsRefuse, overriddenLive, counters, tracker, pins: pinSet };
+  // Since 0.1.6: the seed cache, kept current while the proxy runs (proxy/seed-cache.js). Its bucket fetch waits at most 5 s
+  // per decision and never more than half the body timeout. With no cache in use yet it is fetched for the next start.
+  const seedCache = config.seedCacheUrl && config.seedCachePath ? createSeedCache({
+    get: config.seedCacheGet ?? shardSource(config.seedCacheUrl), cachePath: config.seedCachePath, seedKey: config.seedCacheKey ?? null,
+    ...(config.seedCacheBits ? { bits: config.seedCacheBits } : {}), ...(config.seedCacheNow ? { now: config.seedCacheNow } : {}),
+    waitMs: Math.min(config.seedCacheWaitMs ?? DEFAULT_SEED_CACHE_WAIT_MS, Math.floor((config.bodyTimeoutMs ?? 30_000) / 2)),
+    feedKeys: async () => (pinsGet ? pinsGet('keys.json') : null), log,
+  }) : null;
+  seedCache?.attach(seedV3);
+  const ctx = { unstored, failuresBlock, lookupErrorsRefuse, overriddenLive, counters, tracker, pins: pinSet, seedCache };
 
   // What this process served and refused, per install (memory), and the named and fact events
   // also kept on disk, once per install. Neither can fail a request: a recording error is logged and counted.
@@ -966,6 +981,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       return { ok: false, why: 'the metadata lists no versions' };
     }
     let observed;
+    if (seedCache) await seedCache.need(canonicalName);
     try {
       observed = witness.observePackument(canonicalName, parsed);
     } catch (err) {
@@ -1579,6 +1595,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   const pinsGet = (seedV3 && witnessDb) ? (config.pinsFeedGet ?? (config.pinsFeedUrl ? urlSource(config.pinsFeedUrl) : null)) : null;
   let pinsTimer = null;
   let pinsBusy = null;
+  let seedCacheTimer = null;
   const refreshPinsFeed = () => {
     if (!pinsGet) return Promise.resolve(null);
     pinsBusy ??= refreshPins({ get: pinsGet, db: witnessDb, ...(config.pinsSeedKey ? { seedKey: config.pinsSeedKey } : {}) })
@@ -1600,12 +1617,20 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
       pinsTimer = setInterval(refreshPinsFeed, PINS_REFRESH_MS);
       pinsTimer.unref?.();
     }
+    if (seedCache && !seedCacheTimer) {
+      seedCache.refresh();
+      seedCacheTimer = setInterval(() => seedCache.refresh(), SEED_CACHE_REFRESH_MS);
+      seedCacheTimer.unref?.();
+    }
   });
   server.config = config;
   server.witness = witness;
   server.witnessDb = witnessDb;
   server.seedV3 = seedV3;
   server.refreshPinsFeed = refreshPinsFeed;
+  server.refreshSeedCache = () => (seedCache ? seedCache.refresh() : Promise.resolve(null));
+  server.seedCacheState = () => (seedCache ? seedCache.state() : null);
+  server.seedCacheIdle = () => (seedCache ? seedCache.idle() : Promise.resolve());
   server.depCache = depCache;
   server.depFetcher = depFetcher;
   const origClose = server.close.bind(server);
@@ -1616,6 +1641,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     const finish = () => {
       if (logTick) { clearInterval(logTick); logTick = null; }
       if (pinsTimer) { clearInterval(pinsTimer); pinsTimer = null; }
+      if (seedCacheTimer) { clearInterval(seedCacheTimer); seedCacheTimer = null; }
       log.tick();                                            // the last suppression summary, if any
       origClose(() => {
         try { witness?.close(); } catch { /* already closed */ }

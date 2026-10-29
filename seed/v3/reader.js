@@ -274,6 +274,7 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
     if (tables.has('shard_root')) {
       try {
         cache = SH.checkCache(db, { seedKey: trustedKey, bits: shardBits });
+        cache.opts = { seedKey: trustedKey, bits: shardBits };
         checks.shard_root = true;
       } catch (e) {
         checks.shard_root = e instanceof SH.ShardRefused ? e.why : `${e.name}: ${e.message}`;
@@ -450,8 +451,32 @@ class Seed {
     this.db = new Database(dbPath, { readonly: true, fileMustExist: true });
     this._cache = new Map();
     // since 0.1.6, a seed cache: its checked root, the buckets it holds, and each held bucket's row check once done
-    this.shards = report.cache ? { root: report.cache.root, held: report.cache.held, checked: new Map() } : null;
+    this.shards = report.cache ? { root: report.cache.root, held: report.cache.held, opts: report.cache.opts, checked: new Map() } : null;
     this.now = now;
+  }
+  /**
+   * A seed cache only: read the held buckets again after an import under the same root. A held bucket the root does not list
+   * with that digest is refused at its next lookup, as at open; a bucket imported again is checked again.
+   */
+  reloadHeld() {
+    if (!this.shards) return;
+    const held = new Map();
+    for (const b of SH.cacheBuckets(this.db)) {
+      held.set(b.i, b.logical);
+      if (this.shards.held.get(b.i) !== b.logical) this.shards.checked.delete(b.i);
+      if (this.shards.root.buckets[b.i]?.logical !== b.logical) {
+        this.shards.checked.set(b.i, `bucket ${b.i}: the cache holds a logical digest its root does not list`);
+      }
+    }
+    this.shards.held = held;
+    this._cache.clear();
+  }
+  /** Take over another Seed's file, report and state (a seed cache under a new root, opened and verified); this one's closes. */
+  adopt(next) {
+    const old = this.db;
+    Object.assign(this, { path: next.path, report: next.report, meta: next.meta, db: next.db, shards: next.shards, now: next.now });
+    this._cache = new Map();
+    old.close();
   }
   /** A seed cache only: the bucket a package name falls in and whether the cache holds it; null for a full seed. */
   bucketOf(name) {

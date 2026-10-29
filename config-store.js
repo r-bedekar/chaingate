@@ -47,6 +47,9 @@ const isObjOnly = isObj;
 /** 0.1.6: the published advisory feed, used when the configuration names none (`"advisory_feed": false` turns it off). */
 export const DEFAULT_ADVISORY_FEED_URL = 'https://raw.githubusercontent.com/cgsec-labs/chaingate-pins/main/pins/';
 
+/** 0.1.6: the published seed cache host (buckets of the seed under a signed root); `"seed_cache": false` turns it off. */
+export const DEFAULT_SEED_CACHE_URL = 'https://shards.cgsec.dev/';
+
 export const DEFAULT_STATIC_WALK_WAIT_MS = 10_000;
 
 export function isHttpsUrl(v) {
@@ -123,7 +126,15 @@ export function validateConfig(cfg, file = '(in memory)') {
   if (pu !== undefined && pu !== null && !isHttpsUrl(pu)) bad(`advisory_feed_url must be an https URL, got ${JSON.stringify(pu)}`);
   const pinsFeed = { url: pu ?? DEFAULT_ADVISORY_FEED_URL, enabled: pf !== false };
 
-  return { policy: resolved, caps, staticWithhold: sw === true, staticWalkWaitMs: ww ?? DEFAULT_STATIC_WALK_WAIT_MS, pinsFeed };
+  // 0.1.6: the seed cache. `seed_cache_url` is an https base URL, the published host when unset; while on, the proxy reads the
+  // seed cache instead of a full seed and fetches the buckets it needs. `seed_cache: false` turns it off.
+  const sc = cfg.seed_cache;
+  if (sc !== undefined && sc !== null && typeof sc !== 'boolean') bad(`seed_cache must be true or false, got ${JSON.stringify(sc)}`);
+  const su = cfg.seed_cache_url;
+  if (su !== undefined && su !== null && !isHttpsUrl(su)) bad(`seed_cache_url must be an https URL, got ${JSON.stringify(su)}`);
+  const seedCache = { url: su ?? DEFAULT_SEED_CACHE_URL, enabled: sc !== false };
+
+  return { policy: resolved, caps, staticWithhold: sw === true, staticWalkWaitMs: ww ?? DEFAULT_STATIC_WALK_WAIT_MS, pinsFeed, seedCache };
 }
 
 /**

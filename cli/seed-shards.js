@@ -95,11 +95,12 @@ export function bucketsFor(cachePath, names, { bits = SH.BUCKET_BITS } = {}) {
 }
 
 /**
- * Fetch, verify and import these buckets under the cache's current root (checked again first), a few at a time. Resolves to
- * { imported, failed: [{ i, why }] }: a bucket that fails is left out whole and the others are imported.
+ * Fetch, verify and import these buckets under the cache's current root, a few at a time: `root` when the caller holds it
+ * verified (the proxy's open seed cache), else checked again from the cache. Resolves to { imported, failed: [{ i, why }] }: a
+ * bucket that fails is left out whole and the others are imported; importing refuses a root that is not the cache's.
  */
-export async function fetchBuckets({ get, cachePath, buckets, seedKey = SEED_KEY, bits = SH.BUCKET_BITS }) {
-  const root = readCache(cachePath, (db) => {
+export async function fetchBuckets({ get, cachePath, buckets, seedKey = SEED_KEY, bits = SH.BUCKET_BITS, root: held = null }) {
+  const root = held ?? readCache(cachePath, (db) => {
     if (!db) throw new SH.ShardRefused('the seed cache has no root yet');
     return SH.checkCache(db, { seedKey, bits }).root;
   });

@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { readConfigStrict, validateConfig, requireCompletePolicy,
   ConfigUnreadable } from '../config-store.js';
 import { resolveActiveBundle, verifyBundleDir } from '../cli/seed-bundle.js';
@@ -62,6 +64,17 @@ function toNonNegativeInt(name, value) {
  *
  * Configuration holds the operator's POLICY only. Identity and trust come from the bundle.
  */
+/** A seed cache that holds at least one bucket (and so the seed's tables); false on any doubt. */
+function cacheHoldsBuckets(cachePath) {
+  if (!existsSync(cachePath)) return false;
+  let db;
+  try {
+    db = new Database(cachePath, { readonly: true, fileMustExist: true });
+    return db.prepare("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'shard_buckets'").pluck().get() === 1
+      && db.prepare('SELECT count(*) FROM shard_buckets').pluck().get() > 0;
+  } catch { return false; } finally { db?.close(); }
+}
+
 function readPersisted(env) {
   const base = env.CHAINGATE_HOME || join(homedir(), '.chaingate');
   const file = join(base, 'config.json');
@@ -74,10 +87,22 @@ function readPersisted(env) {
   const staticWithhold = valid ? valid.staticWithhold : false;      // 0.1.5; applies with or without a v3 seed
   const pinsFeedUrl = valid?.pinsFeed.enabled ? valid.pinsFeed.url : null;                 // 0.1.6
   const staticWalkWaitMs = valid ? valid.staticWalkWaitMs : null;                            // 0.1.6; null = the proxy's default
+  // 0.1.6: the seed cache host, or null (no configuration, or `seed_cache: false`), and where the cache lives
+  const seedCacheUrl = valid?.seedCache.enabled ? valid.seedCache.url : null;
+  const seedCachePath = join(base, 'seed-cache', 'chaingate-seed.db');
   const empty = { source: cfg ? file : null, base, seedV3Path: null, seedV3Trust: null,
     seedV3BundleDir: null, seedV3BundleId: null, seedV3Expected: null,
     policyOnUnusableInput: null, policyOnNoEvidence: null,
-    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold, staticWalkWaitMs, pinsFeedUrl };
+    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold, staticWalkWaitMs, pinsFeedUrl,
+    seedCacheUrl, seedCachePath };
+  // A seed cache holding at least one bucket replaces the full seed; until then an installed bundle serves and the proxy fetches
+  // the cache in the background. Its trust is its signed root's, checked when the proxy opens it.
+  if (seedCacheUrl && cacheHoldsBuckets(seedCachePath)) {
+    const policy = validateConfig(cfg || {}, file).policy;
+    requireCompletePolicy(policy, file);
+    return { ...empty, source: file, seedV3Path: seedCachePath, seedV3Trust: 'authenticated',
+      policyOnUnusableInput: policy.on_unusable_input, policyOnNoEvidence: policy.on_no_evidence };
+  }
   if (!active) return empty;
 
   // The bundle says what it is; it is verified through the PINNED directory.
@@ -149,6 +174,9 @@ export function loadConfig(env = process.env, overrides = {}) {
     staticWithhold: persisted.staticWithhold === true,
     // 0.1.6: the advisory feed base URL, or null (none configured, or `advisory_feed: false`); persisted only
     pinsFeedUrl: persisted.pinsFeedUrl ?? null,
+    // 0.1.6: the seed cache host, or null, and the cache's path; persisted only
+    seedCacheUrl: persisted.seedCacheUrl ?? null,
+    seedCachePath: persisted.seedCachePath ?? null,
     // 0.1.6: the wait for a tarball-check walk slot; persisted only
     staticWalkWaitMs: persisted.staticWalkWaitMs ?? null,
     configSource: persisted.source,
