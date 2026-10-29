@@ -430,3 +430,25 @@ test('PF15 status and doctor show the cut and its age; past 48 hours, stale, hel
     assert.deepEqual([pf.pass, pf.severity], [false, 'notice']); assert.match(pf.detail, /older than 48 hours/);
   });
 });
+
+// ------------------------------------------------------------------------------------------------ the real key list
+import { CHAINGATE_SEED_PUBKEY_B64 } from '../../witness/seed_verify.js';
+import { createPublicKey } from 'node:crypto';
+
+test('PF16 the published key list verifies against the seed key the runtime embeds, and names the pins key', async () => {
+  const fx = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'fixtures', 'pins');
+  const bytes = fs.readFileSync(path.join(fx, 'keys.json')); const sig = fs.readFileSync(path.join(fx, 'keys.json.sig'));
+  assert.equal(sha(bytes), 'ea7ed9367afb5a96f3d326ee300533fc65186c7f25381cec9b2a15e1f018a4f4');
+  const seedKey = createPublicKey({ key: Buffer.from(CHAINGATE_SEED_PUBKEY_B64, 'base64'), format: 'der', type: 'spki' });
+  const keys = verifyKeyManifest(bytes, sig, { seedKey });
+  assert.deepEqual(keys.map((k) => [k.key_id, iso(k.from), iso(k.to)]), [['ed25519:cbaa1978ce3adb68', '2026-10-29T10:00:00Z', '2027-01-27T10:00:00Z']]);
+  throwsRefused(() => verifyKeyManifest(bytes, sig, { seedKey: SEED.publicKey }), /does not verify against the seed key/);
+  // through the default trust path: a cut signed by any other key is refused under the real list
+  await withStore(async (db, dir) => {
+    const feed = path.join(dir, 'feed'); const c = cut(Date.parse('2026-10-30T10:00:00Z'), [row('a', '1.0.0')], null, { key: { ...PINS, id: 'ed25519:cbaa1978ce3adb68' } });
+    writeFeed(feed, { bytes, sig }, c, [c]);
+    const r = await refreshPins({ get: dirSource(feed), db, now: Date.parse('2026-10-30T11:00:00Z') });
+    assert.equal(r.outcome, 'refused'); assert.match(r.why, /does not verify/);
+    assert.equal(db.advisoryPinsFeed(), null);
+  });
+});
