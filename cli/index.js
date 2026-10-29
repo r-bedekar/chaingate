@@ -16,7 +16,7 @@ const COMMANDS = {
   allow: () => import('./commands/allow.js'),
   stop: () => import('./commands/stop.js'),
   'update-seed': () => import('./commands/update-seed.js'),
-  'update-pins': () => import('./commands/update-pins.js'),
+  'update-advisories': () => import('./commands/update-advisories.js'),
   why: () => import('./commands/why.js'),
   history: () => import('./commands/history.js'),
   doctor: () => import('./commands/doctor.js'),
@@ -37,7 +37,7 @@ Commands:
   allow <p@v>       Override a WARN/BLOCK for a specific package version
   stop              Stop the proxy and restore .npmrc
   update-seed       Download and verify the latest seed database
-  update-pins       Fetch the signed pins feed of known malicious versions now
+  update-advisories Fetch the signed advisory feed of known malicious versions now
   why <p@v>         The recorded decision for a version (or --packument <file> | --from <file>)
   history <pkg>     Show the version timeline for a package
   doctor            Check local invariants (6 health checks)

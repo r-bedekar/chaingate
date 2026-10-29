@@ -654,27 +654,32 @@ does not skip them.
 
 [SECURITY.md](SECURITY.md) describes the full trust model.
 
-## The pins feed (0.1.6)
+## The advisory feed (0.1.6)
 
-The seed names known malicious versions as of the day it was built. The pins feed adds the ones recorded since then: a
+The seed names known malicious versions as of the day it was built. The advisory feed adds the ones recorded since then: a
 signed list of package versions, cut hourly, read after the seed's own list. A version the feed names is a BLOCK, as a
-seed pin is; `chaingate allow` lifts it for that version. (These are advisory pins. `chaingate pin` is something else: it
-keeps you on a version you chose.) The notice says "a recorded advisory names this version", or "a ChainGate analyst
-record names this version" when the entry comes from ChainGate's own review rather than a public advisory.
+seed entry is; `chaingate allow` lifts it for that version. (`chaingate pin` is unrelated: it keeps you on a version you
+chose.) The notice says "a recorded advisory names this version", or "a ChainGate analyst record names this version" when
+the entry comes from ChainGate's own review of a captured tarball rather than a public advisory. For such an entry,
+`chaingate why` also says whether the registry's integrity for the version matches the tarball that was reviewed. The
+version is blocked either way; a difference is a warning beside the BLOCK and one line in the proxy log.
 
-**It makes an outbound connection.** With `"pins_feed_url": "<https URL>"` in ChainGate's `config.json`, the proxy fetches
-the feed when it starts and then every hour, while a v3 seed is in use. Each fetch is a few plain GET requests to that
-host: no account, no registry token, and nothing about your packages or this machine. `"pins_feed": false` turns it off,
-and a host with no seed never fetches. This release ships with no feed URL, so the feed is off until you set one.
-`chaingate update-pins` fetches it now; `chaingate update-pins --file <dir>` reads a copy from a local directory.
+**It makes an outbound connection.** With `"advisory_feed_url": "<https URL>"` in ChainGate's `config.json`, the proxy
+fetches the feed when it starts and then every hour, while a v3 seed is in use, and `chaingate init` says that it is on.
+Each fetch is a few plain GET requests to that host: no account, no registry token, and nothing about your packages or
+this machine. `"advisory_feed": false` turns it off, and a host with no seed never fetches. `chaingate update-advisories`
+fetches it now; `chaingate update-advisories --file <dir>` reads a copy from a local directory.
 
 **What it accepts.** A cut is used only when it verifies:
 
-- its signature is by a pins key that a key list signed with the seed key names, valid at the cut's own time;
+- its signature is by a feed key that a key list signed with the seed key names, valid at the cut's own time;
 - it is later than the cut ChainGate already has, and it names the cut before it. A newer cut is taken only when the
   chain of cuts between the two is complete, each one checked; a missing or wrong cut refuses it.
-- A cut more than 7 days newer than the one held, or one that adds more than 2,000 versions at once, is held until you
-  take it with `chaingate update-pins --accept-cut <sha256>`. `chaingate status` shows the command with its digest.
+- A cut is held until you take it with `chaingate update-advisories --accept-cut <sha256>` when it is more than 7 days
+  newer than the one held, adds more than 2,000 versions, or removes more than 100 versions or a quarter of those held
+  (whichever is fewer; an empty cut always). A version moved from one advisory to another counts as neither. For a cut
+  that removes versions, the message lists up to 20 of them that this proxy blocked in the last 30 days.
+  `chaingate status` shows the command with its digest.
 
 Whatever happens, the last accepted cut keeps serving. `chaingate status` shows the cut and its age; `chaingate doctor`
 gives a notice when it is older than 48 hours, stale past 7 days, held, or when the last fetch was refused or failed.

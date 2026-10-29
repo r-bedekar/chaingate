@@ -557,6 +557,14 @@ export default async function init(args, deps = {}) {
   if (upstream !== DEFAULT_UPSTREAM) {
     console.log(fmt.dim(`  Upstream: ${upstream} (chained)`));
   }
+  // Since 0.1.6: the advisory feed is the one outbound connection besides the registry; say so whenever it is on.
+  try {
+    const feed = validateConfig(readConfigStrict(paths.configFile) || {}, paths.configFile).pinsFeed;
+    if (feed.enabled) {
+      console.log(fmt.dim(`  Advisory feed: on, from ${new URL(feed.url).host} at proxy start and hourly while a v3 seed is in use`
+        + ' (set "advisory_feed": false to turn it off)'));
+    }
+  } catch { /* an unreadable configuration was refused earlier */ }
   console.log(`\nReady. ${storeCounts.packages} packages, ${storeCounts.versions} versions in witness store.`);
 
   return EXIT.OK;

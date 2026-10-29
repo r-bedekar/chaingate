@@ -19,14 +19,14 @@ function parseArgs(args) {
 }
 
 /**
- * Since 0.1.6: fetch the ChainGate pins feed now (the proxy also does this at start and hourly), or read it from a local
+ * Since 0.1.6: fetch the ChainGate advisory feed (the signed pins feed of known malicious versions) now (the proxy also does this at start and hourly), or read it from a local
  * directory with --file. A cut held for its age or its size is taken only with --accept-cut and that cut's digest.
  * Exit 0 when the kept cut is current, 2 when a cut is held, 1 when the feed was refused or could not be read.
  * `deps` is for tests: { seedKey, get }.
  */
-export default async function updatePins(args, deps = {}) {
+export default async function updateAdvisories(args, deps = {}) {
   const opts = parseArgs(args);
-  if (opts.bad) { console.error(fmt.fail(`update-pins: unknown argument ${opts.bad}`)); return EXIT.ERROR; }
+  if (opts.bad) { console.error(fmt.fail(`update-advisories: unknown argument ${opts.bad}`)); return EXIT.ERROR; }
   if (opts.accept !== null && !/^[0-9a-f]{64}$/.test(opts.accept)) {
     console.error(fmt.fail('--accept-cut takes the 64-character sha256 of the held cut (shown by `chaingate status`)'));
     return EXIT.ERROR;
@@ -43,7 +43,7 @@ export default async function updatePins(args, deps = {}) {
     try { feed = validateConfig(readConfigStrict(paths.configFile) || {}, paths.configFile).pinsFeed; } catch (err) {
       console.error(fmt.fail(err.message)); return EXIT.ERROR;
     }
-    if (!feed.url) { console.error(fmt.fail('No pins feed configured: set pins_feed_url in the configuration, or pass --file <dir>.')); return EXIT.ERROR; }
+    if (!feed.url) { console.error(fmt.fail('No advisory feed configured: set advisory_feed_url in the configuration, or pass --file <dir>.')); return EXIT.ERROR; }
     get = urlSource(feed.url);
   }
 
@@ -55,13 +55,13 @@ export default async function updatePins(args, deps = {}) {
   } finally { db.close(); }
 
   if (opts.json) console.log(JSON.stringify(r, null, 2));
-  else if (r.outcome === 'accepted') console.log(fmt.ok(`Pins feed cut ${r.cut_at} accepted: ${r.rows} versions${r.walked ? ` (${r.walked} cuts between checked)` : ''}`));
-  else if (r.outcome === 'same') console.log(fmt.ok(`Pins feed is current: cut ${r.cut_at}, ${r.rows} versions`));
+  else if (r.outcome === 'accepted') console.log(fmt.ok(`Advisory feed cut ${r.cut_at} accepted: ${r.rows} versions${r.walked ? ` (${r.walked} cuts between checked)` : ''}`));
+  else if (r.outcome === 'same') console.log(fmt.ok(`Advisory feed is current: cut ${r.cut_at}, ${r.rows} versions`));
   else if (r.outcome === 'held') {
-    console.log(fmt.warn(`Pins feed cut ${r.cut_at} HELD: ${r.why}`));
-    console.log(fmt.dim(`  Take it with: chaingate update-pins --accept-cut ${r.digest}`));
+    console.log(fmt.warn(`Advisory feed cut ${r.cut_at} HELD: ${r.why}`));
+    console.log(fmt.dim(`  Take it with: chaingate update-advisories --accept-cut ${r.digest}`));
   } else {
-    console.error(fmt.fail(`Pins feed ${r.outcome}: ${r.why}`));
+    console.error(fmt.fail(`Advisory feed ${r.outcome}: ${r.why}`));
     console.error(fmt.dim(r.cut_at ? `  The kept cut ${r.cut_at} keeps serving.` : '  No cut is kept yet.'));
   }
   return r.outcome === 'held' ? EXIT.WARN : ['accepted', 'same'].includes(r.outcome) ? EXIT.OK : EXIT.ERROR;

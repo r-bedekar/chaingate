@@ -216,7 +216,8 @@ SPEC.retier = { version: expect(T.constant('retier-1.0'), '"retier-1.0"'),
 // /5: the decision's optional pin member, when a pin from the pins feed decided.
 const feedId = (v) => v === null || (typeof v === 'string' && /^[A-Za-z0-9._:/-]{1,80}$/.test(v));
 SPEC.pin = { origin: expect(T.constant('feed'), '"feed"'), source: expect(T.oneOf(['osv', 'ghsa', 'chaingate-analyst', 'other']), 'osv|ghsa|chaingate-analyst|other'),
-  advisory_id: expect(feedId, 'an id or null'), record_id: expect(feedId, 'an id or null') };
+  advisory_id: expect(feedId, 'an id or null'), record_id: expect(feedId, 'an id or null'),
+  integrity: expect(T.oneOf(['matches', 'differs', 'absent']), 'matches|differs|absent') };
 // /4: the same placement object, whose kind may also be new-family-cold-start.
 SPEC.placement_4 = { ...SPEC.placement, kind: expect(T.oneOf(PLACEMENTS_4), `one of ${PLACEMENTS_4.join('|')}`) };
 
@@ -254,7 +255,7 @@ export function validateRecord(rec) {
   const decisionSpec = rec.schema === 'chaingate.check/5' ? { ...SPEC.decision, retier: T.obj, pin: T.obj } : SPEC.decision;
   if (checkObject('decision', d, decisionSpec, p, { optional: ['retier', 'pin'] })) {
     if (has(d, 'retier')) checkObject('decision.retier', d.retier, SPEC.retier, p);
-    if (has(d, 'pin')) checkObject('decision.pin', d.pin, SPEC.pin, p);
+    if (has(d, 'pin')) checkObject('decision.pin', d.pin, SPEC.pin, p, { optional: ['integrity'] });
     const rowSpec = rec.schema === 'chaingate.check/3' || SINCE_4.includes(rec.schema) ? SPEC.result_row_3 : SPEC.result_row;
     if (Array.isArray(d.results)) d.results.forEach((r, i) => checkObject(`decision.results[${i}]`, r, rowSpec, p));
     if (Array.isArray(d.not_evaluated)) {

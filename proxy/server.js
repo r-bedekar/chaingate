@@ -732,6 +732,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
   let witness = null;
   let witnessDb = null;
   let seedV3 = null;
+  const integrityLogged = new Set();       // since 0.1.6: capture pins already logged as differing from the registry
   let depCache = null;
   let depFetcher = null;
   let witnessDbReal = null;               // reported by /_chaingate/self
@@ -804,7 +805,18 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         seedV3Gate = createSeedV3Gate({
           seed: seedV3, config: policyConfig, domainVersionCount: config.domainVersionCount,
           // since 0.1.6: the pins feed overlay in the witness store, read after the seed's own pins
-          pinOverlay: (p, v) => (witnessDb ? witnessDb.advisoryPinFor(p, v) : null) });
+          pinOverlay: (p, v) => (witnessDb ? witnessDb.advisoryPinFor(p, v) : null),
+          // since 0.1.6: a capture pin whose analysed tarball differs from the registry's integrity is logged once per
+          // version, so a wrong record is seen and corrected; the BLOCK stands
+          onDecision: (d) => {
+            if (d.pin?.integrity !== 'differs') return;
+            const key = `${d.package}@${d.version}`;
+            if (integrityLogged.has(key)) return;
+            if (integrityLogged.size >= 10_000) integrityLogged.clear();
+            integrityLogged.add(key);
+            log.warn(`[advisories] ${key}: the registry's integrity differs from the tarball the advisory feed record was made from; `
+              + 'the version stays blocked');
+          } });
         log.info?.(`[seed-v3] ${config.seedV3Path} opened (trust=${config.seedV3Trust}`
           + `${seedV3.report?.authenticated ? ` anchor=${CHAINGATE_SEED_PUBKEY_FINGERPRINT}` : ''}, `
           + `snapshot=${seedV3.meta.corpus_snapshot_digest?.slice(0, 12)}, `
@@ -1528,7 +1540,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     Promise.resolve().then(() => handler(req, res)).catch((err) => finalGuard(res, err));
   });
   let logTick = null;
-  // Since 0.1.6: the pins feed, fetched at start and hourly while a seed is in use and a feed URL is configured (a test
+  // Since 0.1.6: the pins feed (users see "advisory feed"), fetched at start and hourly while a seed is in use and a feed URL is configured (a test
   // passes `pinsFeedGet` and `pinsSeedKey`). One fetch at a time; a feed problem is one log line and the kept cut keeps serving.
   const pinsGet = (seedV3 && witnessDb) ? (config.pinsFeedGet ?? (config.pinsFeedUrl ? urlSource(config.pinsFeedUrl) : null)) : null;
   let pinsTimer = null;
@@ -1537,11 +1549,11 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
     if (!pinsGet) return Promise.resolve(null);
     pinsBusy ??= refreshPins({ get: pinsGet, db: witnessDb, ...(config.pinsSeedKey ? { seedKey: config.pinsSeedKey } : {}) })
       .then((r) => {
-        if (r.outcome === 'accepted') log.info?.(`[pins] pins feed cut ${r.cut_at} accepted: ${r.rows} versions`);
-        else if (r.outcome === 'held') log.warn(`[pins] pins feed cut ${r.cut_at} held: ${r.why}. Take it with: chaingate update-pins --accept-cut ${r.digest}`);
-        else if (r.outcome !== 'same') log.warn(`[pins] pins feed ${r.outcome}: ${r.why}; the kept cut keeps serving`);
+        if (r.outcome === 'accepted') log.info?.(`[advisories] advisory feed cut ${r.cut_at} accepted: ${r.rows} versions`);
+        else if (r.outcome === 'held') log.warn(`[advisories] advisory feed cut ${r.cut_at} held: ${r.why}. Take it with: chaingate update-advisories --accept-cut ${r.digest}`);
+        else if (r.outcome !== 'same') log.warn(`[advisories] advisory feed ${r.outcome}: ${r.why}; the kept cut keeps serving`);
         return r;
-      }, (err) => { log.warn(`[pins] the pins feed result could not be recorded: ${err.message}`); return null; })
+      }, (err) => { log.warn(`[advisories] the advisory feed result could not be recorded: ${err.message}`); return null; })
       .finally(() => { pinsBusy = null; });
     return pinsBusy;
   };

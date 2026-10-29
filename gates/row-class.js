@@ -83,7 +83,9 @@ export function validPin(x) {
   const id = (v) => v === null || (typeof v === 'string' && /^[A-Za-z0-9._:/-]{1,80}$/.test(v));
   if (!x || typeof x !== 'object' || x.origin !== 'feed' || !['osv', 'ghsa', 'chaingate-analyst', 'other'].includes(x.source)) return null;
   if (!id(x.advisory_id) || !id(x.record_id) || (x.advisory_id === null && x.record_id === null)) return null;
-  return { origin: 'feed', source: x.source, advisory_id: x.advisory_id, record_id: x.record_id };
+  if (x.integrity !== undefined && !['matches', 'differs', 'absent'].includes(x.integrity)) return null;
+  return { origin: 'feed', source: x.source, advisory_id: x.advisory_id, record_id: x.record_id,
+    ...(x.integrity !== undefined ? { integrity: x.integrity } : {}) };
 }
 
 /** Since 0.1.6: the seed-v3 result's compact re-tier block (seed/v3/retier.js), validated, or null. */

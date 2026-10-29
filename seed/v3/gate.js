@@ -470,7 +470,8 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount, pinOverlay =
   // placement nor a finding, so it is looked up before anything that can fail and carried into every decision below:
   // a refusal can no longer discard it. A lookup that throws is carried as a recorded failure, never as "no pin".
   const looked = POL.lookupPin(seed, pkg, version, pinOverlay);   // since 0.1.6: the pins feed overlay after the seed
-  const pinCtx = { pin: looked.pin, pinLookupError: looked.error };
+  // since 0.1.6: a feed capture pin is compared with this version's registry integrity; the BLOCK stands either way
+  const pinCtx = { pin: POL.captureIntegrity(looked.pin, manifest), pinLookupError: looked.error };
 
   // A missing manifest is an UNUSABLE INPUT, which is policy's question and not this module's.
   // Answering it with a bare SKIP here bypassed policy entirely and let the aggregate permit.

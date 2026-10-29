@@ -167,9 +167,33 @@ const reasonOf = (err) => (err instanceof Error ? `${err.name}: ${err.message}` 
 // Its row keeps the words "recorded advisory" (the decision rule recognises a pin by them) and names the feed record.
 const feedText = (x) => (typeof x === 'string' ? x.replace(/[^A-Za-z0-9._:/-]/g, '').slice(0, 80) : '');
 const PIN_SOURCES = Object.freeze(['osv', 'ghsa', 'chaingate-analyst']);
+const INTEGRITY = Object.freeze(['matches', 'differs', 'absent']);
 /** The decision's `pin` member for a feed pin (null for a seed pin, which the record's rows already say everything about). */
 const pinMember = (pin) => (pin && pin.origin === 'feed' ? { origin: 'feed', source: PIN_SOURCES.includes(pin.source) ? pin.source : 'other',
-  advisory_id: feedText(pin.advisory_id) || null, record_id: feedText(pin.record_id) || null } : null);
+  advisory_id: feedText(pin.advisory_id) || null, record_id: feedText(pin.record_id) || null,
+  ...(INTEGRITY.includes(pin.integrity) ? { integrity: pin.integrity } : {}) } : null);
+// A capture pin names the version; the tarball it was made from is evidence, never its scope. The comparison is recorded and
+// can only add a warning beside the BLOCK: a registry integrity that differs from the analysed tarball is a reason to look,
+// never to serve.
+const INTEGRITY_WORDS = Object.freeze({
+  matches: 'the registry integrity matches the analysed tarball',
+  differs: "WARNING: the registry's integrity for this version differs from the analysed tarball",
+  absent: 'no integrity in the metadata',
+});
+/**
+ * Since 0.1.6: a feed capture pin compared with the version's `dist.integrity` from the metadata being decided. Returns the pin
+ * with `integrity` 'matches' | 'differs' | 'absent'; any other pin unchanged.
+ */
+function captureIntegrity(pin, manifest) {
+  if (!pin || pin.origin !== 'feed') return pin;
+  let ev = null;
+  try { ev = typeof pin.evidence_json === 'string' ? JSON.parse(pin.evidence_json) : null; } catch { ev = null; }
+  if (ev?.kind !== 'capture' || typeof ev.dist_integrity !== 'string') return pin;
+  const got = manifest?.dist?.integrity;
+  const integrity = typeof got !== 'string' || !got.trim() ? 'absent'
+    : got.trim().split(/\s+/).includes(ev.dist_integrity) ? 'matches' : 'differs';
+  return { ...pin, integrity };
+}
 function pinBlockRow(pin, pkg, version) {
   if (pin.origin !== 'feed') {
     return r(PIN_GATE, BLOCK, `recorded advisory ${pin.advisory_id} pins ${pkg}@${version}${pin.source ? ` (source ${pin.source})` : ''}`);
@@ -177,7 +201,7 @@ function pinBlockRow(pin, pkg, version) {
   const m = pinMember(pin);
   const what = m.advisory_id ?? `(ChainGate analyst record ${m.record_id})`;
   return r(PIN_GATE, BLOCK, `recorded advisory ${what} pins ${pkg}@${version} (source ${m.source}); ChainGate pins feed`
-    + `${m.advisory_id && m.record_id ? `, record ${m.record_id}` : ''}`);
+    + `${m.advisory_id && m.record_id ? `, record ${m.record_id}` : ''}${m.integrity ? `; ${INTEGRITY_WORDS[m.integrity]}` : ''}`);
 }
 const pinFailedRow = (err) => r(PIN_GATE, SKIP,
   `advisory pin lookup FAILED (${reasonOf(err)}): whether an advisory names this version is NOT known`);
@@ -481,13 +505,13 @@ export {
   NAMED_RUNNER_GATES,
   POLICY_CONTRACT_VERSION, IMPLEMENTED_DETECTION_CONTRACT, DISPOSITIONS, OPEN_CHOICES,
   OPEN_CHOICE_KEYS, PolicyConfigInvalid, normaliseConfig, aggregate, notEvaluated,
-  thresholdResults, decide, pinFor, lookupPin, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
+  thresholdResults, decide, pinFor, lookupPin, captureIntegrity, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
   NOTE, NAMED_ROWS, CONTRIBUTING_ROWS, POLICY_ROW_GATES, ROW_RESULTS,
 };
 export default {
   NAMED_RUNNER_GATES,
   POLICY_CONTRACT_VERSION, IMPLEMENTED_DETECTION_CONTRACT, DISPOSITIONS, OPEN_CHOICES,
   OPEN_CHOICE_KEYS, PolicyConfigInvalid, normaliseConfig, aggregate, notEvaluated,
-  thresholdResults, decide, pinFor, lookupPin, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
+  thresholdResults, decide, pinFor, lookupPin, captureIntegrity, PIN_GATE, ALLOW, WARN, BLOCK, SKIP,
   NOTE, NAMED_ROWS, CONTRIBUTING_ROWS, POLICY_ROW_GATES, ROW_RESULTS,
 };

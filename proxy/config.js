@@ -144,7 +144,7 @@ export function loadConfig(env = process.env, overrides = {}) {
     unstoredBlockCapBytes: env.CHAINGATE_UNSTORED_BLOCK_CAP_BYTES || persisted.unstoredBlockCapBytes,
     // 0.1.5: hold an armed download (up to 8 MiB) while the static checks read it; persisted only, off by default
     staticWithhold: persisted.staticWithhold === true,
-    // 0.1.6: the pins feed base URL, or null (none configured, or `pins_feed: false`); persisted only
+    // 0.1.6: the advisory feed base URL, or null (none configured, or `advisory_feed: false`); persisted only
     pinsFeedUrl: persisted.pinsFeedUrl ?? null,
     configSource: persisted.source,
     chaingateBase: persisted.base,

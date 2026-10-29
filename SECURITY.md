@@ -75,23 +75,25 @@ or with elevated trust requirements may:
 - Treat `chaingate-seed.db.manifest.json` as **informational only**:
   the signature does not cover it, and the CLI does not fetch it.
 
-### The pins feed (0.1.6)
+### The advisory feed (0.1.6)
 
-The pins feed is a signed list of known malicious package versions, read after the seed's own list
-(README, "The pins feed"). The runtime embeds no pins key. The seed key signs a key list
-(`keys.json`, with its signature in `keys.json.sig`) that names each pins key, its key id in the form
-above, and a validity window of at most 90 days. A cut's signature (`latest.jsonl.sig`) is Ed25519
-over the sha256 hex of the cut file, as for the seed, by the pins key the cut's header names, valid
-at the cut's own time. Each cut names the one before it, and the runtime takes a newer cut only when
-every cut between it and the one it holds is present and verifies.
+The advisory feed is a signed list of known malicious package versions, read after the seed's own
+list (README, "The advisory feed"). The runtime embeds no feed key. The seed key signs a key list
+(`keys.json`, with its signature in `keys.json.sig`) that names each feed key, its key id in the form
+above, and a validity window of at most 90 days. A cut's signature is Ed25519 over the sha256 hex of
+the cut file, as for the seed, by the feed key the cut's header names, valid at the cut's own time.
+Each cut names the one before it, and the runtime takes a newer cut only when every cut between it
+and the one it holds is present and verifies.
 
-A stolen pins key could publish a cut that adds wrong BLOCKs (`chaingate allow` lifts one; a cut
-adding more than 2,000 versions at once is held for a manual step) or that leaves out versions the
-feed named before. The seed's own pins are not affected by the feed. A cut cannot be replayed or
-rolled back past the cut a host holds, and every dated cut stays public, so a change is visible. The fetch is an outbound connection to the
-configured `pins_feed_url` host (https only), at proxy start and hourly. It sends no identifiers, but
-that host sees the address of each client that fetches, as GitHub does for a seed download. It is
-off when no URL is configured (this release ships none) or with `"pins_feed": false`.
+A stolen feed key could publish a cut that adds wrong BLOCKs (`chaingate allow` lifts one) or that
+leaves out versions the feed named before. A cut adding more than 2,000 versions, or removing more
+than 100 or a quarter of those held, is held for a manual step that names the versions it would
+lift. The seed's own entries are not affected by the feed. A cut cannot be replayed or rolled back
+past the cut a host holds, and every dated cut stays public, so a change is visible. The fetch is an
+outbound connection to the configured `advisory_feed_url` host (https only), at proxy start and
+hourly. It sends no identifiers, but that host sees the address of each client that fetches, as
+GitHub does for a seed download. It is off when no URL is configured or with
+`"advisory_feed": false`.
 
 ### v3 detection seeds and trust modes
 

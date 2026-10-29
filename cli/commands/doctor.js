@@ -236,7 +236,7 @@ export default async function doctor(args) {
     checks.push({ name: 'witness-db', pass, detail });
   }
 
-  // Since 0.1.6: the pins feed. Old (past 48 hours), stale (past 7 days), held, refused or failing is a notice: the last
+  // Since 0.1.6: the advisory feed (the pins feed). Old (past 48 hours), stale (past 7 days), held, refused or failing is a notice: the last
   // accepted cut keeps serving, so none of these is a failure.
   if (existsSync(paths.witnessDb)) {
     try {
@@ -244,9 +244,9 @@ export default async function doctor(args) {
       let d;
       try { d = describePinsFeed({ url: pinsFeedCfg.enabled ? pinsFeedCfg.url : null, feed: db.advisoryPinsFeed(), fetch: db.advisoryPinsFetch() }); }
       finally { db.close(); }
-      checks.push(d.state === 'off' ? { name: 'pins-feed', pass: true, severity: 'skipped', detail: d.text }
-        : d.notice ? { name: 'pins-feed', pass: false, severity: 'notice', detail: d.text }
-          : { name: 'pins-feed', pass: true, detail: d.text });
+      checks.push(d.state === 'off' ? { name: 'advisory-feed', pass: true, severity: 'skipped', detail: d.text }
+        : d.notice ? { name: 'advisory-feed', pass: false, severity: 'notice', detail: d.text }
+          : { name: 'advisory-feed', pass: true, detail: d.text });
     } catch { /* the witness-db check above reports an unreadable store */ }
   }
 

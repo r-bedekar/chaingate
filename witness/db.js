@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS advisory_pins_feed (
     accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 -- The last fetch of the pins feed: when, what came of it ('accepted', 'same', 'held', 'refused', 'failed') and why; a held cut's
--- digest is what update-pins --accept-cut names. The kept cut above keeps serving whatever this says.
+-- digest is what update-advisories --accept-cut names. The kept cut above keeps serving whatever this says.
 CREATE TABLE IF NOT EXISTS advisory_pins_fetch (
     id           INTEGER PRIMARY KEY CHECK (id = 1),
     attempted_at TEXT NOT NULL,
@@ -742,8 +742,14 @@ export class WitnessDB {
   recordAdvisoryPinsFetch({ attemptedAt, outcome, why = null, heldDigest = null, heldCutAt = null }) {
     const st = this._advisoryPinFetchStmts();
     if (!st) throw new Error('advisory_pins_fetch is not in this witness database (open it read-write once to apply the schema)');
-    st.set.run({ attempted_at: attemptedAt, outcome, why: why === null ? null : String(why).slice(0, 300), held_digest: heldDigest,
+    st.set.run({ attempted_at: attemptedAt, outcome, why: why === null ? null : String(why).slice(0, 2000), held_digest: heldDigest,
       held_cut_at: heldCutAt });
+  }
+
+  /** Since 0.1.6: the versions this store recorded a BLOCK for since an ISO time, as a Set of "name@version". */
+  blockedVersionsSince(sinceIso) {
+    return new Set(this.db.prepare("SELECT DISTINCT package_name, version FROM gate_decisions WHERE disposition = 'BLOCK' "
+      + 'AND datetime(decided_at) >= datetime(?)').all(sinceIso).map((r) => `${r.package_name}@${r.version}`));
   }
 
   /** Since 0.1.6: the (name, version) pairs of the kept cut, as "name@version". */

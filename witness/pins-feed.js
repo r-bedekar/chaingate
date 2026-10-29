@@ -7,8 +7,10 @@
 //
 // No gaps: every cut names the previous published cut (its digest and its time). A newer cut is accepted only when its chain
 // reaches the kept cut, every link checked; a link that is missing or does not verify refuses the cut, it is never skipped.
-// The walk goes back at most 7 days; past that, or when a cut adds more than 2,000 new versions, the cut is HELD until
-// `chaingate update-pins --accept-cut <digest>` takes it. A refused or held cut leaves the kept cut serving.
+// The walk goes back at most 7 days; past that, or when a cut adds more than 2,000 new versions, or removes more than 100
+// versions or a quarter of the kept ones (whichever is fewer; an empty cut over a non-empty one always), the cut is HELD until
+// `chaingate update-advisories --accept-cut <digest>` takes it. Versions are counted as (name, version), so an entry moved to
+// another advisory is neither added nor removed. A refused or held cut leaves the kept cut serving.
 import { createHash, createPublicKey, verify as cryptoVerify } from 'node:crypto';
 
 export const PINS_FEED_VERSION = 'pins-feed-1.3';
@@ -20,6 +22,8 @@ export const PINS_LIMITS = Object.freeze({
   walkBackMs: 7 * 24 * 3600e3,
   walkLinks: 400,
   floodNewRows: 2000,
+  removedRows: 100,
+  removedFraction: 0.25,
   ageWarnMs: 48 * 3600e3,
   ageStaleMs: 7 * 24 * 3600e3,
   futureSkewMs: 10 * 60e3,
@@ -147,7 +151,8 @@ export function verifyCut(cut, sig, keys) {
  *   loadCut  async (stamp) => { bytes, sig } of cuts/<stamp>.jsonl; throws when the copy cannot be read
  *   keys     from verifyKeyManifest
  *   accept   a digest the user named with --accept-cut, or null
- * Returns { action: 'same' | 'accept' | 'held', cut, walked, why }. A cut that cannot be accepted throws PinsFeedRefused.
+ * Returns { action: 'same' | 'accept' | 'held', cut, walked, why, removed }; removed lists the kept "name@version" pairs the cut
+ * leaves out. A cut that cannot be accepted throws PinsFeedRefused.
  */
 export async function decideCut({ latest, kept, loadCut, keys, now = Date.now(), accept = null }) {
   const cut = verifyCut(parseCut(latest.bytes), latest.sig, keys);
@@ -176,12 +181,18 @@ export async function decideCut({ latest, kept, loadCut, keys, now = Date.now(),
   }
   if (cur.head.prev_cut_at !== kept.cut_at) refuse(`cut ${cur.head.cut_at} names the kept digest with another time`);
 
-  const added = cut.rows.reduce((n, r) => n + (kept.pairs.has(`${r.name}@${r.version}`) ? 0 : 1), 0);
-  if (added > PINS_LIMITS.floodNewRows) {
-    const h = held(`the cut adds ${added} new versions (more than ${PINS_LIMITS.floodNewRows})`);
-    return { ...h, walked };
+  const pairs = new Set(cut.rows.map((r) => `${r.name}@${r.version}`));
+  const added = [...pairs].filter((x) => !kept.pairs.has(x)).length;
+  const removed = [...kept.pairs].filter((x) => !pairs.has(x)).sort();
+  const removeLimit = Math.min(PINS_LIMITS.removedRows, Math.floor(kept.pairs.size * PINS_LIMITS.removedFraction));
+  const reasons = [];
+  if (added > PINS_LIMITS.floodNewRows) reasons.push(`the cut adds ${added} new versions (more than ${PINS_LIMITS.floodNewRows})`);
+  if (kept.pairs.size > 0 && pairs.size === 0) reasons.push(`the cut is empty and would remove all ${kept.pairs.size} versions`);
+  else if (removed.length > removeLimit) {
+    reasons.push(`the cut removes ${removed.length} versions (more than ${removeLimit}: 100, or a quarter of the ${kept.pairs.size} held, whichever is fewer)`);
   }
-  return { action: 'accept', cut, walked, why: null };
+  if (reasons.length) return { ...held(reasons.join('; ')), walked, removed };
+  return { action: 'accept', cut, walked, why: null, removed };
 }
 
 /** The store rows of an accepted cut (witness/db.js replaceAdvisoryPins). */
