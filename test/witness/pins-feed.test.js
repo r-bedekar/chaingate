@@ -436,9 +436,10 @@ test('PF15 status and doctor show the cut and its age; past 48 hours, stale, hel
 // ------------------------------------------------------------------------------------------------ the real key list
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../../witness/seed_verify.js';
 import { createPublicKey } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 test('PF16 the published key list verifies against the seed key the runtime embeds, and names the pins key', async () => {
-  const fx = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'fixtures', 'pins');
+  const fx = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'pins');
   const bytes = fs.readFileSync(path.join(fx, 'keys.json')); const sig = fs.readFileSync(path.join(fx, 'keys.json.sig'));
   assert.equal(sha(bytes), 'ea7ed9367afb5a96f3d326ee300533fc65186c7f25381cec9b2a15e1f018a4f4');
   const seedKey = createPublicKey({ key: Buffer.from(CHAINGATE_SEED_PUBKEY_B64, 'base64'), format: 'der', type: 'spki' });
