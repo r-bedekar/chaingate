@@ -141,6 +141,12 @@ function gunzipOne(gz, cap, at) {
   return raw;
 }
 
+/** root.json.gz: exactly one gzip stream, at most the root bound when decompressed. */
+export function gunzipRoot(gz) {
+  if (!Buffer.isBuffer(gz) || gz.length > SHARD_LIMITS.rootBytes) refuse('root.json.gz is missing or too large');
+  return gunzipOne(gz, SHARD_LIMITS.rootBytes, 'root.json.gz');
+}
+
 /** A bucket's bytes: size, sha256 against the root, then one gzip stream under raw_bytes_max. Returns the raw file. */
 export function verifyBucketBytes(root, i, gz) {
   const e = Array.isArray(root?.buckets) ? root.buckets.find((b) => b && b.i === i) : null;
@@ -188,8 +194,37 @@ CREATE TABLE IF NOT EXISTS shard_buckets (i INTEGER PRIMARY KEY, logical TEXT NO
   imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 CREATE TABLE IF NOT EXISTS shard_bucket_packages (i INTEGER NOT NULL, package_id INTEGER NOT NULL, PRIMARY KEY (i, package_id)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS shard_bucket_pins (i INTEGER NOT NULL, package_name TEXT NOT NULL, PRIMARY KEY (i, package_name)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS shard_fetch (id INTEGER PRIMARY KEY CHECK (id = 1), root_etag TEXT, attempted_at TEXT, outcome TEXT,
+  why TEXT, accepted_at TEXT);
 `;
 const DDL_ONLY = /^CREATE (?:TABLE|UNIQUE INDEX|INDEX) /;
+
+/** The cache for writing; a new one gets the seed writer's page size. */
+function openCache(cachePath) {
+  const fresh = !fs.existsSync(cachePath);
+  const db = new Database(cachePath);
+  if (fresh) db.pragma('page_size = 8192');
+  db.pragma('journal_mode = DELETE');
+  db.pragma('foreign_keys = OFF');           // as the seed writer and the reference import: a pin may name no package here
+  db.exec(CACHE_DDL);
+  return db;
+}
+
+/** The last root fetch as recorded: { root_etag, attempted_at, outcome, why, accepted_at }, or null. */
+export function readFetch(db) {
+  const t = tablesOf(db);
+  return t.has('shard_fetch') ? (db.prepare('SELECT root_etag, attempted_at, outcome, why, accepted_at FROM shard_fetch WHERE id = 1').get() ?? null) : null;
+}
+
+/** Record a root fetch's outcome (the ETag only when given; accepted_at only on an accepted root). */
+export function recordFetch(cachePath, { outcome, why = null, etag, accepted = false, at = new Date().toISOString() }) {
+  const db = openCache(cachePath);
+  try {
+    db.prepare(`INSERT INTO shard_fetch (id, root_etag, attempted_at, outcome, why, accepted_at) VALUES (1, @etag, @at, @outcome, @why, @acc)
+      ON CONFLICT(id) DO UPDATE SET root_etag = coalesce(@etag, root_etag), attempted_at = @at, outcome = @outcome, why = @why,
+        accepted_at = coalesce(@acc, accepted_at)`).run({ etag: etag ?? null, at, outcome, why, acc: accepted ? at : null });
+  } finally { db.close(); }
+}
 
 /** Delete every row bucket `i` brought into the cache (its packages and their rows, its pins by name), inside a transaction. */
 function dropBucketRows(db, i) {
@@ -212,11 +247,8 @@ function dropBucketRows(db, i) {
  * are stored with it; a cache whose root has none is refused when opened.
  */
 export function setRoot(cachePath, root, rootBytes) {
-  const db = new Database(cachePath);
+  const db = openCache(cachePath);
   try {
-    db.pragma('foreign_keys = OFF');           // as the seed writer and the reference import: a pin may name no package here
-    db.pragma('journal_mode = DELETE');
-    db.exec(CACHE_DDL);
     const held = db.prepare('SELECT digest, cut_at FROM shard_root WHERE id = 1').get();
     if (held?.digest === root.digest) return { kept: db.prepare('SELECT count(*) FROM shard_buckets').pluck().get(), dropped: 0 };
     if (held && !(root.cut_at > held.cut_at)) refuse(`the root of ${root.cut_at} is not later than the cache's root of ${held.cut_at}`);
@@ -227,7 +259,9 @@ export function setRoot(cachePath, root, rootBytes) {
           db.prepare('UPDATE shard_buckets SET confirmed_cut_at = ? WHERE i = ?').run(root.cut_at, b.i); kept += 1;
         } else { dropBucketRows(db, b.i); dropped += 1; }
       }
-      if (tablesOf(db).has('seed_metadata')) {
+      // the writer's table, so a cache holding a root and no bucket yet already states the root's metadata
+      db.exec('CREATE TABLE IF NOT EXISTS seed_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID');
+      {
         db.prepare('DELETE FROM seed_metadata').run();
         const ins = db.prepare('INSERT INTO seed_metadata (key, value) VALUES (?, ?)');
         for (const [k, v] of Object.entries(root.seed_metadata).sort()) ins.run(k, v);
@@ -261,18 +295,14 @@ export function importBucket(cachePath, root, i, raw) {
       ddl = sdb.prepare("SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type DESC, name").all();
     } finally { sdb.close(); }
     for (const d of ddl) if (!DDL_ONLY.test(d.sql)) refuse(`bucket ${i}: carries a schema statement that is not a table or an index`);
-    if (!fs.existsSync(cachePath)) {
-      const c = new Database(cachePath); c.pragma('page_size = 8192'); c.pragma('journal_mode = DELETE'); c.exec(CACHE_DDL); c.close();
-    }
+    if (!fs.existsSync(cachePath)) openCache(cachePath).close();
     const heldDb = new Database(cachePath, { readonly: true });
     let held;
     try { held = heldDb.prepare('SELECT digest FROM shard_root WHERE id = 1').get(); } finally { heldDb.close(); }
     if (!held) setRoot(cachePath, root);
     else if (held.digest !== root.digest) refuse(`bucket ${i}: the cache is under another root; set this root first`);
-    const db = new Database(cachePath);
+    const db = openCache(cachePath);
     try {
-      db.pragma('foreign_keys = OFF');
-      db.exec(CACHE_DDL);
       db.prepare('ATTACH DATABASE ? AS b').run(staged);
       try {
         db.transaction(() => {
@@ -361,4 +391,5 @@ export function bucketRowsProblem(db, root, i) {
 }
 
 export default { SHARDS_CONTRACT, SHARD_SEED_CONTRACT, SHARD_LINEAGE_ID_RULE, BUCKET_BITS, BUCKET_HASH, SHARD_LIMITS, ShardRefused,
-  bucketOf, canonicalJson, verifyRoot, verifyBucketBytes, setRoot, importBucket, cacheBuckets, checkCache, bucketRowsProblem };
+  bucketOf, canonicalJson, verifyRoot, gunzipRoot, verifyBucketBytes, setRoot, importBucket, cacheBuckets, checkCache, bucketRowsProblem,
+  readFetch, recordFetch };
