@@ -142,3 +142,40 @@ test('SF6 the host is https (a local test host aside), and a redirect is refused
     await assert.rejects(F.refreshRoot({ get: F.shardSource(base), cachePath: cache, ...opts() }), /redirect|fetch failed/i);
   }, { over: { 'root.json.gz': (req, res) => { res.writeHead(302, { location: 'https://example.com/root.json.gz' }); res.end(); } } });
 });
+
+test('SF7 setting up a cache: the root, the buckets the names need, and always at least one bucket (it brings the tables)', async () => {
+  await serve(async ({ base, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: cache, names: ['pkg-b'], ...opts() });
+    assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.cut_at, EXPECTED.now); assert.deepEqual(r.held, [2]);
+    assert.match(r.root_digest, /^[0-9a-f]{64}$/);
+  });
+  await serve(async ({ base, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: path.join(path.dirname(cache), 'sub', 'c.db'), names: [], ...opts() });
+    assert.equal(r.ok, true); assert.deepEqual(r.held, [0], 'no names: one bucket all the same');
+    const seed = R.openSeed(path.join(path.dirname(cache), 'sub', 'c.db'), { trust: R.TRUST_AUTHENTICATED, pubkey: SEED_KEY, shardBits: 3, now: () => NOW });
+    seed.close();
+  });
+  await serve(async ({ base, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: cache, names: ['pkg-b'], ...opts() });
+    assert.equal(r.ok, false); assert.match(r.why, /root\.json\.gz: HTTP 404/);
+  }, { over: { 'root.json.gz': (req, res) => { res.writeHead(404); res.end(); } } });
+});
+
+test('SF8 the names a lockfile lists: package-lock or shrinkwrap, lockfile versions 1 to 3, nested and scoped; none is empty', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg016-lock-'));
+  try {
+    assert.deepEqual(F.lockfileNames(dir), []);
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3, packages: {
+      '': { name: 'app' }, 'node_modules/a': {}, 'node_modules/@s/b': {}, 'node_modules/a/node_modules/c': {}, 'packages/local': {},
+      'node_modules/linked': { link: true } } }));
+    assert.deepEqual(F.lockfileNames(dir), ['@s/b', 'a', 'c', 'linked']);
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify({ lockfileVersion: 1, dependencies: {
+      a: { version: '1.0.0', dependencies: { c: { version: '2.0.0' } } }, '@s/b': { version: '3.0.0' } } }));
+    assert.deepEqual(F.lockfileNames(dir), ['@s/b', 'a', 'c']);
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), '{ not json');
+    assert.deepEqual(F.lockfileNames(dir), []);
+    fs.rmSync(path.join(dir, 'package-lock.json'));
+    fs.writeFileSync(path.join(dir, 'npm-shrinkwrap.json'), JSON.stringify({ lockfileVersion: 2, packages: { 'node_modules/z': {} } }));
+    assert.deepEqual(F.lockfileNames(dir), ['z']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
