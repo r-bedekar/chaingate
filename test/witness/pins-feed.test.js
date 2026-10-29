@@ -44,7 +44,7 @@ const row = (name, version, extra = {}) => ({ name, version, advisory_id: `MAL-2
   record_id: sha(`${name}@${version}`), source: 'osv', evidence: { kind: 'advisory', advisory_id: `MAL-2026-${name}-${version}` },
   added_at: '2026-10-29T09:00:00Z', ...extra });
 const capture = (name, version) => row(name, version, { advisory_id: `CHAINGATE-${sha(name).slice(0, 16)}`, source: 'chaingate-analyst',
-  evidence: { kind: 'capture', sha256: sha(`tgz:${name}`), dist_integrity: 'sha512-AAAA+/==' } });
+  evidence: { kind: 'capture', sha256: sha(`tgz:${name}`), dist_integrity: `sha512-${'A+/b'.repeat(21)}AB==` } });
 
 /** One cut: bytes, signature, parsed head, digest. `prev` is the previous cut or null. */
 function cut(atMs, rows, prev = null, { key = PINS, head = {} } = {}) {
@@ -118,7 +118,9 @@ test('PF2 a cut parses only as written: ASCII lines, the header fields, the coun
   bad(one({ ...capture('a', '1.0.0'), source: 'osv' }), /does not fit its source/);
   bad(one({ ...capture('a', '1.0.0'), evidence: { kind: 'capture', sha256: 'short', dist_integrity: null } }), /bad evidence/);
   bad(one({ ...row('a', '1.0.0'), extra: 1 }), /row fields/);
-  assert.equal(parseCut(Buffer.from(one({ ...capture('a', '1.0.0'), evidence: { kind: 'capture', sha256: sha('t'), dist_integrity: null } }))).rows.length, 1);
+  const capEv = (di) => one({ ...capture('a', '1.0.0'), evidence: { kind: 'capture', sha256: sha('t'), dist_integrity: di } });
+  assert.equal(parseCut(Buffer.from(capEv(capture('a', '1.0.0').evidence.dist_integrity))).rows.length, 1);
+  for (const di of [null, 'sha1-abc=', 'sha512-short==', `sha256-${'A'.repeat(43)}=`]) bad(capEv(di), /bad evidence/);
 });
 
 test('PF3 a cut is checked against the pins key its header names, valid at the cut time, over the ASCII digest', () => {

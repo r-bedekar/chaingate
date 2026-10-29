@@ -34,6 +34,7 @@ const refuse = (why) => { throw new PinsFeedRefused(why); };
 const HEX64 = /^[0-9a-f]{64}$/;
 const TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const KEY_ID = /^ed25519:[0-9a-f]{16}$/;
+const SRI512 = /^sha512-[A-Za-z0-9+/]{86}==$/;                    // a capture's npm dist.integrity, as the publisher admits it
 const TEXT = /^[\x21-\x7e]{1,214}$/;
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -94,7 +95,7 @@ function checkRow(r, i) {
   const e = r.evidence;
   const okEvidence = isObj(e) && ((e.kind === 'advisory' && exactKeys(e, ['kind', 'advisory_id']) && typeof e.advisory_id === 'string' && TEXT.test(e.advisory_id))
     || (e.kind === 'capture' && exactKeys(e, ['kind', 'sha256', 'dist_integrity']) && HEX64.test(e.sha256 ?? '')
-      && (e.dist_integrity === null || (typeof e.dist_integrity === 'string' && TEXT.test(e.dist_integrity)))));
+      && SRI512.test(e.dist_integrity ?? '')));
   if (!okEvidence) refuse(`${at}: bad evidence`);
   if (r.source === 'chaingate-analyst' ? e.kind !== 'capture' : e.kind !== 'advisory') refuse(`${at}: evidence does not fit its source`);
   if (!TS.test(r.added_at ?? '')) refuse(`${at}: bad added_at`);
