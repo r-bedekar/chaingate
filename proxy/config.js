@@ -89,7 +89,9 @@ function readPersisted(env) {
   const policy = validateConfig(cfg || {}, file).policy;
   requireCompletePolicy(policy, file);
 
+  // every setting that applies with or without a seed comes from `empty`, so none is lost when a bundle is active
   return {
+    ...empty,
     source: file,
     base,
     seedV3Path: active.files.db,                    // inside the PINNED directory, not via the link
