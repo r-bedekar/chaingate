@@ -148,10 +148,11 @@ test('PF4 the first cut is taken; the same cut is "same"; an older or equal cut 
 });
 
 test('PF5 no gaps: a newer cut is taken only when its chain reaches the kept cut, every link checked', async () => {
-  const c1 = cut(T0, [row('a', '1.0.0')]);
-  const c2 = cut(T0 + H, [row('a', '1.0.0'), row('b', '1.0.0')], c1);
-  const c3 = cut(T0 + 2 * H, [row('b', '1.0.0')], c2);
-  const c4 = cut(T0 + 3 * H, [row('b', '1.0.0'), row('c', '1.0.0')], c3);
+  const F = rowsN(8, 'f');                                // filler, so one removal stays within the removal guard
+  const c1 = cut(T0, [row('a', '1.0.0'), ...F]);
+  const c2 = cut(T0 + H, [row('a', '1.0.0'), row('b', '1.0.0'), ...F], c1);
+  const c3 = cut(T0 + 2 * H, [row('b', '1.0.0'), ...F], c2);
+  const c4 = cut(T0 + 3 * H, [row('b', '1.0.0'), row('c', '1.0.0'), ...F], c3);
   const now = T0 + 4 * H; const kept = keptOf(c1);
   const next = await decideCut({ latest: c2, kept, loadCut: loaderOf([]), keys: KEYS, now });
   assert.deepEqual([next.action, next.walked], ['accept', 0], 'the next cut needs no walk');
@@ -160,10 +161,10 @@ test('PF5 no gaps: a newer cut is taken only when its chain reaches the kept cut
   // a missing dated copy refuses: never skipped
   await refused(decideCut({ latest: c4, kept, loadCut: loaderOf([c1, c2, c4]), keys: KEYS, now }), /cannot be read/);
   // a dated copy that is not the cut the next one names
-  const c3b = cut(T0 + 2 * H, [row('z', '9.9.9')], c2);
+  const c3b = cut(T0 + 2 * H, [row('z', '9.9.9'), ...F], c2);
   await refused(decideCut({ latest: c4, kept, loadCut: loaderOf([c1, c2, c3b]), keys: KEYS, now }), /is not the one/);
   // a link signed by a key the manifest does not name
-  const c3s = { ...c3, sig: cut(T0 + 2 * H, [row('b', '1.0.0')], c2, { key: newKey() }).sig };
+  const c3s = { ...c3, sig: cut(T0 + 2 * H, [row('b', '1.0.0'), ...F], c2, { key: newKey() }).sig };
   await refused(decideCut({ latest: c4, kept, loadCut: loaderOf([c1, c2, c3s]), keys: KEYS, now }), /does not verify|no pins key/);
   // a fork: a chain that passes the kept cut's time without naming it
   const f2 = cut(T0 + H, [row('x', '1.0.0')], c1); const f3 = cut(T0 + 2 * H, [row('x', '1.0.0')], f2);
@@ -185,11 +186,11 @@ test('PF6 past 7 days, or over 2,000 new versions, a cut is HELD; --accept-cut w
   const other = await decideCut({ latest: far, kept: keptOf(c1), loadCut: loaderOf([]), keys: KEYS, now, accept: sha('other') });
   assert.equal(other.action, 'held', 'only the named digest is taken');
 
-  const many = Array.from({ length: 2001 }, (_, i) => row(`w${String(i).padStart(5, '0')}`, '1.0.0'));
+  const many = [row('a', '1.0.0'), ...Array.from({ length: 2001 }, (_, i) => row(`w${String(i).padStart(5, '0')}`, '1.0.0'))];
   const flood = cut(T0 + H, many, c1);
   const fh = await decideCut({ latest: flood, kept: keptOf(c1), loadCut: loaderOf([]), keys: KEYS, now: T0 + 2 * H });
   assert.equal(fh.action, 'held'); assert.match(fh.why, /adds 2001 new versions/);
-  const ok2000 = cut(T0 + H, many.slice(0, 2000), c1);
+  const ok2000 = cut(T0 + H, many.slice(0, 2001), c1);
   assert.equal((await decideCut({ latest: ok2000, kept: keptOf(c1), loadCut: loaderOf([]), keys: KEYS, now: T0 + 2 * H })).action, 'accept');
   assert.equal((await decideCut({ latest: flood, kept: keptOf(c1), loadCut: loaderOf([]), keys: KEYS, now: T0 + 2 * H,
     accept: flood.digest })).action, 'accept');
@@ -207,7 +208,8 @@ test('PF7 feed age: fresh, old past 48 hours, stale past 7 days', () => {
 test('PF8 refresh from a directory: accepted cuts land in the store, a refused or unreadable feed keeps the kept cut serving', async () => {
   await withStore(async (db, dir) => {
     const feed = path.join(dir, 'feed'); const man = manifest([pinsEntry()]);
-    const c1 = cut(T0, [row('a', '1.0.0'), capture('b', '2.0.0')]);
+    const F = rowsN(8, 'f');
+    const c1 = cut(T0, [row('a', '1.0.0'), capture('b', '2.0.0'), ...F]);
     writeFeed(feed, man, c1, [c1]);
     const r1 = await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + H });
     assert.equal(r1.outcome, 'accepted'); assert.equal(db.advisoryPinsFeed().digest, c1.digest);
@@ -217,7 +219,7 @@ test('PF8 refresh from a directory: accepted cuts land in the store, a refused o
     assert.equal((await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + H })).outcome, 'same');
 
     // two cuts later, both dated copies present: walked and accepted; 'a' is no longer a pin
-    const c2 = cut(T0 + H, [capture('b', '2.0.0')], c1); const c3 = cut(T0 + 2 * H, [capture('b', '2.0.0'), row('c', '3.0.0')], c2);
+    const c2 = cut(T0 + H, [capture('b', '2.0.0'), ...F], c1); const c3 = cut(T0 + 2 * H, [capture('b', '2.0.0'), row('c', '3.0.0'), ...F], c2);
     writeFeed(feed, man, c3, [c2, c3]);
     const r3 = await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + 3 * H });
     assert.deepEqual([r3.outcome, r3.walked], ['accepted', 1]);
@@ -283,18 +285,18 @@ test('PF10 fetching by URL: https only, plain GETs, no redirects, a size cap', a
 // ------------------------------------------------------------------------------------------------ config, proxy, CLI
 import { validateConfig, ConfigUnreadable } from '../../config-store.js';
 import { createProxyServer } from '../../proxy/server.js';
-import updatePins from '../../cli/commands/update-pins.js';
+import updatePins from '../../cli/commands/update-advisories.js';
 import status from '../../cli/commands/status.js';
 import doctor from '../../cli/commands/doctor.js';
 import { describePinsFeed } from '../../cli/pins-feed.js';
 import { buildSeed, docFor, after, LIVE } from '../seed-v3/u05-fixtures.mjs';
 
-test('PF11 configuration: pins_feed_url must be https; with it set the feed is on unless pins_feed is false', () => {
+test('PF11 configuration: advisory_feed_url must be https; with it set the feed is on unless advisory_feed is false', () => {
   assert.deepEqual(validateConfig({}).pinsFeed, { url: null, enabled: false });
-  assert.deepEqual(validateConfig({ pins_feed_url: 'https://pins.example.org/pins' }).pinsFeed, { url: 'https://pins.example.org/pins', enabled: true });
-  assert.deepEqual(validateConfig({ pins_feed_url: 'https://pins.example.org/pins', pins_feed: false }).pinsFeed.enabled, false);
-  for (const bad of [{ pins_feed_url: 'http://pins.example.org/' }, { pins_feed_url: 'https://u:p@pins.example.org/' },
-    { pins_feed_url: 'https://pins.example.org/?id=1' }, { pins_feed_url: 7 }, { pins_feed: 'yes' }]) {
+  assert.deepEqual(validateConfig({ advisory_feed_url: 'https://pins.example.org/pins' }).pinsFeed, { url: 'https://pins.example.org/pins', enabled: true });
+  assert.deepEqual(validateConfig({ advisory_feed_url: 'https://pins.example.org/pins', advisory_feed: false }).pinsFeed.enabled, false);
+  for (const bad of [{ advisory_feed_url: 'http://pins.example.org/' }, { advisory_feed_url: 'https://u:p@pins.example.org/' },
+    { advisory_feed_url: 'https://pins.example.org/?id=1' }, { advisory_feed_url: 7 }, { advisory_feed: 'yes' }]) {
     assert.throws(() => validateConfig(bad), ConfigUnreadable, JSON.stringify(bad));
   }
 });
@@ -340,8 +342,8 @@ test('PF12 the proxy fetches the feed when it starts: an accepted cut BLOCKs its
     proxy = mk(dirSource(path.join(dir, 'nowhere')));
     const base2 = await listen(proxy);
     await proxy.refreshPinsFeed();
-    assert.equal(lines.filter((l) => l.startsWith('[pins]')).length, 1, lines.join('\n'));
-    assert.match(lines.find((l) => l.startsWith('[pins]')), /pins feed failed: .*the kept cut keeps serving/);
+    assert.equal(lines.filter((l) => l.startsWith('[advisories]')).length, 1, lines.join('\n'));
+    assert.match(lines.find((l) => l.startsWith('[advisories]')), /advisory feed failed: .*the kept cut keeps serving/);
     assert.equal((await hget(`${base2}/q/-/q-1.4.0.tgz`)).status, 403);
   } finally {
     console.error = realErr; await close(proxy); await close(upstream); s.cleanup(); fs.rmSync(dir, { recursive: true, force: true });
@@ -375,7 +377,7 @@ async function inHome(fn) {
 // eslint-disable-next-line no-control-regex
 const plain = (lines) => lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
 
-test('PF14 update-pins: --file reads a directory; a held cut exits 2 and names its digest; --accept-cut takes exactly it', async () => {
+test('PF14 update-advisories: --file reads a directory; a held cut exits 2 and names its digest; --accept-cut takes exactly it', async () => {
   await inHome(async (dir, out) => {
     const feed = path.join(dir, 'feed'); const now = Date.now(); const man = manifest([pinsEntry(PINS, now - 10 * D)]);
     const c1 = cut(now - 9 * D, [row('a', '1.0.0')]);
@@ -388,14 +390,14 @@ test('PF14 update-pins: --file reads a directory; a held cut exits 2 and names i
     writeFeed(feed, man, far, []);
     out.length = 0;
     assert.equal(await updatePins(['--file', feed], { seedKey: SEED.publicKey }), 2);
-    assert.match(plain(out), new RegExp(`HELD: .*more than 7 days[\\s\\S]*update-pins --accept-cut ${far.digest}`));
+    assert.match(plain(out), new RegExp(`HELD: .*more than 7 days[\\s\\S]*update-advisories --accept-cut ${far.digest}`));
     assert.equal(await updatePins(['--file', feed, '--accept-cut', 'abc'], { seedKey: SEED.publicKey }), 1);
     assert.equal(await updatePins(['--file', feed, '--accept-cut', far.digest], { seedKey: SEED.publicKey }), 0);
     const db = openWitnessDB(path.join(dir, 'witness.db'), { readonly: true });
     try { assert.ok(db.advisoryPinFor('b', '1.0.0')); assert.equal(db.advisoryPinFor('a', '1.0.0'), null); } finally { db.close(); }
     out.length = 0;
     assert.equal(await updatePins([]), 1, 'no URL configured and no --file');
-    assert.match(plain(out), /No pins feed configured/);
+    assert.match(plain(out), /No advisory feed configured/);
   });
 });
 
@@ -417,16 +419,16 @@ test('PF15 status and doctor show the cut and its age; past 48 hours, stale, hel
     const db = openWitnessDB(path.join(dir, 'witness.db')); db.applySchema();
     db.replaceAdvisoryPins({ cutAt: iso(Date.now() - 3 * D), digest: 'a'.repeat(64), rows: [] });
     db.close();
-    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ config_version: 1, pins_feed_url: 'https://pins.example.org/pins' }));
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed_url: 'https://pins.example.org/pins' }));
     await status([]);
-    assert.match(plain(out), /Pins feed:\s+cut .* \(3 days old\), 0 versions; older than 48 hours/);
+    assert.match(plain(out), /Advisory feed:\s+cut .* \(3 days old\), 0 versions; older than 48 hours/);
     out.length = 0;
     await status(['--json']);
     const j = JSON.parse(out.join('\n'));
-    assert.equal(j.pins_feed.state, 'old'); assert.equal(j.pins_feed.url, 'https://pins.example.org/pins');
+    assert.equal(j.advisory_feed.state, 'old'); assert.equal(j.advisory_feed.url, 'https://pins.example.org/pins');
     out.length = 0;
     await doctor(['--json']);
-    const pf = JSON.parse(out.join('\n')).find((c) => c.name === 'pins-feed');
+    const pf = JSON.parse(out.join('\n')).find((c) => c.name === 'advisory-feed');
     assert.deepEqual([pf.pass, pf.severity], [false, 'notice']); assert.match(pf.detail, /older than 48 hours/);
   });
 });
@@ -450,5 +452,72 @@ test('PF16 the published key list verifies against the seed key the runtime embe
     const r = await refreshPins({ get: dirSource(feed), db, now: Date.parse('2026-10-30T11:00:00Z') });
     assert.equal(r.outcome, 'refused'); assert.match(r.why, /does not verify/);
     assert.equal(db.advisoryPinsFeed(), null);
+  });
+});
+
+// ------------------------------------------------------------------------------------------------ the removal guard
+const rowsN = (n, prefix = 'r') => Array.from({ length: n }, (_, i) => row(`${prefix}${String(i).padStart(4, '0')}`, '1.0.0'));
+
+test('PF17 a cut removing more than 100 versions, or a quarter of those held (whichever is fewer), or emptying the feed, is HELD', async () => {
+  const now = T0 + 2 * H; const go = (latest, kept, accept = null) => decideCut({ latest, kept: keptOf(kept), loadCut: loaderOf([]), keys: KEYS, now, accept });
+  const big = cut(T0, rowsN(1000));
+  assert.equal((await go(cut(T0 + H, rowsN(1000).slice(100), big), big)).action, 'accept', '100 removed of 1000: within');
+  const h = await go(cut(T0 + H, rowsN(1000).slice(101), big), big);
+  assert.equal(h.action, 'held'); assert.match(h.why, /removes 101 versions \(more than 100/);
+  assert.equal(h.removed.length, 101);
+  const small = cut(T0, rowsN(40));
+  assert.equal((await go(cut(T0 + H, rowsN(40).slice(10), small), small)).action, 'accept', '10 of 40: a quarter');
+  assert.match((await go(cut(T0 + H, rowsN(40).slice(11), small), small)).why, /removes 11 versions \(more than 10/);
+  const empty = cut(T0 + H, [], small);
+  assert.match((await go(empty, small)).why, /empty and would remove all 40/);
+  assert.equal((await go(empty, small, empty.digest)).action, 'accept', '--accept-cut takes it');
+  // an entry moved to another advisory (same name and version) is not a removal
+  const moved = cut(T0 + H, rowsN(40).map((r) => ({ ...r, advisory_id: `GHSA-${r.name}`, also_advisories: [r.advisory_id] })), small);
+  const m = await go(moved, small);
+  assert.deepEqual([m.action, m.removed.length], ['accept', 0]);
+});
+
+test('PF18 a removal hold names, up to 20, the removed versions this proxy BLOCKed in the last 30 days', async () => {
+  await withStore(async (db, dir) => {
+    const feed = path.join(dir, 'feed'); const man = manifest([pinsEntry(PINS, T0 - D)]); const now = Date.now();
+    const base = rowsN(200); const c1 = cut(now - 2 * H, base);
+    writeFeed(feed, man, c1, [c1]);
+    assert.equal((await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now })).outcome, 'accepted');
+    for (let i = 0; i < 25; i++) db.insertGateDecision(`r${String(i).padStart(4, '0')}`, '1.0.0', 'BLOCK', []);
+    db.insertGateDecision('r0199', '1.0.0', 'WARN', []);
+    const c2 = cut(now - H, base.slice(0, 50), c1);       // removes r0050..r0199: 150 versions
+    writeFeed(feed, man, c2, [c1, c2]);
+    const r = await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now });
+    assert.equal(r.outcome, 'held'); assert.match(r.why, /removes 150 versions/);
+    assert.doesNotMatch(r.why, /BLOCKed/, 'none of the removed versions was blocked here');
+    const c3 = cut(now - H + 60e3, base.slice(60), c1);   // removes r0000..r0059: 60 versions (more than 50), 25 blocked here
+    writeFeed(feed, man, c3, [c1, c3]);
+    const r3 = await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: now + 120e3 });
+    assert.equal(r3.outcome, 'held');
+    assert.match(r3.why, /would lift 25 version\(s\) this proxy BLOCKed in the last 30 days: r0000@1\.0\.0, .* and 5 more/);
+    assert.equal((r3.why.match(/r00\d\d@1\.0\.0/g) ?? []).length, 20);
+    assert.equal(db.advisoryPinsFetch().why, r3.why);
+  });
+});
+
+test('PF19 the newest cut is checked with its dated signature, so a cached old latest.jsonl.sig does not refuse it', async () => {
+  await withStore(async (db, dir) => {
+    const feed = path.join(dir, 'feed'); const man = manifest([pinsEntry()]);
+    const c1 = cut(T0, rowsN(8)); const c2 = cut(T0 + H, rowsN(8).concat(row('z', '1.0.0')), c1);
+    writeFeed(feed, man, c1, [c1]);
+    assert.equal((await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + 2 * H })).outcome, 'accepted');
+    writeFeed(feed, man, c2, [c1, c2]);
+    fs.writeFileSync(path.join(feed, 'latest.jsonl.sig'), c1.sig);          // a cache still serving the previous signature
+    assert.equal((await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + 2 * H })).outcome, 'accepted');
+    assert.equal(db.advisoryPinsFeed().digest, c2.digest);
+    // no dated signature yet: latest.jsonl.sig is used, and still verified
+    const c3 = cut(T0 + 2 * H, rowsN(8), c2);
+    writeFeed(feed, man, c3, [c3]); fs.rmSync(path.join(feed, 'cuts', `${stampOf(c3.head.cut_at)}.jsonl.sig`));
+    assert.equal((await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + 3 * H })).outcome, 'accepted');
+    const c4 = cut(T0 + 3 * H, rowsN(8), c3);
+    writeFeed(feed, man, c4, [c4]); fs.rmSync(path.join(feed, 'cuts', `${stampOf(c4.head.cut_at)}.jsonl.sig`));
+    fs.writeFileSync(path.join(feed, 'latest.jsonl.sig'), c3.sig);
+    const r4 = await refreshPins({ get: dirSource(feed), db, seedKey: SEED.publicKey, now: T0 + 4 * H });
+    assert.equal(r4.outcome, 'refused'); assert.equal(db.advisoryPinsFeed().digest, c3.digest);
   });
 });

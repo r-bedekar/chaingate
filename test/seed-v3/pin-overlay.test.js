@@ -141,3 +141,37 @@ test('PO5 check reads the same overlay the proxy uses: an overlay pin is a BLOCK
     assert.deepEqual(r.record.decision.pin, { origin: 'feed', source: 'chaingate-analyst', advisory_id: 'CG-2026-0001', record_id: 'rec-17' });
   } finally { s.cleanup(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ------------------------------------------------------------------------------------------------ capture integrity
+test('PO6 a capture pin is compared with the registry integrity: matches, differs or absent is recorded; the BLOCK stands in all three', () => {
+  const s = buildSeed({ layout: '1.1' }); const seed = openFixtureSeed(s.dbPath);
+  try {
+    const SRI = `sha512-${'A+/b'.repeat(21)}AB==`; const OTHER = `sha512-${'Zz09'.repeat(21)}AB==`;
+    const capture = { ...ROW, advisory_id: 'CHAINGATE-0123456789abcdef', evidence_json: JSON.stringify({ kind: 'capture', sha256: 'a'.repeat(64),
+      dist_integrity: SRI, also_advisories: [] }), feed_cut_at: CUT };
+    const pinOverlay = (p, v) => (p === 'q' && v === '1.4.0' ? capture : null);
+    const run = (integrity) => {
+      const doc = docFor('q', [['1.4.0', after(1)]]);
+      if (integrity !== undefined) doc.versions['1.4.0'].dist = { ...(doc.versions['1.4.0'].dist ?? {}), integrity };
+      else if (doc.versions['1.4.0'].dist) delete doc.versions['1.4.0'].dist.integrity;
+      return G.evaluateCandidate(seed, { config: LIVE, domainVersionCount: 'from-packument', pinOverlay }, inputFromPackument(doc, 'q', '1.4.0')).decision;
+    };
+    const words = { matches: /; the registry integrity matches the analysed tarball$/,
+      differs: /; WARNING: the registry's integrity for this version differs from the analysed tarball$/, absent: /; no integrity in the metadata$/ };
+    for (const [integrity, want] of [[SRI, 'matches'], [`${OTHER} sha1-abc=`, 'differs'], [`sha1-abc= ${SRI}`, 'matches'], [undefined, 'absent']]) {
+      const d = run(integrity);
+      assert.equal(d.disposition, 'BLOCK', want);
+      assert.equal(d.pin.integrity, want);
+      assert.match(d.results.find((x) => x.gate === POL.PIN_GATE).detail, words[want]);
+    }
+    // an advisory pin (not a capture) carries no comparison
+    const adv = G.evaluateCandidate(seed, { config: LIVE, domainVersionCount: 'from-packument', pinOverlay: () => ({ ...ROW, source: 'osv',
+      advisory_id: 'MAL-2026-1', evidence_json: JSON.stringify({ kind: 'advisory', advisory_id: 'MAL-2026-1' }), feed_cut_at: CUT }) },
+    inputFromPackument(docFor('q', [['1.4.0', after(1)]]), 'q', '1.4.0')).decision;
+    assert.equal(adv.pin.integrity, undefined);
+    // the runner keeps the member; a bad value is dropped with the whole member
+    const gate = G.createSeedV3Gate({ seed, config: LIVE, domainVersionCount: 'from-packument', pinOverlay });
+    const r = createGateRunner({ modules: [gate] })({ ...inputFromPackument(docFor('q', [['1.4.0', after(1)]]), 'q', '1.4.0'), history: [] });
+    assert.ok(['matches', 'differs', 'absent'].includes(r.results[0].pin.integrity));
+  } finally { seed.close(); s.cleanup(); }
+});
