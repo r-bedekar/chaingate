@@ -1,0 +1,337 @@
+{
+ "version": "lineage-tag-family-cases-0.3",
+ "about": "0.3 (operator ruling 2026-10-29, the narrow platform rule): the 0.2 family, unchanged, then, when the prerelease names a platform, '@' and its platform tokens. The 0.2 family: drop build metadata (after the first '+'); no '-' => 'release'; otherwise the prerelease is everything after the first '-': a first identifier (up to the first '.') that is lower-case hex [0-9a-f], 7 to 40 characters, with at least one digit => 'num' (a commit hash); else the leading run of ASCII letters [A-Za-z]+, lower-cased; no leading letter => 'num'. The platform tokens: split the prerelease on '.' and '-', lower-case each token, keep the tokens that are exactly one of platform_tokens, each once, in order of first appearance, joined by '-'. None => the 0.2 family alone. 'release' never gains a suffix. So executor's 15 KB shim 2.0.0-beta.25 is 'beta' and its 480 MB build 2.0.0-beta.25-darwin-arm64 is 'beta@darwin-arm64': a platform build's predecessor is the previous build for the same platform. platform_tokens is closed: a new token is a new fixture version.",
+ "platform_tokens": [
+  "aarch64",
+  "aix",
+  "amd64",
+  "android",
+  "arm",
+  "arm64",
+  "armhf",
+  "armv6",
+  "armv6l",
+  "armv7",
+  "armv7l",
+  "cygwin",
+  "darwin",
+  "freebsd",
+  "glibc",
+  "gnu",
+  "gnueabihf",
+  "ia32",
+  "ios",
+  "linux",
+  "loong64",
+  "mac",
+  "macos",
+  "mingw",
+  "mips",
+  "mips64el",
+  "mipsel",
+  "msvc",
+  "musl",
+  "musleabihf",
+  "netbsd",
+  "ohos",
+  "openbsd",
+  "osx",
+  "ppc",
+  "ppc64",
+  "ppc64le",
+  "riscv64",
+  "s390",
+  "s390x",
+  "sunos",
+  "universal",
+  "wasm32",
+  "win",
+  "win32",
+  "win64",
+  "windows",
+  "x64",
+  "x86"
+ ],
+ "cases": [
+  {
+   "version": "1.0.0",
+   "family": "release",
+   "note": "no prerelease"
+  },
+  {
+   "version": "1.0.0+build.5",
+   "family": "release",
+   "note": "build metadata ignored"
+  },
+  {
+   "version": "1.0.0-alpha",
+   "family": "alpha",
+   "note": ""
+  },
+  {
+   "version": "1.0.0-alpha.1",
+   "family": "alpha",
+   "note": "first identifier"
+  },
+  {
+   "version": "1.0.0-beta.9",
+   "family": "beta",
+   "note": ""
+  },
+  {
+   "version": "1.0.0-rc.1",
+   "family": "rc",
+   "note": ""
+  },
+  {
+   "version": "1.0.0-RC.1",
+   "family": "rc",
+   "note": "case folded to lower"
+  },
+  {
+   "version": "1.0.0-Beta2",
+   "family": "beta",
+   "note": "alphabetic prefix only; trailing digits dropped"
+  },
+  {
+   "version": "1.0.0-beta2.3",
+   "family": "beta",
+   "note": ""
+  },
+  {
+   "version": "1.0.0-rc.1+sha.abc",
+   "family": "rc",
+   "note": "build metadata ignored"
+  },
+  {
+   "version": "1.0.0-alpha-FX-1981.12",
+   "family": "alpha",
+   "note": "prefix stops at the first non-letter, '-' included"
+  },
+  {
+   "version": "8.0.0-rc.15-dev.108",
+   "family": "rc",
+   "note": "only the first identifier counts (prisma GitHub Actions line)"
+  },
+  {
+   "version": "8.1.0-dev.8",
+   "family": "dev",
+   "note": "prisma prismabot line"
+  },
+  {
+   "version": "1.0.0-canary-20250407-10a9b42",
+   "family": "canary",
+   "note": ""
+  },
+  {
+   "version": "1.0.0-0",
+   "family": "num",
+   "note": "no alphabetic prefix: all numeric-first prereleases share one family 'num'"
+  },
+  {
+   "version": "1.0.0-1",
+   "family": "num",
+   "note": "same"
+  },
+  {
+   "version": "1.0.0-20251001.1",
+   "family": "num",
+   "note": "same"
+  },
+  {
+   "version": "1.0.0-1a",
+   "family": "num",
+   "note": "starts with a digit: 'num', the 'a' is not read"
+  },
+  {
+   "version": "1.0.0-x.7.z.92",
+   "family": "x",
+   "note": ""
+  },
+  {
+   "version": "0.0.0-stage",
+   "family": "stage",
+   "note": "stub names are excluded earlier by E4, not here"
+  },
+  {
+   "version": "1.0.0-0.3.7",
+   "family": "num",
+   "note": ""
+  },
+  {
+   "version": "1.0.0--a",
+   "family": "num",
+   "note": "an empty-then-dash identifier has no alphabetic prefix"
+  },
+  {
+   "version": "0.0.0-a132b82",
+   "family": "num",
+   "note": "MEASURED 0.2: 7-char lower-case hex with a digit"
+  },
+  {
+   "version": "1.2.1-d33b9fcd",
+   "family": "num",
+   "note": "MEASURED 0.2: 8-char hex"
+  },
+  {
+   "version": "3.1.1-af8e5c6",
+   "family": "num",
+   "note": "MEASURED 0.2"
+  },
+  {
+   "version": "1.0.0-271588f2c0ffee1234567890abcdef1234567890",
+   "family": "num",
+   "note": "MEASURED 0.2: 40-char hex (upper bound)"
+  },
+  {
+   "version": "1.0.0-abcdef0123456789abcdef0123456789abcdef0123",
+   "family": "abcdef",
+   "note": "MEASURED 0.2: 42 chars, over 40, not a hash: letter prefix"
+  },
+  {
+   "version": "1.0.0-abc1234.5",
+   "family": "num",
+   "note": "MEASURED 0.2: only the first identifier is tested"
+  },
+  {
+   "version": "1.0.0-abc123",
+   "family": "abc",
+   "note": "MEASURED 0.2: 6 chars, under 7: letter prefix"
+  },
+  {
+   "version": "1.0.0-deadbeef",
+   "family": "deadbeef",
+   "note": "MEASURED 0.2: hex but no digit: letter prefix"
+  },
+  {
+   "version": "1.0.0-A132B82",
+   "family": "a",
+   "note": "MEASURED 0.2: upper-case hex is not the hash form: letter prefix, lower-cased"
+  },
+  {
+   "version": "1.0.0-a132b82-linux",
+   "family": "a@linux",
+   "note": "MEASURED 0.2: first identifier 'a132b82-linux' is not pure hex; 0.3: was 'a' in 0.2, now gains its platform token"
+  },
+  {
+   "version": "1.0.0-a132b82+build.7",
+   "family": "num",
+   "note": "MEASURED 0.2: build metadata stripped first"
+  },
+  {
+   "version": "0.0.0-fix-build.1",
+   "family": "fix",
+   "note": "MEASURED: a branch-name tag is its own family"
+  },
+  {
+   "version": "2.0.0-beta.25",
+   "family": "beta",
+   "note": "MEASURED 0.3: executor shim (14,033 B)"
+  },
+  {
+   "version": "2.0.0-beta.25-darwin-arm64",
+   "family": "beta@darwin-arm64",
+   "note": "MEASURED 0.3: executor platform build (480 MB); its predecessor is the previous darwin-arm64 build, never the shim"
+  },
+  {
+   "version": "2.0.0-beta.25-darwin-x64",
+   "family": "beta@darwin-x64",
+   "note": "MEASURED 0.3: executor"
+  },
+  {
+   "version": "2.0.0-beta.25-linux-arm64",
+   "family": "beta@linux-arm64",
+   "note": "MEASURED 0.3: executor"
+  },
+  {
+   "version": "2.0.0-beta.25-linux-x64",
+   "family": "beta@linux-x64",
+   "note": "MEASURED 0.3: executor"
+  },
+  {
+   "version": "2.0.0-beta.25-win32-x64",
+   "family": "beta@win32-x64",
+   "note": "MEASURED 0.3: executor"
+  },
+  {
+   "version": "2.0.0-beta.32-darwin-arm64",
+   "family": "beta@darwin-arm64",
+   "note": "the triage case of 2026-10-29"
+  },
+  {
+   "version": "0.164.0-alpha.3",
+   "family": "alpha",
+   "note": "MEASURED 0.3: @openai/codex shim (13,262 B)"
+  },
+  {
+   "version": "0.164.0-alpha.3-darwin-arm64",
+   "family": "alpha@darwin-arm64",
+   "note": "MEASURED 0.3: @openai/codex platform build"
+  },
+  {
+   "version": "0.164.0-alpha.3-linux-x64",
+   "family": "alpha@linux-x64",
+   "note": "MEASURED 0.3: @openai/codex"
+  },
+  {
+   "version": "0.164.0-alpha.3-win32-arm64",
+   "family": "alpha@win32-arm64",
+   "note": "MEASURED 0.3: @openai/codex"
+  },
+  {
+   "version": "1.0.0-linux-x64-musl",
+   "family": "linux@linux-x64-musl",
+   "note": "libc token kept, in order"
+  },
+  {
+   "version": "1.0.0-beta.1-Darwin-ARM64",
+   "family": "beta@darwin-arm64",
+   "note": "tokens lower-cased before the match"
+  },
+  {
+   "version": "1.0.0-beta.1-linux-x64-linux",
+   "family": "beta@linux-x64",
+   "note": "each token once, at its first appearance"
+  },
+  {
+   "version": "1.0.0-linux-x64",
+   "family": "linux@linux-x64",
+   "note": "a platform-first prerelease keeps its 0.2 family as the prefix"
+  },
+  {
+   "version": "1.0.0-0.linux",
+   "family": "num@linux",
+   "note": "numeric-first: num, then the platform"
+  },
+  {
+   "version": "1.0.0-beta.1+linux-x64",
+   "family": "beta",
+   "note": "build metadata dropped before anything is read"
+  },
+  {
+   "version": "1.0.0+linux",
+   "family": "release",
+   "note": "a release never gains a suffix"
+  },
+  {
+   "version": "1.0.0-rc.1-linuxbrew",
+   "family": "rc",
+   "note": "whole tokens only: linuxbrew is not linux"
+  },
+  {
+   "version": "1.0.0-x86_64",
+   "family": "x",
+   "note": "not valid semver ('_'); read as written: x86_64 is not a token"
+  },
+  {
+   "version": "19.0.0-canary-8a0e3b5c-20240501",
+   "family": "canary",
+   "note": "no platform token: the 0.2 family (one canary line, not one family per hash)"
+  },
+  {
+   "version": "1.0.0-armada.1",
+   "family": "armada",
+   "note": "whole tokens only: armada is not arm"
+  }
+ ]
+}

@@ -141,7 +141,8 @@ test('R1 a 1.2 seed is accepted only with every pipeline-key identifier together
   assert.equal(ok.ok, true, JSON.stringify(ok.checks));
   assert.equal(ok.meta.seed_contract_version, 'cft-seed-v3-contract-1.2');
   assert.ok(R.SUPPORTED_SEED_CONTRACT_VERSIONS.includes('cft-seed-v3-contract-1.2'));
-  assert.deepEqual(R.SUPPORTED_RULE_VERSIONS.channel_a, [OLD_A, PIPEKEY_A]);
+  // changed with tag family 0.3: the 1.3 stamp is supported too, read only from a 1.3 seed (seed-contract-1-3.test.js)
+  assert.deepEqual(R.SUPPORTED_RULE_VERSIONS.channel_a, [OLD_A, PIPEKEY_A, `${PIPEKEY_A}+platfam1`]);
   for (const [key, bad] of [
     ['lineage_rule_version', 'fu2-final+e1e4e5'],
     ['stub_detector_effective_at', '2026-10-14T22:00:00+00:00'],

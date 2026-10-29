@@ -29,7 +29,12 @@ const META_1_2 = {
   storage_layout: 'wr1/noeidx/p8k/pinname1/xlink1',
   tag_family_fixture: '{"sha256":"f4be8bc5ab9eaeb5a59eef8c4f206483cfc545a3aba8e90437fde21c542a7061","version":"lineage-tag-family-cases-0.2"}',
 };
-const META_1_3 = { ...META_1_2, contract_version: C13, lineage_id_rule: 'pkg4096-1' };
+// changed with tag family 0.3: a 1.3 seed carries its own lineage pair (+platfam1, fixture 0.3, channel_a ...+platfam1)
+const PLATFAM_A = `${PIPEKEY_A}+platfam1`;
+const META_1_3 = { ...META_1_2, contract_version: C13, lineage_id_rule: 'pkg4096-1',
+  lineage_rule_version: 'fu2-final+e1e4e5+pipekey1+stubpred1+platfam1',
+  rule_versions: JSON.stringify({ channel_a: PLATFAM_A, dac_trajectory: 'dac-trajectory-1.0' }),
+  tag_family_fixture: '{"sha256":"82f551e75df644954b7813dc6fcb804369f67e0c565b3e318ccf31d8971ffe37","version":"lineage-tag-family-cases-0.3"}' };
 // the 1.2 / 1.3 layout (writer.py SCHEMA_SQL): 1.3 changes no table
 const SCHEMA = `
 CREATE TABLE packages (id INTEGER PRIMARY KEY, package_name TEXT NOT NULL UNIQUE, latest_version TEXT,
@@ -140,6 +145,11 @@ test('C2 the id rule is checked on the rows and the 1.2 identifiers still bind: 
   }
   refused(buildSeed(ONE, [], { meta: { ...META_1_3, rule_versions: JSON.stringify({ channel_a: 'infra5d-1.2+fu2final+norm1+sizeshrink', dac_trajectory: 'dac-trajectory-1.0' }) } }),
     'a 1.3 seed without the pipeline-key rule');
+  // each contract reads only under its own lineage pair: a crossed identifier is refused either way
+  for (const key of ['lineage_rule_version', 'rule_versions', 'tag_family_fixture']) {
+    refused(buildSeed(ONE, [], { meta: { ...META_1_3, [key]: META_1_2[key] } }), `a 1.3 seed with the 1.2 ${key}`);
+    refused(buildSeed(ONE, [], { meta: { ...META_1_2, [key]: META_1_3[key] }, pid: 1, lid: (ord) => ord + 1 }), `a 1.2 seed with the 1.3 ${key}`);
+  }
   assert.equal(R.verify(buildSeed(ONE, [], { meta: META_1_2, pid: 1, lid: (ord) => ord + 1 }), DEV).ok, true, 'a 1.2 seed reads as before');
 });
 
@@ -170,6 +180,22 @@ test('C3 placement and Channel-A on a 1.3 seed are those of the 1.2 seed of the 
   }
   assert.equal(results[0].pred, '2.1.0-beta.1');
   assert.deepEqual(results[0], results[1], 'the same answer under 1.3 ids and 1.2 ids');
+});
+
+test('C6 a 1.3 seed places a platform build by tag family 0.3, a 1.2 seed by 0.2', () => {
+  const chains = [{ key: '2', family: 'beta', rows: [['2.0.0-beta.24', 1767225600]] },
+    { key: '2', family: 'beta@darwin-arm64', rows: [['2.0.0-beta.24-darwin-arm64', 1767225600]] }];
+  const s13 = R.openSeed(buildSeed(chains), DEV);
+  try {
+    const p = G.resolvePlacement(s13, 'p', '2.0.0-beta.25-darwin-arm64', 1767225800);
+    assert.deepEqual([p.kind, p.lineage_id], ['append', lid13(1)]);
+    assert.equal(G.resolvePlacement(s13, 'p', '2.0.0-beta.25', 1767225800).lineage_id, lid13(0));
+  } finally { s13.close(); }
+  const s12 = R.openSeed(buildSeed(chains.slice(0, 1), [], { meta: META_1_2, pid: 1, lid: (ord) => ord + 1 }), DEV);
+  try {
+    const p = G.resolvePlacement(s12, 'p', '2.0.0-beta.25-darwin-arm64', 1767225800);
+    assert.deepEqual([p.kind, p.lineage_id], ['append', 1]);
+  } finally { s12.close(); }
 });
 
 test('C4 a 1.3 seed finds a pin by NAME, represented or not', () => {

@@ -30,6 +30,18 @@
   "reason": "raw_bytes_max (the root is validly signed and names these bytes)"
  },
  {
+  "name": "bucket-rl1-row-changed",
+  "replaces": [
+   "buckets/00003.db.gz",
+   "root.json",
+   "root.json.gz",
+   "root.json.sig"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "rl1_digest (the root is validly signed, names these bytes and their logical digest: only the rl1 check refuses)"
+ },
+ {
   "name": "root-changed-after-signing",
   "replaces": [
    "root.json",

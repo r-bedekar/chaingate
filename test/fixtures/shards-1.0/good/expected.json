@@ -9,6 +9,23 @@
   "pkg-f": 5,
   "pkg-gone": 3
  },
+ "buckets_with_packages_and_no_rl1": [
+  0,
+  2,
+  4,
+  5
+ ],
+ "lineage_pair": {
+  "lineage_rule_version": "fu2-final+e1e4e5+pipekey1+stubpred1+platfam1",
+  "rule_versions": {
+   "channel_a": "infra5d-1.2+fu2final+norm1+sizeshrink+pipekey1+platfam1",
+   "dac_trajectory": "dac-trajectory-1.0"
+  },
+  "tag_family_fixture": {
+   "sha256": "82f551e75df644954b7813dc6fcb804369f67e0c565b3e318ccf31d8971ffe37",
+   "version": "lineage-tag-family-cases-0.3"
+  }
+ },
  "now": "2026-10-29T12:00:00Z",
  "pins": [
   [
@@ -20,6 +37,9 @@
    "6.6.6"
   ]
  ],
- "seed_logical_digest": "fdf30828855241c79c08332471ca24e9d3150d0e5ce3124239e86043e80b9e56",
- "signing_key_id": "ed25519:f96ebc12c69f735e"
+ "rl1_buckets": [
+  3
+ ],
+ "seed_logical_digest": "dce04b8b17556ec1521421d7bfad0e3a9bb2549607ebfbb09a5c3113140dbff7",
+ "signing_key_id": "ed25519:66631930959fee1f"
 }

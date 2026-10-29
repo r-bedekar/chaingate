@@ -4,6 +4,7 @@
 // order: its size, its sha256, one gzip stream under raw_bytes_max, staged in a temporary database, its logical digest, read
 // layout, bucket rule and lineage ids, then imported in one transaction. The fixture is the seed lane's signed toy set (per-run
 // keys, public keys only; bucket_bits 3, so these tests pass bits 3 and production refuses anything but 14), loaded unchanged.
+// Its second version carries the contract 1.3 lineage pair (tag family 0.3) and read-layout rows in bucket 3.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -18,7 +19,7 @@ import L from '../../seed/v3/logical.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'shards-1.0');
 const sums = fs.readFileSync(path.join(FIX, 'SHA256SUMS'));
-assert.equal(crypto.createHash('sha256').update(sums).digest('hex'), 'ea74447db0baaaa9f1ec2d4e2fd6fbcbc7b81916480555f939ef04dc4bfed574');
+assert.equal(crypto.createHash('sha256').update(sums).digest('hex'), '1051afd9abd133d75616d5a89ad3b466f6269c8a6cbaf3c3e6a0f0e460201f91');
 for (const line of sums.toString('ascii').trim().split('\n')) {
   const [h, f] = line.split(/\s+/);
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(FIX, f))).digest('hex'), h, `${f} is the seed lane's, unchanged`);
@@ -69,10 +70,10 @@ test('SH2 every bucket verifies and imports whole; all eight give the full seed\
 
 const WHY = {
   gz_sha256: /gz_sha256/, gz_bytes: /gz_bytes/, raw_bytes_max: /raw_bytes_max/, 'root signature': /root signature/,
-  canonical: /canonical/, 'key manifest signature': /key manifest signature/, 'shards key': /shards key/, 'valid at': /valid at/,
+  rl1_digest: /rl1_digest differs from the root/, canonical: /canonical/, 'key manifest signature': /key manifest signature/, 'shards key': /shards key/, 'valid at': /valid at/,
 };
 test('SH3 every refusal case of the fixture is refused, for its stated reason, and nothing of a refused bucket is imported', () => {
-  assert.equal(CASES.length, 10);
+  assert.equal(CASES.length, 11);
   for (const c of CASES) {
     const re = Object.entries(WHY).find(([k]) => c.reason.startsWith(k))?.[1];
     assert.ok(re, `a pattern for ${c.reason}`);

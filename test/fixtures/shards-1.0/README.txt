@@ -1,8 +1,9 @@
-Signed toy shards fixture (seed shards 1.0, contract 1.3). FIXTURE KEYS ONLY, generated per run; only public keys here.
+Signed toy shards fixture v2 (seed shards 1.0, contract 1.3, lineage pair +platfam1, read layout g10-rl1). FIXTURE KEYS ONLY, generated per run; only public keys here.
 good/: root.json (canonical), root.json.gz, root.json.sig (raw Ed25519 by the shards key over the ASCII sha256 hex
 of root.json), buckets/NNNNN.db.gz (8 buckets, bucket_bits 3: a production reader refuses anything but 14),
 keys.json + keys.json.sig (pins-keys-1.0 form, role shards, signed by the fixture seed key), fixture-seed-pub.pem,
-expected.json (the reader's time, bucket of each name, the pins, the full seed logical digest).
+expected.json (the reader's time, bucket of each name, the pins, the full seed logical digest, the lineage pair, the
+bucket holding rl1 rows (pkg-a's) and the held buckets with none).
 Root: canonical bytes; keys.json verifies under the seed key; a shards key valid at the time whose key_id the root
 names and matches its spki; the signature verifies. Bucket: gz_bytes bound, gz_sha256, decompress under
 raw_bytes_max as one gzip stream, stage, logical digest and bucket rule, then import whole.
