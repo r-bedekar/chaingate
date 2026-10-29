@@ -96,8 +96,9 @@ function logicalDigestOfDb(dbOrPath) {
 }
 
 /** The same canon over the given tables in the given order (seed shards: a bucket's tables, its read-layout rows last). A table
- *  that does not exist is skipped when `optional` names it. */
-function digestTables(dbOrPath, tables, order, optional = OPTIONAL_TABLES) {
+ *  that does not exist is skipped when `optional` names it. `where` (seed shards: one bucket's rows inside a cache) maps a table
+ *  to a condition on its rows, with its named parameters in `params`. */
+function digestTables(dbOrPath, tables, order, optional = OPTIONAL_TABLES, { where = {}, params = {} } = {}) {
   const owned = typeof dbOrPath === 'string';
   const db = owned ? new Database(dbOrPath, { readonly: true, fileMustExist: true }) : dbOrPath;
   // Without this, better-sqlite3 silently rounds an INTEGER beyond 2^53-1 to a double — 9007199254740993
@@ -110,9 +111,9 @@ function digestTables(dbOrPath, tables, order, optional = OPTIONAL_TABLES) {
       if (!cols.length && optional.has(t)) continue;
       const names = cols.map((c) => c.name);
       const real = new Set(cols.filter((c) => String(c.type).toUpperCase().includes('REAL')).map((c) => c.name));
-      const stmt = db.prepare(`SELECT ${names.join(', ')} FROM ${t} ORDER BY ${order[t]}`);
+      const stmt = db.prepare(`SELECT ${names.join(', ')} FROM ${t}${where[t] ? ` WHERE ${where[t]}` : ''} ORDER BY ${order[t]}`);
       stmt.raw(true);
-      for (const row of stmt.iterate()) {
+      for (const row of (where[t] ? stmt.iterate(params) : stmt.iterate())) {
         const parts = row.map((v, i) => jsonValue(v, real.has(names[i])));
         h.update(`[${JSON.stringify(t)},[${parts.join(',')}]]\n`, 'utf8');
       }

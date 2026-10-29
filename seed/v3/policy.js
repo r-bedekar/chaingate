@@ -206,6 +206,7 @@ function pinBlockRow(pin, pkg, version) {
 const pinFailedRow = (err) => r(PIN_GATE, SKIP,
   `advisory pin lookup FAILED (${reasonOf(err)}): whether an advisory names this version is NOT known`);
 const pinLookupMissing = (err) => ({ where: 'policy', name: 'pin_lookup', reason: reasonOf(err) });
+const pinUncoveredRow = (why) => r(PIN_GATE, SKIP, `not checked: ${why}; whether the seed records an advisory for this version is NOT known`);
 const inputResult = (choice) => (choice === 'BLOCK' ? BLOCK : (choice === 'WARN' ? WARN : SKIP));
 
 /** The gate runner's aggregation, unchanged: any BLOCK -> BLOCK, else any WARN -> WARN, else ALLOW. */
@@ -300,6 +301,9 @@ function staleSeedRow(st) {
 function decide(finding, ctx = {}) {
   const { pin = null, refusal = null, override = null } = ctx;
   const pinLookupError = pin ? null : (ctx.pinLookupError ?? null);
+  // since 0.1.6, a seed cache: the seed could not answer for this package (its bucket is not held), and the root's age
+  const pinUncovered = pin || pinLookupError ? null : (ctx.pinUncovered ?? null);
+  const cacheStaleRow = ctx.cacheStale ? r('seed-v3:coverage', SKIP, ctx.cacheStale) : null;
   const config = normaliseConfig(ctx.config || {});
   const base = {
     placement: null,
@@ -342,9 +346,12 @@ function decide(finding, ctx = {}) {
     const results = [];
     if (pin) results.push(pinBlockRow(pin, base.package, base.version));
     else if (pinLookupError) results.push(pinFailedRow(pinLookupError));
+    else if (pinUncovered) results.push(pinUncoveredRow(pinUncovered));
     results.push(r('seed-v3:input', inputResult(choice), detail));
+    if (cacheStaleRow) results.push(cacheStaleRow);
     const notEvaluated = [{ where: 'policy', name, reason: detail }];
     if (pinLookupError) notEvaluated.push(pinLookupMissing(pinLookupError));
+    if (pinUncovered) notEvaluated.push({ where: 'policy', name: 'pin', reason: pinUncovered });
     return {
       ...base,
       // A pin is a recorded fact and stands on its own, as it does when nothing was evaluated.
@@ -391,6 +398,9 @@ function decide(finding, ctx = {}) {
     results.push(r('seed-v3:input', inputResult(config.on_unusable_input),
       `advisory pin lookup FAILED (${reasonOf(pinLookupError)}); on_unusable_input decides it`));
     policyMissing.push(pinLookupMissing(pinLookupError));
+  } else if (pinUncovered) {
+    results.push(pinUncoveredRow(pinUncovered));
+    policyMissing.push({ where: 'policy', name: 'pin', reason: pinUncovered });
   } else {
     results.push(r(PIN_GATE, ALLOW, 'no recorded advisory pins this version'));
   }
@@ -413,6 +423,7 @@ function decide(finding, ctx = {}) {
   //     publication times to count from it says "not checked" rather than implying k = 0.
   const stale = staleSeedRow(ctx.staleSeed);
   if (stale) results.push(stale);
+  if (cacheStaleRow) results.push(cacheStaleRow);
 
   // 3c. RE-TIER (cft-policy-1.3, 0.1.6). Only a strict WARN can move, only to NOTE.
   const rt = retierRows(results, ctx.retier ?? null);
@@ -423,8 +434,10 @@ function decide(finding, ctx = {}) {
   //    disposition itself is an open question rather than an ALLOW by default.
   // What counts as "something was evaluated" must ignore a Channel-A aggregate the placement just
   // invalidated, or an unplaced release would look evidenced when only the discarded half was.
-  const evaluatedAnything = (channelAUsable && finding.channel_a.n_evaluable > 0)
-    || finding.dac_trajectory.n_evaluable > 0;
+  // A seed cache that does not hold the package's bucket checked neither its history nor its recorded advisories: whatever the
+  // registry document alone allowed, the no-evidence choice decides it, as for a package with nothing evaluated.
+  const evaluatedAnything = !pinUncovered && ((channelAUsable && finding.channel_a.n_evaluable > 0)
+    || finding.dac_trajectory.n_evaluable > 0);
   if (missing.length) {
     const reasons = [...new Set(missing.map((m) => m.reason))].sort();
     results.push(r('seed-v3:coverage', SKIP,
@@ -440,7 +453,8 @@ function decide(finding, ctx = {}) {
       // A pin is a recorded fact and stands on its own even with no history to evaluate.
       disposition = pin ? BLOCK : null;
     } else if (choice === WARN) {
-      results.push(r('seed-v3:coverage', WARN, 'nothing in this finding was evaluated'));
+      results.push(r('seed-v3:coverage', WARN, pinUncovered
+        ? `${pinUncovered}: neither its history nor its recorded advisories were checked` : 'nothing in this finding was evaluated'));
       disposition = aggregate(results);
     }
     // ALLOW: the gate runner's fail-open, chosen explicitly by an operator rather than arrived at by omission.
@@ -491,6 +505,15 @@ function lookupPin(seed, packageName, version, overlay = null) {
     return { pin: null, error: null, attempted: false };
   }
   try {
+    // since 0.1.6, a seed cache: a package whose bucket it does not hold has no seed answer, which is not "no pin"; the feed is
+    // still read. A held bucket whose rows no longer match the root fails the lookup.
+    const unheld = seed.uncoveredReason?.(packageName) ?? null;
+    if (unheld) {
+      const feedOnly = typeof overlay === 'function' ? overlay(packageName, version) : null;
+      return feedOnly ? { pin: { ...feedOnly, origin: 'feed' }, error: null, attempted: true }
+        : { pin: null, error: null, attempted: true, uncovered: unheld };
+    }
+    seed.touch?.(packageName);
     const seedPin = pinFor(seed, packageName, version);
     if (seedPin) return { pin: { ...seedPin, origin: 'seed' }, error: null, attempted: true };
     // since 0.1.6: the pins feed overlay, read after the seed; a throw is a FAILED lookup like the seed's own

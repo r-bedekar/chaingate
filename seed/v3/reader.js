@@ -9,6 +9,7 @@ import Database from 'better-sqlite3';
 import K from './contract.js';
 import C from './checker.js';
 import RL from './read-layout.js';
+import SH from './shards.js';
 import { pyStrip } from './normalize.js';
 import { CAPS, FileRefused, openRegular, readBounded, readBoundedIfPresent, sha256Regular } from './bounded-file.js';
 
@@ -228,12 +229,18 @@ function resolvePubkey({ pubkeyPath = null, pubkey = null }) {
   return null;
 }
 
-function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey = null, expect = null, verifyDigest = true } = {}) {
+const DAY_MS = 24 * 3600e3;
+/** A seed cache whose root is older than this states it on every decision. */
+const SHARD_ROOT_STALE_DAYS = 7;
+
+// `shardBits` and `now` exist for the seed shards tests (a toy root of 3 bits; a fixed clock); production passes neither.
+function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey = null, expect = null, verifyDigest = true,
+  shardBits = SH.BUCKET_BITS, now = Date.now } = {}) {
   let trustedKey = null;
   let trustedKeyError = null;
   try { trustedKey = resolvePubkey({ pubkeyPath, pubkey }); } catch (e) { trustedKeyError = `${e.name}: ${e.message}`; }
   if (!TRUST_MODES.includes(trust)) throw new Error(`trust must be one of ${JSON.stringify(TRUST_MODES)}`);
-  const checks = {}; let meta = {}; let readLayout = null;
+  const checks = {}; let meta = {}; let readLayout = null; let cache = null;
   const base = { trust_mode: trust, authenticated: false, path: String(dbPath) };
   if (!fs.existsSync(dbPath)) return { ...base, ok: false, checks: { present: `no such file: ${dbPath}` }, meta: {} };
   checks.present = true;
@@ -253,6 +260,16 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
       return { ...base, ok: false, meta: {}, checks: { ...checks, readable_sqlite: `not a readable SQLite database: ${e.message}` } };
     }
     checks.readable_sqlite = true;
+    // Since 0.1.6: a seed cache (seed shards 1.0) holds some buckets of one signed root and is checked on that root, not on a
+    // file digest and signature: see shards.js checkCache. Its rows are re-hashed per bucket at the first lookup (Seed).
+    if (tables.has('shard_root')) {
+      try {
+        cache = SH.checkCache(db, { seedKey: trustedKey, bits: shardBits });
+        checks.shard_root = true;
+      } catch (e) {
+        checks.shard_root = e instanceof SH.ShardRefused ? e.why : `${e.name}: ${e.message}`;
+      }
+    }
     const missing = REQUIRED_TABLES.filter((t) => !tables.has(t));
     checks.required_tables = missing.length ? `missing: ${missing.join(', ')}` : true;
     if (!tables.has('seed_metadata')) {
@@ -319,9 +336,13 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
       } else checks.rule_versions = true;
     }
     // EXPERIMENTAL read layout (read-layout.js): checked only when the seed declares one; a legacy seed's report is unchanged
-    const rl = RL.verifyReadLayout(db, raw, tables);
+    // a cache holding only some buckets checks the read layout of the packages it holds; the whole-seed digest needs every bucket
+    const partial = cache !== null && cache.held.size < cache.root.buckets.length;
+    const rl = RL.verifyReadLayout(db, raw, tables, { partial });
     if (rl !== null) { checks.read_layout = rl; readLayout = { id: raw.read_layout, digest: raw.read_layout_digest ?? null }; }
   } finally { db.close(); }
+
+  if (checks.shard_root !== undefined) return cacheReport({ base, checks, meta, readLayout, cache, trust, trustedKey, trustedKeyError, expect, now });
 
   const shaSide = `${dbPath}.sha256`;
   // The digest this reader actually computed over the bytes it opened. Reported, not just checked:
@@ -366,13 +387,36 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
   if (trust === TRUST_AUTHENTICATED && !trustedKey) {
     checks.trusted_key = `trust mode '${TRUST_AUTHENTICATED}' requires a pinned public key; none was supplied`;
   }
+  expectChecks(checks, meta, expect);
+  return { ...base, authenticated, content_sha256: contentSha256,
+    ok: Object.values(checks).every((v) => v === true), checks, meta, ...(readLayout ? { read_layout: readLayout } : {}) };
+}
+
+function expectChecks(checks, meta, expect) {
   for (const [k, want] of Object.entries(expect || {})) {
     const got = meta[k] === undefined ? null : meta[k];
     checks[`expect.${k}`] = got === want ? true
       : `seed says ${JSON.stringify(got)}, caller expected ${JSON.stringify(want)}`;
   }
-  return { ...base, authenticated, content_sha256: contentSha256,
-    ok: Object.values(checks).every((v) => v === true), checks, meta, ...(readLayout ? { read_layout: readLayout } : {}) };
+}
+
+/**
+ * The report for a seed cache. Its trust is its stored root's: authenticated when the key list verifies against the pinned seed
+ * key and the root against the shards key it names; there is no file digest or signature, since imports change the file. The
+ * checked root and held buckets travel with the report, not enumerated, for the Seed that opens it.
+ */
+function cacheReport({ base, checks, meta, readLayout, cache, trust, trustedKey, trustedKeyError, expect, now }) {
+  if (trustedKeyError !== null) checks.trusted_key = `the supplied public key could not be read: ${trustedKeyError}`;
+  if (trust === TRUST_AUTHENTICATED && !trustedKey) {
+    checks.trusted_key = `trust mode '${TRUST_AUTHENTICATED}' requires a pinned public key; none was supplied`;
+  }
+  expectChecks(checks, meta, expect);
+  const shardCache = cache ? { root_cut_at: cache.root.cut_at, root_digest: cache.root.digest, buckets_held: cache.held.size,
+    buckets_total: cache.root.buckets.length, root_age_days: Math.max(0, Math.floor((now() - Date.parse(cache.root.cut_at)) / DAY_MS)) } : null;
+  const rep = { ...base, authenticated: Boolean(cache?.authenticated && checks.shard_root === true), content_sha256: null,
+    ok: Object.values(checks).every((v) => v === true), checks, meta, ...(readLayout ? { read_layout: readLayout } : {}), shard_cache: shardCache };
+  Object.defineProperty(rep, 'cache', { value: cache, enumerable: false });
+  return rep;
 }
 
 /** The signed MESSAGE is the 64-character ASCII hex digest, matching sign.py and seed_verify.js. */
@@ -388,12 +432,43 @@ function verifySignature(dbPath, sigPath, keyOrPath) {
 }
 
 class Seed {
-  constructor(dbPath, report) {
+  constructor(dbPath, report, { now = Date.now } = {}) {
     this.path = dbPath; this.report = report; this.meta = report.meta;
     this.db = new Database(dbPath, { readonly: true, fileMustExist: true });
     this._cache = new Map();
+    // since 0.1.6, a seed cache: its checked root, the buckets it holds, and each held bucket's row check once done
+    this.shards = report.cache ? { root: report.cache.root, held: report.cache.held, checked: new Map() } : null;
+    this.now = now;
+  }
+  /** A seed cache only: the bucket a package name falls in and whether the cache holds it; null for a full seed. */
+  bucketOf(name) {
+    if (!this.shards) return null;
+    const i = SH.bucketOf(name, this.shards.root.bucket_bits);
+    return { i, held: this.shards.held.has(i) };
+  }
+  /** Why a package is uncovered because its bucket is not held, or null. */
+  uncoveredReason(name) {
+    const b = this.bucketOf(name);
+    return b && !b.held ? `the seed cache does not hold this package's bucket (${b.i})` : null;
+  }
+  /** Before a held bucket answers its first lookup, its rows are re-hashed against the root; a mismatch refuses that bucket. */
+  touch(name) {
+    const b = this.bucketOf(name);
+    if (!b || !b.held) return;
+    if (!this.shards.checked.has(b.i)) this.shards.checked.set(b.i, SH.bucketRowsProblem(this.db, this.shards.root, b.i));
+    const problem = this.shards.checked.get(b.i);
+    if (problem) throw new SeedRefused([problem]);
+  }
+  /** A seed cache whose root is older than 7 days says so; null otherwise. */
+  staleness() {
+    if (!this.shards) return null;
+    const cut = this.shards.root.cut_at; const age = this.now() - Date.parse(cut);
+    if (!(age > SHARD_ROOT_STALE_DAYS * DAY_MS)) return null;
+    return `the seed cache's root was cut ${cut}, ${Math.floor(age / DAY_MS)} days ago (over ${SHARD_ROOT_STALE_DAYS}): `
+      + 'newer seed data may be missing';
   }
   package(name) {
+    this.touch(name);
     if (this._cache.has(name)) return this._cache.get(name);
     const pv = C.loadPackage(this.db, name, this.meta);
     if (this._cache.size > 64) this._cache.delete(this._cache.keys().next().value);
@@ -409,7 +484,7 @@ function openSeed(dbPath, opts = {}) {
   if (!rep.ok) {
     throw new SeedRefused(Object.entries(rep.checks).filter(([, v]) => v !== true).map(([k, v]) => `${k}: ${v}`));
   }
-  return new Seed(dbPath, rep);
+  return new Seed(dbPath, rep, { now: opts.now });
 }
 
 export {

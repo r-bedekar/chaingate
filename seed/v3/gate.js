@@ -178,6 +178,12 @@ const PLACEMENTS = Object.freeze({
 function resolvePlacement(seed, packageName, version, publishedS, { holdingDescription = false } = {}) {
   const no = (kind, reason) => ({ kind, lineage_id: null, ord: null, channel_a_usable: false, reason });
 
+  // Since 0.1.6, a seed cache: a package whose bucket the cache does not hold is uncovered (never "not in the seed"), and a held
+  // bucket's rows are checked against the root before they answer (a mismatch throws: an unusable input).
+  const unheld = seed.uncoveredReason?.(packageName) ?? null;
+  if (unheld) return no(PLACEMENTS.UNCOVERED_PACKAGE, unheld);
+  seed.touch?.(packageName);
+
   const pkg = seed.db.prepare('SELECT id FROM packages WHERE package_name = ?').get(packageName);
   if (!pkg) {
     // A takedown stub is outside lineage grouping whether or not the seed represents its package (an all-stub
@@ -472,7 +478,8 @@ function evaluateCandidate(seed, { config = {}, domainVersionCount, pinOverlay =
   // a refusal can no longer discard it. A lookup that throws is carried as a recorded failure, never as "no pin".
   const looked = POL.lookupPin(seed, pkg, version, pinOverlay);   // since 0.1.6: the pins feed overlay after the seed
   // since 0.1.6: a feed capture pin is compared with this version's registry integrity; the BLOCK stands either way
-  const pinCtx = { pin: POL.captureIntegrity(looked.pin, manifest), pinLookupError: looked.error };
+  const pinCtx = { pin: POL.captureIntegrity(looked.pin, manifest), pinLookupError: looked.error, pinUncovered: looked.uncovered ?? null,
+    cacheStale: seed.staleness?.() ?? null };   // since 0.1.6: a seed cache's unheld bucket, and its root's age
 
   // A missing manifest is an UNUSABLE INPUT, which is policy's question and not this module's.
   // Answering it with a bare SKIP here bypassed policy entirely and let the aggregate permit.

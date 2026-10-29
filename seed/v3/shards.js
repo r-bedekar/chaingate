@@ -1,7 +1,7 @@
 // Since 0.1.6: seed shards 1.0 (cft-seed-v3-shards-1.0), the reader side. A contract 1.3 seed is published as buckets of
 // packages (the first 14 bits of sha256 of the package name) under a signed root that names each bucket by its logical digest,
 // its gzip sha256 and size, with a decompression bound. Ported by hand from the seed side (chaingate-ops tools/seedgen/shards.py:
-// bucket_of, verify_bucket, assemble; the root signature rule of verify_root) and the contract text, cache open rules 3.1-3.4.
+// bucket_of, verify_bucket, assemble; the root signature rule of verify_root) and the contract text's rules for opening a cache.
 //
 // Trust comes only from the root: a key list the seed key signs names the shards key, valid at the reader's time, and that key
 // signs the sha256 hex of the canonical root bytes. A bucket is checked before anything of it is decompressed or opened (size,
@@ -84,7 +84,7 @@ function checkFields(root, bits) {
 }
 
 /**
- * Cache open rule 3.1: the root verified first. Returns the root object, with `digest` (sha256 hex of its bytes) beside it.
+ * The root, verified first. Returns the root object, with `digest` (sha256 hex of its bytes) beside it.
  * `bits` is BUCKET_BITS in production; the seed lane's toy fixture uses 3.
  */
 export function verifyRoot({ rootBytes, sig, keysBytes, keysSig, seedKey, now = Date.now(), bits = BUCKET_BITS }) {
@@ -111,6 +111,8 @@ export function verifyRoot({ rootBytes, sig, keysBytes, keysSig, seedKey, now = 
   if (!cryptoVerify(null, Buffer.from(digest, 'ascii'), key.key, sig)) refuse('the root signature does not verify');
   checkFields(root, bits);
   Object.defineProperty(root, 'digest', { value: digest, enumerable: false });
+  // what proves it, kept with the root in a cache so the cache is checked again each time it is opened
+  Object.defineProperty(root, 'proof', { value: { rootBytes, sig, keysBytes, keysSig }, enumerable: false });
   return root;
 }
 
@@ -139,7 +141,7 @@ function gunzipOne(gz, cap, at) {
   return raw;
 }
 
-/** Cache open rule 3.2, the bytes: size, sha256 against the root, then one gzip stream under raw_bytes_max. Returns the raw file. */
+/** A bucket's bytes: size, sha256 against the root, then one gzip stream under raw_bytes_max. Returns the raw file. */
 export function verifyBucketBytes(root, i, gz) {
   const e = Array.isArray(root?.buckets) ? root.buckets.find((b) => b && b.i === i) : null;
   if (!e) refuse(`bucket ${i} is not listed in the root`);
@@ -180,7 +182,8 @@ function checkStaged(db, root, i) {
 
 const CACHE_DDL = `
 CREATE TABLE IF NOT EXISTS shard_root (id INTEGER PRIMARY KEY CHECK (id = 1), digest TEXT NOT NULL, cut_at TEXT NOT NULL,
-  root_json TEXT NOT NULL, set_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
+  root_json TEXT NOT NULL, root_sig BLOB, keys_json BLOB, keys_sig BLOB,
+  set_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 CREATE TABLE IF NOT EXISTS shard_buckets (i INTEGER PRIMARY KEY, logical TEXT NOT NULL, confirmed_cut_at TEXT NOT NULL,
   imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 CREATE TABLE IF NOT EXISTS shard_bucket_packages (i INTEGER NOT NULL, package_id INTEGER NOT NULL, PRIMARY KEY (i, package_id)) WITHOUT ROWID;
@@ -203,9 +206,10 @@ function dropBucketRows(db, i) {
 }
 
 /**
- * Cache open rule 3.3: make `root` the cache's one current root (its cut_at later than the one held). Buckets the new root lists
+ * Make `root` the cache's one current root (its cut_at later than the one held). Buckets the new root lists
  * with the same logical digest are kept and confirmed; every other bucket's rows are deleted, so its packages are uncovered until
- * it is imported again. seed_metadata becomes the root's (3.4).
+ * it is imported again. seed_metadata becomes the root's. A root from verifyRoot carries its signature and key list, which
+ * are stored with it; a cache whose root has none is refused when opened.
  */
 export function setRoot(cachePath, root, rootBytes) {
   const db = new Database(cachePath);
@@ -228,16 +232,21 @@ export function setRoot(cachePath, root, rootBytes) {
         const ins = db.prepare('INSERT INTO seed_metadata (key, value) VALUES (?, ?)');
         for (const [k, v] of Object.entries(root.seed_metadata).sort()) ins.run(k, v);
       }
-      db.prepare(`INSERT INTO shard_root (id, digest, cut_at, root_json) VALUES (1, @digest, @cut_at, @json)
-        ON CONFLICT(id) DO UPDATE SET digest = @digest, cut_at = @cut_at, root_json = @json, set_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`)
-        .run({ digest: root.digest, cut_at: root.cut_at, json: rootBytes ? rootBytes.toString('utf8') : canonicalJson(root) });
+      const proof = root.proof ?? {};
+      const bytes = proof.rootBytes ?? rootBytes;
+      db.prepare(`INSERT INTO shard_root (id, digest, cut_at, root_json, root_sig, keys_json, keys_sig)
+        VALUES (1, @digest, @cut_at, @json, @sig, @keys, @keysSig)
+        ON CONFLICT(id) DO UPDATE SET digest = @digest, cut_at = @cut_at, root_json = @json, root_sig = @sig, keys_json = @keys,
+          keys_sig = @keysSig, set_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`)
+        .run({ digest: root.digest, cut_at: root.cut_at, json: bytes ? bytes.toString('utf8') : canonicalJson(root),
+          sig: proof.sig ?? null, keys: proof.keysBytes ?? null, keysSig: proof.keysSig ?? null });
     })();
     return { kept, dropped };
   } finally { db.close(); }
 }
 
 /**
- * Cache open rule 3.2, the rows: stage `raw` (from verifyBucketBytes) in a temporary database beside the cache, check it, then
+ * A bucket's rows: stage `raw` (from verifyBucketBytes) in a temporary database beside the cache, check it, then
  * replace bucket `i` in the cache in one transaction. A cache with no root takes this one; a cache under another root refuses.
  */
 export function importBucket(cachePath, root, i, raw) {
@@ -272,7 +281,7 @@ export function importBucket(cachePath, root, i, raw) {
             if (d.type === 'table' && !have.has(d.name)) db.exec(d.sql);
             if (d.type === 'index') db.exec(d.sql.replace(/^CREATE (UNIQUE )?INDEX /, 'CREATE $1INDEX IF NOT EXISTS '));
           }
-          // the cache's metadata is the root's (3.4); the first bucket brings the table
+          // the cache's metadata is the root's; the first bucket brings the table
           if (!db.prepare('SELECT count(*) FROM seed_metadata').pluck().get()) {
             const ins = db.prepare('INSERT INTO seed_metadata (key, value) VALUES (?, ?)');
             for (const [k, v] of Object.entries(root.seed_metadata).sort()) ins.run(k, v);
@@ -299,5 +308,57 @@ export function cacheBuckets(db) {
   return db.prepare('SELECT i, logical, confirmed_cut_at, imported_at FROM shard_buckets ORDER BY i').all();
 }
 
+/**
+ * The cache checked as it is opened: its stored root verified again (the key list against the seed key, the shards key valid at
+ * the root's cut, the signature), the cache's seed_metadata exactly the root's, and every held bucket listed by the root with the
+ * same logical digest. Rows are not re-hashed here; bucketRowsProblem does that per bucket at its first lookup. With no seed key
+ * (an unsigned development seed) the signature is not checked and the result says so. Returns { root, held: Map(i -> logical),
+ * authenticated }.
+ */
+export function checkCache(db, { seedKey = null, bits = BUCKET_BITS } = {}) {
+  const tables = tablesOf(db);
+  if (!tables.has('shard_root') || !tables.has('shard_buckets')) refuse('the cache has no root');
+  const s = db.prepare('SELECT digest, cut_at, root_json, root_sig, keys_json, keys_sig FROM shard_root WHERE id = 1').get();
+  if (!s) refuse('the cache has no root');
+  const rootBytes = Buffer.from(s.root_json, 'utf8');
+  let root;
+  if (seedKey) {
+    if (!s.root_sig || !s.keys_json || !s.keys_sig) refuse('the cache\'s root carries no signature or key list');
+    root = verifyRoot({ rootBytes, sig: Buffer.from(s.root_sig), keysBytes: Buffer.from(s.keys_json), keysSig: Buffer.from(s.keys_sig),
+      seedKey, now: Date.parse(s.cut_at), bits });
+  } else {
+    try { root = JSON.parse(s.root_json); } catch { refuse('the cache\'s root is not JSON'); }
+    if (!isObj(root)) refuse('the cache\'s root is not a JSON object');
+    checkFields(root, bits);
+    Object.defineProperty(root, 'digest', { value: sha256Hex(rootBytes), enumerable: false });
+  }
+  if (root.digest !== s.digest || root.cut_at !== s.cut_at) refuse('the cache\'s root differs from its recorded digest or cut');
+  const meta = tables.has('seed_metadata') ? Object.fromEntries(db.prepare('SELECT key, value FROM seed_metadata').raw(true).all()) : {};
+  if (canonicalJson(meta) !== canonicalJson(root.seed_metadata)) refuse('the cache\'s seed_metadata is not its root\'s');
+  const held = new Map();
+  for (const b of cacheBuckets(db)) {
+    if (root.buckets[b.i]?.logical !== b.logical) refuse(`the cache holds bucket ${b.i} with a logical digest its root does not list`);
+    held.set(b.i, b.logical);
+  }
+  return { root, held, authenticated: Boolean(seedKey) };
+}
+
+/** Bucket `i`'s rows inside a cache re-hashed against its root entry: null when they match, else what differs. */
+export function bucketRowsProblem(db, root, i) {
+  const e = root.buckets[i]; const at = `bucket ${i}`;
+  const P = '(SELECT package_id FROM shard_bucket_packages WHERE i = @i)';
+  const where = { packages: `id IN ${P}`, known_malicious_pins: 'package_name IN (SELECT package_name FROM shard_bucket_pins WHERE i = @i)' };
+  for (const [t, col] of Object.entries(PACKAGE_COL)) if (t !== 'packages') where[t] = `${col} IN ${P}`;
+  for (const t of LINEAGE_KEYED) where[t] = `lineage_id IN (SELECT id FROM lineages WHERE package_id IN ${P})`;
+  const tables = tablesOf(db);
+  const logical = L.digestTables(db, [...BUCKET_TABLES, RL.RL1_TABLE], DIGEST_ORDER, new Set(['cross_links', RL.RL1_TABLE]),
+    { where, params: { i } });
+  if (logical !== e.logical) return `${at}: its rows no longer match the root (logical digest differs)`;
+  const rl1 = tables.has(RL.RL1_TABLE)
+    ? db.prepare(`SELECT ${RL.RL1_COLUMNS.join(', ')} FROM ${RL.RL1_TABLE} WHERE ${where[RL.RL1_TABLE]} ORDER BY package_id`).all({ i }) : [];
+  if ((rl1.length ? RL.contentDigest(rl1) : null) !== e.rl1_digest) return `${at}: its rows no longer match the root (rl1_digest differs)`;
+  return null;
+}
+
 export default { SHARDS_CONTRACT, SHARD_SEED_CONTRACT, SHARD_LINEAGE_ID_RULE, BUCKET_BITS, BUCKET_HASH, SHARD_LIMITS, ShardRefused,
-  bucketOf, canonicalJson, verifyRoot, verifyBucketBytes, setRoot, importBucket, cacheBuckets };
+  bucketOf, canonicalJson, verifyRoot, verifyBucketBytes, setRoot, importBucket, cacheBuckets, checkCache, bucketRowsProblem };

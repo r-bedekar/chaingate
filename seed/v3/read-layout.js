@@ -60,18 +60,24 @@ function decodeRow(d, lineageIds) {
 }
 
 /** verify(): null when the seed declares no read layout (legacy), else true or the reason it is refused. */
-function verifyReadLayout(db, raw, tables) {
+// `partial` (since 0.1.6, a seed cache holding only some buckets): the rows held are checked against the rule and lineage_state,
+// over the packages held; the whole-seed digest is not, since it covers buckets the cache does not hold (each held bucket's rows
+// were checked against its own rl1_digest from the signed root).
+function verifyReadLayout(db, raw, tables, { partial = false } = {}) {
   const declared = RL1_KEYS.filter((k) => k in raw);
   if (!declared.length) return null;
   if (declared.length !== RL1_KEYS.length) return `partial read-layout declaration (${declared.join(', ')})`;
   if (raw.read_layout !== RL1) return `unknown read layout ${JSON.stringify(raw.read_layout)}; this reader implements ${RL1}`;
   if (raw.read_layout_recipe !== RL1_RECIPE) return 'read_layout_recipe differs from this reader\'s g10-rl1 recipe';
-  if (!tables.has(RL1_TABLE)) return `declared ${RL1} but table ${RL1_TABLE} is missing`;
+  if (!tables.has(RL1_TABLE) && !partial) return `declared ${RL1} but table ${RL1_TABLE} is missing`;
   try {
-    const cols = db.prepare(`PRAGMA table_info(${RL1_TABLE})`).all().map((r) => r.name);
-    if (cols.join(',') !== RL1_COLUMNS.join(',')) return `${RL1_TABLE} columns ${JSON.stringify(cols)}`;
-    const rows = db.prepare(`SELECT ${RL1_COLUMNS.join(', ')} FROM ${RL1_TABLE} ORDER BY package_id`).all();
-    if (contentDigest(rows) !== raw.read_layout_digest) return 'read_layout_digest differs from the table contents';
+    let rows = [];
+    if (tables.has(RL1_TABLE)) {
+      const cols = db.prepare(`PRAGMA table_info(${RL1_TABLE})`).all().map((r) => r.name);
+      if (cols.join(',') !== RL1_COLUMNS.join(',')) return `${RL1_TABLE} columns ${JSON.stringify(cols)}`;
+      rows = db.prepare(`SELECT ${RL1_COLUMNS.join(', ')} FROM ${RL1_TABLE} ORDER BY package_id`).all();
+    }
+    if (!partial && contentDigest(rows) !== raw.read_layout_digest) return 'read_layout_digest differs from the table contents';
     const want = db.prepare('SELECT package_id FROM lineages GROUP BY package_id HAVING count(*) >= ? ORDER BY package_id')
       .pluck().all(RL1_MIN_LINEAGES).filter((pid) => db.prepare(
         'SELECT count(*) FROM (SELECT l.id FROM lineages l LEFT JOIN lineage_state s ON s.lineage_id = l.id WHERE l.package_id = ? '
