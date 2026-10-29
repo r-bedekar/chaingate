@@ -157,7 +157,7 @@ async function runInstall({ pinned }) {
   const installed = stageBundle({ dbPath: buildBundle(home, { pinned }) }, home,
     { trust: 'unsigned-development' });
   activateBundle(home, installed.bundle_id);
-  writeConfig(join(home, 'config.json'), { policy: DEFAULT_POLICY, advisory_feed: false });   // 0.1.6: no feed fetch from a test
+  writeConfig(join(home, 'config.json'), { policy: DEFAULT_POLICY, advisory_feed: false, seed_cache: false });   // 0.1.6: no feed or cache fetch from a test
   const db = openWitnessDB(witnessDb); db.applySchema(); db.close();
 
   const cfg = loadConfig(envFree(home));
@@ -228,7 +228,7 @@ test('no CHAINGATE_* variable is REQUIRED for the installs above', () => {
     const installed = stageBundle({ dbPath: buildBundle(home) }, home,
       { trust: 'unsigned-development' });
     activateBundle(home, installed.bundle_id);
-    writeConfig(join(home, 'config.json'), { policy: DEFAULT_POLICY, advisory_feed: false });   // 0.1.6: no feed fetch from a test
+    writeConfig(join(home, 'config.json'), { policy: DEFAULT_POLICY, advisory_feed: false, seed_cache: false });   // 0.1.6: no feed or cache fetch from a test
 
     const env = envFree(home);
     assert.deepEqual(Object.keys(env).filter((k) => k.startsWith('CHAINGATE_')), ['CHAINGATE_HOME'],

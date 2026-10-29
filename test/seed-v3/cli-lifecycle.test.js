@@ -306,7 +306,7 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
       const b2 = makeBundle(home, { name: 'two.db', snapshot: 'b'.repeat(64) });
       // 0.1.6: the user's settings survive init (it used to rewrite config.json with the policy alone), and this test fetches no feed
       mkdirSync(base, { recursive: true });
-      writeFileSync(join(base, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }, null, 2));
+      writeFileSync(join(base, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false, seed_cache: false }, null, 2));
       const kept = () => JSON.parse(readFileSync(join(base, 'config.json'), 'utf8')).advisory_feed;
 
       try {
@@ -388,7 +388,7 @@ test('project scope keeps its configuration OUT of the user directory',
     const b = makeBundle(home, { name: 'proj.db', snapshot: 'd'.repeat(64) });
     const ctx = { home, cwd: proj, scopeArgs: ['--scope', 'project'] };
     mkdirSync(projectBase(proj), { recursive: true });
-    writeFileSync(join(projectBase(proj), 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }));   // no feed fetch from a test
+    writeFileSync(join(projectBase(proj), 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false, seed_cache: false }));   // no feed or cache fetch from a test
     try {
       const init = cli(['init', '--scope', 'project', '--seed', b, '--unsigned-development'], ctx);
       assert.equal(init.status, 0, `${init.stdout}${init.stderr}`);

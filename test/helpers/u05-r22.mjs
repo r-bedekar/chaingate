@@ -64,7 +64,7 @@ export async function v3Host({ tag } = {}) {
   activateBundle(base, id);
   openWitnessDB(path.join(base, 'witness.db')).applySchema().close();
   fs.writeFileSync(path.join(base, 'config.json'),
-    `${JSON.stringify({ config_version: 1, policy: { on_unusable_input: 'BLOCK', on_no_evidence: 'ALLOW' }, advisory_feed: false }, null, 2)}\n`);
+    `${JSON.stringify({ config_version: 1, policy: { on_unusable_input: 'BLOCK', on_no_evidence: 'ALLOW' }, advisory_feed: false, seed_cache: false }, null, 2)}\n`);
   const dir = path.join(seedsDir(base), id);
   return { home, base, id, dir, files: bundleFiles(dir), src,
     cleanup: () => { fs.rmSync(home, { recursive: true, force: true }); src.cleanup(); } };
