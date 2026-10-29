@@ -62,7 +62,7 @@ export function keyIdOf(spkiDer) {
  * signed as they are. Every listed key must be Ed25519, carry its own id, and have a window of more than 0 and at most 90
  * days. Returns all pins keys; a cut is checked against the one valid at its own time.
  */
-export function verifyKeyManifest(bytes, sig, { seedKey }) {
+export function verifyKeyManifest(bytes, sig, { seedKey, role = 'pins' }) {
   if (!Buffer.isBuffer(bytes) || bytes.length > PINS_LIMITS.manifestBytes) refuse('the key manifest is missing or too large');
   if (!Buffer.isBuffer(sig) || sig.length !== 64) refuse('the key manifest signature is not 64 bytes');
   if (!cryptoVerify(null, bytes, seedKey, sig)) refuse('the key manifest signature does not verify against the seed key');
@@ -77,10 +77,10 @@ export function verifyKeyManifest(bytes, sig, { seedKey }) {
     if (keyIdOf(der) !== k.key_id) refuse(`manifest key ${k.key_id} does not match its public key`);
     const from = tsMs(k.valid_from); const to = tsMs(k.valid_to);
     if (!(to - from > 0 && to - from <= PINS_LIMITS.keyValidityMs)) refuse(`manifest key ${k.key_id} has a window over 90 days`);
-    if (k.role !== 'pins') continue;
+    if (k.role !== role) continue;           // a list may carry keys of other roles (pins, shards)
     keys.push({ key_id: k.key_id, from, to, key: createPublicKey({ key: der, format: 'der', type: 'spki' }) });
   }
-  if (!keys.length) refuse('the key manifest names no pins key');
+  if (!keys.length) refuse(`the key manifest names no ${role} key`);
   return keys;
 }
 

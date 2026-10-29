@@ -92,6 +92,12 @@ function jsonValue(v, isReal) {
 
 /** sha256 over the canonical row serialisation. `db` may be a path or an open better-sqlite3 handle. */
 function logicalDigestOfDb(dbOrPath) {
+  return digestTables(dbOrPath, TABLES_IN_DIGEST, ORDER);
+}
+
+/** The same canon over the given tables in the given order (seed shards: a bucket's tables, its read-layout rows last). A table
+ *  that does not exist is skipped when `optional` names it. */
+function digestTables(dbOrPath, tables, order, optional = OPTIONAL_TABLES) {
   const owned = typeof dbOrPath === 'string';
   const db = owned ? new Database(dbOrPath, { readonly: true, fileMustExist: true }) : dbOrPath;
   // Without this, better-sqlite3 silently rounds an INTEGER beyond 2^53-1 to a double — 9007199254740993
@@ -99,12 +105,12 @@ function logicalDigestOfDb(dbOrPath) {
   db.defaultSafeIntegers(true);
   const h = crypto.createHash('sha256');
   try {
-    for (const t of TABLES_IN_DIGEST) {
+    for (const t of tables) {
       const cols = db.prepare(`PRAGMA table_info(${t})`).all();
-      if (!cols.length && OPTIONAL_TABLES.has(t)) continue;
+      if (!cols.length && optional.has(t)) continue;
       const names = cols.map((c) => c.name);
       const real = new Set(cols.filter((c) => String(c.type).toUpperCase().includes('REAL')).map((c) => c.name));
-      const stmt = db.prepare(`SELECT ${names.join(', ')} FROM ${t} ORDER BY ${ORDER[t]}`);
+      const stmt = db.prepare(`SELECT ${names.join(', ')} FROM ${t} ORDER BY ${order[t]}`);
       stmt.raw(true);
       for (const row of stmt.iterate()) {
         const parts = row.map((v, i) => jsonValue(v, real.has(names[i])));
@@ -117,11 +123,11 @@ function logicalDigestOfDb(dbOrPath) {
   return h.digest('hex');
 }
 
-export { logicalDigestOfDb, TABLES_IN_DIGEST, ORDER, pyFloat, jsonValue, NonPortableValue };
+export { logicalDigestOfDb, digestTables, TABLES_IN_DIGEST, ORDER, pyFloat, jsonValue, NonPortableValue };
 
 
 // A default export as well: the consumer is used both as `import R from` and
 // `import { verify } from`, and the runtime package is ESM.
-export default { logicalDigestOfDb, TABLES_IN_DIGEST, ORDER, pyFloat, jsonValue,
+export default { logicalDigestOfDb, digestTables, TABLES_IN_DIGEST, ORDER, pyFloat, jsonValue,
   NonPortableValue
 };
