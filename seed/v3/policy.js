@@ -60,10 +60,10 @@ import K from './contract.js';
 
 const POLICY_CONTRACT_VERSION = 'cft-policy-1.3';
 const PIN_GATE = 'seed-v3:known-malicious-pin';
-// The seed contracts whose pins are keyed by package name (reader.js SEED_CONTRACT_1_1 and SEED_CONTRACT_1_2; the reader
+// The seed contracts whose pins are keyed by package name (reader.js SEED_CONTRACT_1_1, 1_2 and 1_3; the reader
 // requires the name column and its index for both). Literals here, not an import: policy.js imports nothing from the
 // detection path.
-const PIN_BY_NAME_SEED_CONTRACTS = Object.freeze(['cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2']);
+const PIN_BY_NAME_SEED_CONTRACTS = Object.freeze(['cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2', 'cft-seed-v3-contract-1.3']);
 const IMPLEMENTED_DETECTION_CONTRACT = K.CONTRACT_VERSION;
 
 const ALLOW = 'ALLOW';

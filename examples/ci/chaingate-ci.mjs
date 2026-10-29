@@ -67,7 +67,8 @@ const COMBINATIONS = {
   // chaingate.check/5 (0.1.6): /4 under cft-policy-1.3; the decision may carry an OPTIONAL `retier` member
   'chaingate.check/5': { explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.3',
     detection_contract_version: 'cft-detection-contract-1.0',
-    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] },
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2',
+      'cft-seed-v3-contract-1.3'] },
 };
 const SINCE_4 = ['chaingate.check/4', 'chaingate.check/5'];
 const SCHEMA_IDS = Object.keys(COMBINATIONS);

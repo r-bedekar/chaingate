@@ -42,7 +42,8 @@ export const SUPPORTED_RECORDS = Object.freeze({
   // since 0.1.6: /5 = /4 under cft-policy-1.3, written for every check; the decision may carry the `retier` member
   'chaingate.check/5': Object.freeze({ explain_version: 'chaingate-explain-2', policy_version: 'cft-policy-1.3',
     detection_contract_version: 'cft-detection-contract-1.0',
-    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2'] }),
+    seed_contract_versions: ['cft-seed-v3-contract-1.0', 'cft-seed-v3-contract-1.1', 'cft-seed-v3-contract-1.2',
+      'cft-seed-v3-contract-1.3'] }),
 });
 export const CHECK_SCHEMA_IDS = Object.freeze(Object.keys(SUPPORTED_RECORDS));
 

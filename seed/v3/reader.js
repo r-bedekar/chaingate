@@ -21,7 +21,14 @@ const SEED_CONTRACT_1_1 = 'cft-seed-v3-contract-1.1';
 // predecessor that is not the previous row of its own chain. Read ONLY together with the pipeline-key identifiers below; a
 // 1.1 reader would take ord - 1 as every predecessor, so it refuses 1.2 by its contract version.
 const SEED_CONTRACT_1_2 = 'cft-seed-v3-contract-1.2';
-const SUPPORTED_SEED_CONTRACT_VERSIONS = [SEED_CONTRACT_1_0, SEED_CONTRACT_1_1, SEED_CONTRACT_1_2];
+// 1.3 (since 0.1.6): 1.2 with package-scoped lineage ids, lineages.id = package_id * 4096 + ord, carried by every column that
+// names a lineage and declared as `lineage_id_rule`. Read under every 1.2 rule plus the id rule, which is checked on the rows,
+// not trusted from the key (the seed side's reader.py lineage_id_rule_problem). Ids reach about 9.5e9: exact in a JS number.
+const SEED_CONTRACT_1_3 = 'cft-seed-v3-contract-1.3';
+const LINEAGE_ID_RULE_1_3 = 'pkg4096-1';
+const LINEAGE_ID_STRIDE_1_3 = 4096;
+const RL2_CONTRACTS = Object.freeze([SEED_CONTRACT_1_2, SEED_CONTRACT_1_3]);
+const SUPPORTED_SEED_CONTRACT_VERSIONS = [SEED_CONTRACT_1_0, SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, SEED_CONTRACT_1_3];
 const PIPEKEY_CHANNEL_A = 'infra5d-1.2+fu2final+norm1+sizeshrink+pipekey1';
 // This reader's own literals for what a 1.2 seed must declare, as the seed side's reader.py and versions.py pin them. The
 // stub instant and the tag-family definition decide predecessors, so a seed built under others would disagree with the gate.
@@ -106,6 +113,17 @@ function pinLayoutProblem(db, tables) {
 }
 
 /** The lineage layout a 1.2 seed must carry, or null; the seed side's reader.py rl2_layout_problem. */
+/** The lineage ids a 1.3 seed must carry, checked on the rows, or null. */
+function lineageIdRuleProblem(db, tables, declared) {
+  if (declared !== LINEAGE_ID_RULE_1_3) {
+    return `seed declares ${SEED_CONTRACT_1_3} with lineage_id_rule=${JSON.stringify(declared ?? null)}; this reader implements ${LINEAGE_ID_RULE_1_3}`;
+  }
+  if (!tables.has('lineages')) return 'missing table lineages';
+  const n = db.prepare('SELECT count(*) AS n FROM lineages WHERE ord < 0 OR ord >= ? OR id != package_id * ? + ord')
+    .get(LINEAGE_ID_STRIDE_1_3, LINEAGE_ID_STRIDE_1_3).n;
+  return n ? `${n} lineage(s) whose id is not package_id * ${LINEAGE_ID_STRIDE_1_3} + ord (${LINEAGE_ID_RULE_1_3})` : null;
+}
+
 function rl2LayoutProblem(db, tables) {
   if (!tables.has('cross_links')) return 'missing table cross_links';
   const cols = db.prepare("PRAGMA table_info('cross_links')").all().map((r) => r.name);
@@ -259,17 +277,24 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
       : `seed declares contract_version=${JSON.stringify(raw.contract_version)}; this reader implements ${JSON.stringify(SUPPORTED_SEED_CONTRACT_VERSIONS)}`;
     meta.seed_contract_version = raw.contract_version === undefined ? null : raw.contract_version;
     meta.detection_contract_version = IMPLEMENTED_DETECTION_CONTRACT;
-    if (raw.contract_version === SEED_CONTRACT_1_1 || raw.contract_version === SEED_CONTRACT_1_2) {
+    if (raw.contract_version === SEED_CONTRACT_1_1 || RL2_CONTRACTS.includes(raw.contract_version)) {
       const bad = pinLayoutProblem(db, tables);
       checks.pin_layout = bad === null ? true : `seed declares ${raw.contract_version} but ${bad}`;
     }
-    if (raw.contract_version === SEED_CONTRACT_1_2) {
+    if (RL2_CONTRACTS.includes(raw.contract_version)) {
       const bad = rl2LayoutProblem(db, tables);
-      checks.rl2_layout = bad === null ? true : `seed declares ${SEED_CONTRACT_1_2} but ${bad}`;
+      checks.rl2_layout = bad === null ? true : `seed declares ${raw.contract_version} but ${bad}`;
       for (const [k, want] of Object.entries(RL2_IDENTIFIERS)) {
         checks[k] = raw[k] === want ? true
-          : `seed declares ${SEED_CONTRACT_1_2} with ${k}=${JSON.stringify(raw[k] ?? null)}; this reader reads 1.2 only under ${want}`;
+          : `seed declares ${raw.contract_version} with ${k}=${JSON.stringify(raw[k] ?? null)}; this reader reads 1.2 and 1.3 only under ${want}`;
       }
+    }
+    if (raw.contract_version === SEED_CONTRACT_1_3) {
+      const bad = lineageIdRuleProblem(db, tables, raw.lineage_id_rule);
+      checks.lineage_id_rule = bad === null ? true : bad;
+    } else if ('lineage_id_rule' in raw) {
+      checks.lineage_id_rule = `seed declares ${JSON.stringify(raw.contract_version ?? null)} but carries lineage_id_rule=${JSON.stringify(raw.lineage_id_rule)}; `
+        + `the lineage id rule is a ${SEED_CONTRACT_1_3} identifier`;
     }
 
     const absent = REQUIRED_BINDING_KEYS.filter((k) => !raw[k]);
@@ -287,10 +312,10 @@ function verify(dbPath, { trust = TRUST_AUTHENTICATED, pubkeyPath = null, pubkey
           + `(supported: ${JSON.stringify(SUPPORTED_RULE_VERSIONS)})`;
       } else if (extra.length) {
         checks.rule_versions = `seed carries rule families this reader does not implement: ${JSON.stringify(extra)}`;
-      } else if ((rv.channel_a === PIPEKEY_CHANNEL_A) !== (raw.contract_version === SEED_CONTRACT_1_2)) {
+      } else if ((rv.channel_a === PIPEKEY_CHANNEL_A) !== RL2_CONTRACTS.includes(raw.contract_version)) {
         // no inference: the pipeline-key rule and the 1.2 layout come together or the seed is refused
         checks.rule_versions = `channel_a=${JSON.stringify(rv.channel_a)} with contract_version=${JSON.stringify(raw.contract_version)}: `
-          + `${PIPEKEY_CHANNEL_A} is read only from a ${SEED_CONTRACT_1_2} seed, and a ${SEED_CONTRACT_1_2} seed only under it`;
+          + `${PIPEKEY_CHANNEL_A} is read only from a ${SEED_CONTRACT_1_2} or ${SEED_CONTRACT_1_3} seed, and such a seed only under it`;
       } else checks.rule_versions = true;
     }
     // EXPERIMENTAL read layout (read-layout.js): checked only when the seed declares one; a legacy seed's report is unchanged
@@ -389,8 +414,8 @@ function openSeed(dbPath, opts = {}) {
 
 export {
   SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0, SEED_CONTRACT_1_1,
-  SEED_CONTRACT_1_2, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS, IMPLEMENTED_DETECTION_CONTRACT,
-  REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS, REQUIRED_BINDING_KEYS,
+  SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS,
+  IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS, REQUIRED_BINDING_KEYS,
   TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES,
   CANDIDATE_SPEC, CANDIDATE_REQUIRED, PROVIDER_CLASSES,
   SeedRefused, CandidateRejected, sha256File, validateField, candidateFromMapping,
@@ -401,7 +426,7 @@ export {
 // A default export as well: the consumer is used both as `import R from` and
 // `import { verify } from`, and the runtime package is ESM.
 export default { SUPPORTED_SCHEMA_VERSIONS, SUPPORTED_SEED_CONTRACT_VERSIONS, SEED_CONTRACT_1_0,
-  SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS, IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
+  SEED_CONTRACT_1_1, SEED_CONTRACT_1_2, SEED_CONTRACT_1_3, LINEAGE_ID_RULE_1_3, RL2_CONTRACTS, PIPEKEY_CHANNEL_A, RL2_IDENTIFIERS, CROSS_LINK_COLUMNS, IMPLEMENTED_DETECTION_CONTRACT, REQUIRED_TABLES, SUPPORTED_RULE_VERSIONS,
   REQUIRED_BINDING_KEYS, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV, TRUST_MODES, CANDIDATE_SPEC,
   CANDIDATE_REQUIRED, PROVIDER_CLASSES, SeedRefused, CandidateRejected, sha256File,
   validateField, candidateFromMapping, verify, verifySignature, Seed, openSeed

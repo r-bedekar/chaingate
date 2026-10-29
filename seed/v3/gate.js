@@ -127,7 +127,8 @@ const CALVER_YEAR_MIN = 2000;
 const CALVER_YEAR_MAX = 2027;
 
 const PLACEMENT_RULE_VERSION = 'rl2-placement-1.0';
-const SEED_CONTRACT_1_2 = 'cft-seed-v3-contract-1.2';
+// the contracts placed by rl2 (reader.js RL2_CONTRACTS): 1.3 is 1.2 with package-scoped lineage ids
+const RL2_SEED_CONTRACTS = Object.freeze(['cft-seed-v3-contract-1.2', 'cft-seed-v3-contract-1.3']);
 
 const majorOf = (version) => (MAJOR_RE.exec(version || '')?.[1] ?? '0');
 const isStub = (version) => STUB_RE.test(version || '');
@@ -203,7 +204,7 @@ function resolvePlacement(seed, packageName, version, publishedS, { holdingDescr
       channel_a_usable: true, reason: null };
   }
 
-  if (seed.meta?.seed_contract_version === SEED_CONTRACT_1_2) {
+  if (RL2_SEED_CONTRACTS.includes(seed.meta?.seed_contract_version)) {
     const rows = seed.db.prepare('SELECT id, lineage_key, tag_family, last_version, last_published_s FROM lineages '
       + 'WHERE package_id = ? ORDER BY ord').all(pkg.id);
     return placeRl2(rows, version, publishedS, { holdingDescription });
