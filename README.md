@@ -503,10 +503,11 @@ The release page lists the seed's exact identifiers and how to verify the downlo
 [SECURITY.md](SECURITY.md) describes the trust model. An unsigned seed still needs `--unsigned-development`, and the tool then reports
 `authenticated: false`.
 
-Running `chaingate init` without `--seed` does **not** set up v3 detection. On a new install (no v3
-seed and no witness database yet) it downloads the older, signed legacy witness seed (about 100 MB)
-and tells you so. It never downloads with `--no-seed`, or on a host that uses a v3 seed. For v3
-detection, always pass `--seed`.
+Since 0.1.6, `chaingate init` without `--seed` sets up v3 detection through the seed cache (see
+[The seed cache](#the-seed-cache-016)) unless `"seed_cache": false`. When the cache is off or its host has none to give
+yet, init does what it did before: on a new install (no v3 seed and no witness database yet) it downloads the older,
+signed legacy witness seed (about 100 MB) and tells you so. It never downloads with `--no-seed`, or on a host that uses a
+v3 seed. For a full v3 seed file, pass `--seed`.
 
 **1. Initialize.** This installs the v3 seed, starts the proxy and points npm at it:
 
@@ -594,8 +595,8 @@ restores `.npmrc`.
 unsigned seed), and go back to the
 previous one with `chaingate update-seed --rollback`. A running proxy keeps its current seed until
 you restart it with `chaingate stop && chaingate init`. On a host that uses a v3 seed,
-`chaingate update-seed` without `--seed` **refuses**, because v3 seeds cannot be downloaded
-automatically. `update-seed --seed` accepts v3 seeds only; a legacy seed file is refused (see
+`chaingate update-seed` without `--seed` **refuses**, because a full v3 seed file is not downloaded
+automatically (the seed cache keeps itself current; see [The seed cache](#the-seed-cache-016)). `update-seed --seed` accepts v3 seeds only; a legacy seed file is refused (see
 [Seed bundles](#seed-bundles)).
 
 **One seed command at a time.** `init`, `update-seed` and `update-seed --rollback` take a lock on the
@@ -629,7 +630,8 @@ There are two kinds of seed.
 - **v3 detection seed**, installed by `init --seed` or `update-seed --seed`. It is built from public
   npm registry metadata and published as signed GitHub
   releases (`seed-v3.*`), starting with `seed-v3.1-full`; the current one is `seed-v3.2-full`.
-  **You download it yourself; it is not downloaded automatically.** It is opened read-only and checked
+  **You download the full file yourself; it is not downloaded automatically** (with the seed cache on, ChainGate
+  fetches the same seed in buckets instead). It is opened read-only and checked
   against its `.sha256` file. It counts as authenticated only when its signature verifies against the
   built-in key (see SECURITY.md).
 - **Legacy witness seed**, published as `seed-v2.x` GitHub releases. On a new install, `chaingate init`
@@ -696,6 +698,34 @@ fetches it now; `chaingate update-advisories --file <dir>` reads a copy from a l
 
 Whatever happens, the last accepted cut keeps serving. `chaingate status` shows the cut and its age; `chaingate doctor`
 gives a notice when it is older than 48 hours, stale past 7 days, held, or when the last fetch was refused or failed.
+
+## The seed cache (0.1.6)
+
+The seed is also published in pieces: 16,384 buckets of packages (a package's bucket is fixed by its name, so a bucket holds
+the records of about 22 package names) under a signed index. With the seed cache, ChainGate fetches only the buckets it
+needs instead of the whole seed file, and the index is refreshed every hour.
+
+**It is on by default, with an outbound connection to `https://shards.cgsec.dev/`.** `chaingate init`, run without
+`--seed`, fetches the index and the buckets of the packages in the current directory's `package-lock.json` (or
+`npm-shrinkwrap.json`). When a package the proxy decides falls in a bucket the cache does not hold yet, the proxy fetches
+that bucket first and waits for it at most 5 seconds. If it has not arrived by then, that decision says the seed did not
+check the package, which warns (as for a package the seed does not cover; `on_no_evidence` decides), and the bucket keeps
+downloading for the next one. The index is fetched again at start and every hour; a request with nothing new is answered
+"not modified". Each request is a plain GET with no account, no registry token and no identifiers.
+`"seed_cache": false` in `config.json` turns it off; ChainGate then reads a full seed you install with
+`chaingate init --seed`. `"seed_cache_url": "<https URL>"` fetches from another host.
+
+**What the host learns.** Each bucket request names one bucket, which narrows a package to about 22 names that share
+it. The host, like any web server, also sees the address of the machine that asks. A full seed file reveals nothing about
+your packages; use it if this matters to you.
+
+**What it accepts.** The index is used only when its signature is by a key that a key list signed with the seed key
+names, valid at the time ChainGate fetches it, and only when it is later than the index the cache holds. A bucket is
+checked before anything in it is read: its size and sha256 against the index, then its records against the digest the
+index names. A bucket that fails is not used, and the rest of the cache keeps serving. A bucket already held is checked
+again the first time it is used after the proxy starts. An index more than 7 days old is stated on every decision, and
+`chaingate doctor` gives a notice past 48 hours. A cache holding at least one bucket takes the place of an installed full
+seed; until then the full seed serves. `chaingate status` shows the index, its age and how many buckets are held.
 
 ## What's Next
 

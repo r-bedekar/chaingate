@@ -95,10 +95,27 @@ outbound connection, on by default, to raw.githubusercontent.com (or the configu
 host sees the address of each client that fetches, as GitHub does for a seed download. It is off
 with `"advisory_feed": false`.
 
+### The seed cache (0.1.6)
+
+The seed cache reads the seed as buckets under a signed index (README, "The seed cache"). The runtime embeds no key for
+it: the key list that names the advisory feed's key also names the seed cache's, signed with the seed key, each key valid
+for at most 90 days. The index is Ed25519-signed over the sha256 hex of its bytes and is accepted only at the reader's own
+clock, never at a time the index states. The copy of the key list served beside the index must equal the advisory feed's,
+byte for byte, when the feed is on. A bucket is used only after its size, its sha256 and the digest of its records match
+what the index names; it is imported whole or not at all. A bucket changed in the cache file after import is refused the
+first time it is read after a start; the others keep serving.
+
+A stolen seed cache key could publish an index that leaves packages out or changes their history, until the key list
+drops the key (at most 90 days). An index older than the one held is refused. The fetch is an outbound connection, on by
+default, to shards.cgsec.dev (or the configured `seed_cache_url` host, https only), at `init`, at proxy start, hourly, and
+for each bucket a decision needs. A bucket request tells that host which of 16,384 buckets a machine needs, which narrows a
+package to about 22 names. It is off with `"seed_cache": false`.
+
 ### v3 detection seeds and trust modes
 
-The v3 detection seed is **supplied locally** (`chaingate init --seed <file>`,
-`chaingate update-seed --seed <file>`). It is **not downloaded automatically**.
+The full v3 detection seed file is **supplied locally** (`chaingate init --seed <file>`,
+`chaingate update-seed --seed <file>`). It is **not downloaded automatically**; since 0.1.6 the seed cache (above)
+fetches the same seed in signed buckets instead, unless it is off.
 The first published v3 seed is `seed-v3.1-full`, a signed GitHub
 pre-release (see SEEDS.md). Before use, the runtime checks the
 seed's schema and contract versions, its required bindings and its
