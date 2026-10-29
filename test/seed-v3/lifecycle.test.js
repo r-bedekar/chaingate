@@ -241,3 +241,20 @@ test('no CHAINGATE_* variable is REQUIRED for the installs above', () => {
       DEFAULT_POLICY.on_no_evidence);
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+test('since 0.1.6: every persisted setting reaches the proxy with a seed installed, as without one', () => {
+  const home = mkdtempSync(join(tmpdir(), 'cft05-life-'));
+  try {
+    const settings = { static_withhold: true, static_walk_wait_ms: 2_500, advisory_feed_url: 'https://feed.example/pins/' };
+    writeConfig(join(home, 'config.json'), { policy: DEFAULT_POLICY, ...settings });
+    const without = loadConfig(envFree(home));
+    const installed = stageBundle({ dbPath: buildBundle(home) }, home, { trust: 'unsigned-development' });
+    activateBundle(home, installed.bundle_id);
+    const withSeed = loadConfig(envFree(home));
+    assert.equal(withSeed.seedV3BundleId, installed.bundle_id);
+    for (const k of ['staticWithhold', 'staticWalkWaitMs', 'pinsFeedUrl', 'unstoredBlockCapEntries', 'unstoredBlockCapBytes']) {
+      assert.deepEqual(withSeed[k], without[k], k);
+    }
+    assert.equal(withSeed.staticWalkWaitMs, 2_500);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
