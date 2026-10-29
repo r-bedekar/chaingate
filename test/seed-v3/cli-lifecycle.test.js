@@ -304,11 +304,17 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
       const base = baseOf(home, cwd);
       const b1 = makeBundle(home, { name: 'one.db', snapshot: 'a'.repeat(64) });
       const b2 = makeBundle(home, { name: 'two.db', snapshot: 'b'.repeat(64) });
+      // 0.1.6: the user's settings survive init (it used to rewrite config.json with the policy alone), and this test fetches no feed
+      mkdirSync(base, { recursive: true });
+      writeFileSync(join(base, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }, null, 2));
+      const kept = () => JSON.parse(readFileSync(join(base, 'config.json'), 'utf8')).advisory_feed;
 
       try {
         // INIT
         const init = cli(['init', ...scopeArgs, '--seed', b1, '--unsigned-development'], ctx);
         assert.equal(init.status, 0, `init must SUCCEED:\n${init.stdout}\n${init.stderr}`);
+        assert.equal(kept(), false, 'init keeps advisory_feed: false');
+        assert.doesNotMatch(`${init.stdout}`, /Advisory feed: on/);
         // U-05: the witness database is reported once (it used to be "created" and then "found")
         const wdb = `${init.stdout}${init.stderr}`.split('\n').filter((l) => /witness database/i.test(l));
         assert.equal(wdb.length, 1, `one witness-database line:\n${wdb.join('\n')}`);
@@ -322,6 +328,8 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
         const afterInit = selfReport();
         assert.equal(afterInit?.seed_v3?.sha256, id1.sha256,
           'the proxy init started must be running the bundle init activated');
+        restartAndReport(ctx);
+        assert.equal(kept(), false, 'a restart through init keeps it too');
 
         // DOCTOR
         const doc = cli(['doctor', ...scopeArgs], ctx);
@@ -379,6 +387,8 @@ test('project scope keeps its configuration OUT of the user directory',
     mkdirSync(proj, { recursive: true });
     const b = makeBundle(home, { name: 'proj.db', snapshot: 'd'.repeat(64) });
     const ctx = { home, cwd: proj, scopeArgs: ['--scope', 'project'] };
+    mkdirSync(projectBase(proj), { recursive: true });
+    writeFileSync(join(projectBase(proj), 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }));   // no feed fetch from a test
     try {
       const init = cli(['init', '--scope', 'project', '--seed', b, '--unsigned-development'], ctx);
       assert.equal(init.status, 0, `${init.stdout}${init.stderr}`);

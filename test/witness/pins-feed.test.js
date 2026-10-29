@@ -283,7 +283,7 @@ test('PF10 fetching by URL: https only, plain GETs, no redirects, a size cap', a
 });
 
 // ------------------------------------------------------------------------------------------------ config, proxy, CLI
-import { validateConfig, ConfigUnreadable } from '../../config-store.js';
+import { validateConfig, ConfigUnreadable, DEFAULT_ADVISORY_FEED_URL } from '../../config-store.js';
 import { createProxyServer } from '../../proxy/server.js';
 import updatePins from '../../cli/commands/update-advisories.js';
 import status from '../../cli/commands/status.js';
@@ -292,7 +292,13 @@ import { describePinsFeed } from '../../cli/pins-feed.js';
 import { buildSeed, docFor, after, LIVE } from '../seed-v3/u05-fixtures.mjs';
 
 test('PF11 configuration: advisory_feed_url must be https; with it set the feed is on unless advisory_feed is false', () => {
-  assert.deepEqual(validateConfig({}).pinsFeed, { url: null, enabled: false });
+  // since the first signed cut is live (operator 2026-10-29), an unset advisory_feed_url means the published feed (deliberate change
+  // of expectation: it was off); advisory_feed: false turns it off, and a configured URL replaces it
+  const DEFAULT = 'https://raw.githubusercontent.com/cgsec-labs/chaingate-pins/main/pins/';
+  assert.equal(DEFAULT_ADVISORY_FEED_URL, DEFAULT);
+  assert.deepEqual(validateConfig({}).pinsFeed, { url: DEFAULT, enabled: true });
+  assert.deepEqual(validateConfig({ advisory_feed_url: null }).pinsFeed, { url: DEFAULT, enabled: true });
+  assert.deepEqual(validateConfig({ advisory_feed: false }).pinsFeed, { url: DEFAULT, enabled: false });
   assert.deepEqual(validateConfig({ advisory_feed_url: 'https://pins.example.org/pins' }).pinsFeed, { url: 'https://pins.example.org/pins', enabled: true });
   assert.deepEqual(validateConfig({ advisory_feed_url: 'https://pins.example.org/pins', advisory_feed: false }).pinsFeed.enabled, false);
   for (const bad of [{ advisory_feed_url: 'http://pins.example.org/' }, { advisory_feed_url: 'https://u:p@pins.example.org/' },
@@ -396,8 +402,10 @@ test('PF14 update-advisories: --file reads a directory; a held cut exits 2 and n
     const db = openWitnessDB(path.join(dir, 'witness.db'), { readonly: true });
     try { assert.ok(db.advisoryPinFor('b', '1.0.0')); assert.equal(db.advisoryPinFor('a', '1.0.0'), null); } finally { db.close(); }
     out.length = 0;
-    assert.equal(await updatePins([]), 1, 'no URL configured and no --file');
-    assert.match(plain(out), /No advisory feed configured/);
+    // since the default address (2026-10-29): a configuration with the feed turned off refuses without fetching
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }));
+    assert.equal(await updatePins([]), 1, 'the feed turned off and no --file');
+    assert.match(plain(out), /The advisory feed is off \("advisory_feed": false in the configuration\)/);
   });
 });
 
