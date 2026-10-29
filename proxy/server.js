@@ -39,7 +39,8 @@ import { createTarWalker } from './tar-walk.js';
 import { rememberManifestHooks, manifestHooksFor, manifestEntryFor, mcRow, recordLate, mcDeterminate, hookDict, GATE as MC_GATE } from './manifest-check.js';
 import { tarballRow } from '../gates/install-introduced.js';
 import { reraise } from '../gates/retier-late.js';
-import { armedBy, walkReason, keepListFor, staticRows, unarmedRows, noManifestRows, staticSettled, MAX_ARMED_WALKS, STATIC_WITHHOLD_CAP_BYTES,
+import { DEFAULT_STATIC_WALK_WAIT_MS } from '../config-store.js';
+import { armedBy, walkReason, keepListFor, staticRows, budgetRows, noManifestRows, staticSettled, MAX_ARMED_WALKS, STATIC_WITHHOLD_CAP_BYTES,
   withholdingChecks, entryKeepFor, entryFactsOf, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, FACTS_LIMITS, makeBase64Share, createMemberTally,
   staticFactsOf } from './static-checks.js';
 import { withRole } from '../gates/row-class.js';
@@ -51,6 +52,31 @@ function parsedPackageJson(walk) {
 }
 let factsWalks = 0;                                         // 0.1.5: entry-facts-only walks in flight (ceiling MAX_FACTS_WALKS)
 let armedWalks = 0;                                        // 0.1.5: armed keep-list walks in flight (process-wide ceiling MAX_ARMED_WALKS)
+// Since 0.1.6 a download that finds every walk slot busy waits for one, first come first served, up to static_walk_wait_ms
+// (default 10 s, at most half the upstream body timeout so a waiting body never times out); past it it is served unwalked.
+const walkWaiters = [];
+function takeWalkSlot(waitMs) {
+  if (armedWalks < MAX_ARMED_WALKS && !walkWaiters.length) { armedWalks += 1; return Promise.resolve({ ok: true, waitedMs: 0 }); }
+  if (!(waitMs > 0)) return Promise.resolve({ ok: false, waitedMs: 0 });
+  const t0 = performance.now();
+  return new Promise((resolve) => {
+    const w = { done: false };
+    w.take = () => {
+      if (w.done) return false;
+      w.done = true; clearTimeout(w.timer); armedWalks += 1; resolve({ ok: true, waitedMs: performance.now() - t0 }); return true;
+    };
+    w.timer = setTimeout(() => {
+      if (w.done) return;
+      w.done = true; const i = walkWaiters.indexOf(w); if (i >= 0) walkWaiters.splice(i, 1);
+      resolve({ ok: false, waitedMs: performance.now() - t0 });
+    }, waitMs);
+    walkWaiters.push(w);
+  });
+}
+function freeWalkSlot() {
+  armedWalks -= 1;
+  while (walkWaiters.length && armedWalks < MAX_ARMED_WALKS) if (walkWaiters.shift().take()) break;
+}
 let claimFetches = 0;                                      // 0.1.5: attestation bundle fetches in flight (REPO_CLAIM_LIMITS.maxInFlight)
 // The install summary, the disk record and the last version without the signal.
 import { createInstallSummary, isLoopbackPeer } from './install-summary.js';
@@ -1216,12 +1242,17 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
         // stream; the download is held only with the static_withhold switch.
         const armed = walkLatest ? walkReason(walkLatest.gates_fired) : null;
         const staticDue = Boolean(walkLatest && !staticSettled(walkLatest));
-        let keepOpts = {}; let staticWhy = null; let armedSlot = false; let staticManifest;
+        let keepOpts = {}; let staticWhy = null; let armedSlot = false; let staticManifest; let walkWaitMs = null;
         if (walkLatest && (!mcDeterminate(walkLatest) || staticDue) && armed) {
           staticManifest = manifestEntryFor(canonicalName, state.tarballVersion);
           if (staticManifest === undefined) staticWhy = 'no-manifest';
-          else if (armedWalks >= MAX_ARMED_WALKS) staticWhy = 'ceiling';
-          else { armedWalks += 1; armedSlot = true; staticWhy = 'armed'; keepOpts = { keep: keepListFor(staticManifest).paths }; }
+          else {
+            const waitMs = Math.min(config.staticWalkWaitMs ?? DEFAULT_STATIC_WALK_WAIT_MS, Math.floor((config.bodyTimeoutMs ?? 30_000) / 2));
+            const slot = await takeWalkSlot(waitMs);
+            walkWaitMs = Number(slot.waitedMs.toFixed(3));
+            if (!slot.ok) staticWhy = 'budget';
+            else { armedSlot = true; staticWhy = 'armed'; keepOpts = { keep: keepListFor(staticManifest).paths }; }
+          }
         }
         const mcWalk = Boolean(walkLatest && (!mcDeterminate(walkLatest) || staticDue));
         // 0.1.5 entry facts: EVERY served version, armed or not, has its main and bin facts stored
@@ -1258,12 +1289,12 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
             held = await holdUpstream(res, upstream, upstream.statusCode, headerFn, tap, STATIC_WITHHOLD_CAP_BYTES);
           } else await streamUpstream(res, upstream, upstream.statusCode, headerFn, tap);
         } catch (err) {
-          if (armedSlot) { armedWalks -= 1; armedSlot = false; }            // the slot is freed on every exit, or the ceiling would stick
+          if (armedSlot) { freeWalkSlot(); armedSlot = false; }            // the slot is freed on every exit, or the ceiling would stick
           if (factsSlot) { factsWalks -= 1; factsSlot = false; }
           throw err;
         }
         const walk = walker ? await walker.end() : null;
-        if (armedSlot) { armedWalks -= 1; armedSlot = false; }
+        if (armedSlot) { freeWalkSlot(); armedSlot = false; }
         if (factsSlot) { factsWalks -= 1; factsSlot = false; }
         // a complete walk is the tarball's facts; a refused archive is stored as refused only once the whole download was served
         // (an aborted one, or a walk that fell behind, says nothing about the archive and is tried again)
@@ -1276,7 +1307,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
             const factsMs = Number((performance.now() - t0).toFixed(3));
             factsShape = walk.ok && shapeTally ? shapeTally.result() : null;
             factsWrote = witnessDb.recordEntryFacts({ package_name: canonicalName, version: state.tarballVersion,
-              static_checks_version: STATIC_CHECKS_VERSION, facts_ms: factsMs, shape: factsShape, ...ef }) === 'wrote';
+              static_checks_version: STATIC_CHECKS_VERSION, facts_ms: factsMs, shape: factsShape, walk_wait_ms: walkWaitMs, ...ef }) === 'wrote';
           } catch (err) {
             log?.warn?.(`[facts] ${canonicalName}@${state.tarballVersion}: not stored (${err.message})`);
           }
@@ -1309,7 +1340,7 @@ export function createProxyServer(configOverrides = {}, hooks = {}) {
               // static-checks-1.8: S8 and S9 read the member facts the armed walk gathered
               ...(memberTally ? (({ members, over }) => ({ members, membersOver: over }))(memberTally.result()) : {}) })
               : staticWhy === 'no-manifest' ? noManifestRows(armed)
-                : unarmedRows(`concurrency ceiling: ${MAX_ARMED_WALKS} armed walks in flight`)).map(withRole)]));
+                : budgetRows(walkWaitMs ?? 0)).map(withRole)]));
           // 0.1.5: a held download is served or withheld only now, after the walk; withheld only for a named static WARN
           // the user has not accepted (while every check is contributing this never happens, and the held bytes are served)
           let staticHold = null;

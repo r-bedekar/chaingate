@@ -73,10 +73,11 @@ function readPersisted(env) {
   const caps = valid ? valid.caps : { entries: null, bytes: null };
   const staticWithhold = valid ? valid.staticWithhold : false;      // 0.1.5; applies with or without a v3 seed
   const pinsFeedUrl = valid?.pinsFeed.enabled ? valid.pinsFeed.url : null;                 // 0.1.6
+  const staticWalkWaitMs = valid ? valid.staticWalkWaitMs : null;                            // 0.1.6; null = the proxy's default
   const empty = { source: cfg ? file : null, base, seedV3Path: null, seedV3Trust: null,
     seedV3BundleDir: null, seedV3BundleId: null, seedV3Expected: null,
     policyOnUnusableInput: null, policyOnNoEvidence: null,
-    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold, pinsFeedUrl };
+    unstoredBlockCapEntries: caps.entries, unstoredBlockCapBytes: caps.bytes, staticWithhold, staticWalkWaitMs, pinsFeedUrl };
   if (!active) return empty;
 
   // The bundle says what it is; it is verified through the PINNED directory.
@@ -146,6 +147,8 @@ export function loadConfig(env = process.env, overrides = {}) {
     staticWithhold: persisted.staticWithhold === true,
     // 0.1.6: the advisory feed base URL, or null (none configured, or `advisory_feed: false`); persisted only
     pinsFeedUrl: persisted.pinsFeedUrl ?? null,
+    // 0.1.6: the wait for a tarball-check walk slot; persisted only
+    staticWalkWaitMs: persisted.staticWalkWaitMs ?? null,
     configSource: persisted.source,
     chaingateBase: persisted.base,
   };

@@ -175,6 +175,7 @@ CREATE TRIGGER IF NOT EXISTS adjudications_append_only_d BEFORE DELETE ON adjudi
 -- and tally, the streamed share and staticFactsOf), in milliseconds, written with static_facts. repo_claim = an armed version's
 -- repository claim (proxy/shadow-facts.js repoClaimFact: its attestation bundle's repository against its package metadata's), written
 -- once after its first download; record only likewise. repo_claim_ms = the time it took, the bundle fetch included, in milliseconds.
+-- Since 0.1.6: walk_wait_ms = how long the download that stored the facts waited for a tarball-check walk slot, in milliseconds.
 CREATE TABLE IF NOT EXISTS entry_fact_versions (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     package_name          TEXT NOT NULL,
@@ -190,6 +191,7 @@ CREATE TABLE IF NOT EXISTS entry_fact_versions (
     static_facts_ms       REAL,
     repo_claim            TEXT,
     repo_claim_ms         REAL,
+    walk_wait_ms          REAL,
     UNIQUE (package_name, version)
 );
 CREATE TABLE IF NOT EXISTS entry_facts (
@@ -320,6 +322,7 @@ export class WitnessDB {
     if (efv.length && !efv.includes('static_facts_ms')) this.db.exec('ALTER TABLE entry_fact_versions ADD COLUMN static_facts_ms REAL');
     if (efv.length && !efv.includes('repo_claim')) this.db.exec('ALTER TABLE entry_fact_versions ADD COLUMN repo_claim TEXT');
     if (efv.length && !efv.includes('repo_claim_ms')) this.db.exec('ALTER TABLE entry_fact_versions ADD COLUMN repo_claim_ms REAL');
+    if (efv.length && !efv.includes('walk_wait_ms')) this.db.exec('ALTER TABLE entry_fact_versions ADD COLUMN walk_wait_ms REAL');   // 0.1.6
     this._prepare();
     return this;
   }
@@ -589,8 +592,8 @@ export class WitnessDB {
     if (!this._tableStmts('entry_facts', () => ({}))) return null;
     return this._tableStmts('entry_fact_versions', () => ({
       has: this.db.prepare('SELECT 1 FROM entry_fact_versions WHERE package_name = ? AND version = ?'),
-      insV: this.db.prepare(`INSERT OR IGNORE INTO entry_fact_versions (package_name, version, walk, reason, static_checks_version, facts_ms, shape)
-        VALUES (@package_name, @version, @walk, @reason, @static_checks_version, @facts_ms, @shape)`),
+      insV: this.db.prepare(`INSERT OR IGNORE INTO entry_fact_versions (package_name, version, walk, reason, static_checks_version, facts_ms, shape,
+        walk_wait_ms) VALUES (@package_name, @version, @walk, @reason, @static_checks_version, @facts_ms, @shape, @walk_wait_ms)`),
       shadowSet: this.db.prepare('UPDATE entry_fact_versions SET shadow = @shadow WHERE package_name = @p AND version = @v AND shadow IS NULL'),
       staticSet: this.db.prepare('UPDATE entry_fact_versions SET static_facts = @x, static_facts_ms = @ms WHERE package_name = @p AND version = @v AND static_facts IS NULL'),
       claimSet: this.db.prepare('UPDATE entry_fact_versions SET repo_claim = @x, repo_claim_ms = @ms WHERE package_name = @p AND version = @v AND repo_claim IS NULL'),
@@ -622,7 +625,7 @@ export class WitnessDB {
     return this.db.transaction(() => {
       const ins = st.insV.run({ package_name: r.package_name, version: r.version, walk: r.walk, reason: r.reason ?? null,
         static_checks_version: r.static_checks_version, facts_ms: Number.isFinite(r.facts_ms) ? r.facts_ms : null,
-        shape: r.shape == null ? null : JSON.stringify(r.shape) });
+        shape: r.shape == null ? null : JSON.stringify(r.shape), walk_wait_ms: Number.isFinite(r.walk_wait_ms) ? r.walk_wait_ms : null });
       if (!ins.changes) return 'exists';
       const versionId = Number(ins.lastInsertRowid);
       for (const f of Array.isArray(r.files) ? r.files : []) {

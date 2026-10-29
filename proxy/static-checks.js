@@ -991,7 +991,10 @@ export function armedBy(results) {
 }
 /** Since 0.1.6: every download is walked. The rows name what armed the walk, or "every download" when no recorded row did. */
 export const walkReason = (results) => armedBy(results) ?? 'every download';
-const RETRY_PREFIXES = ['not checked: not armed', 'not checked: no registry manifest at hand'];
+const RETRY_PREFIXES = ['not checked: not armed', 'not checked: no registry manifest at hand', 'not checked: walk budget exceeded'];
+/** Since 0.1.6: the rows of a download that found no walk slot within static_walk_wait_ms; served unwalked, read at its next download. */
+export const budgetRows = (waitedMs) => CHECKS.map((c) => ({ gate: c.gate, result: 'SKIP',
+  detail: clipDetail(`not checked: walk budget exceeded (waited ${Number((Math.max(0, waitedMs) / 1000).toFixed(1))} s)`) }));
 /** The ten rows of a walk that was not armed (or could not be: the concurrency ceiling), with the reason; retried when a later download is armed. */
 export const unarmedRows = (why) => CHECKS.map((c) => ({ gate: c.gate, result: 'SKIP', detail: clipDetail(`not checked: not armed (${why})`) }));
 /** The ten rows of an armed walk whose registry manifest was not at hand (no keep list); retried, as MC's own "not checked" is. */
@@ -1007,5 +1010,5 @@ export function staticSettled(latest) {
 
 export default { FACTS_LIMITS, FACTS_NOTE, DECODED_MAGIC, magicOf, B64_RUN, HEX_ESCAPE_RUN, encodedRuns, makeBase64Share, EXCLUDED_PATH, DYNAMIC_CODE,
   AGENT_CONFIG_NAMES, AGENT_HOME_DIR, AGENT_XDG_DIR, WRITE_MARKERS, SHELL_REDIRECT, SHELL_SCRIPT, agentConfigWrite, IO_CLASSES, IO_TOKENS, memberFacts, staticFacts,
-  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, walkReason, unarmedRows, noManifestRows, staticSettled,
+  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, walkReason, budgetRows, unarmedRows, noManifestRows, staticSettled,
   S8_LIMITS, NATIVE_MAGIC, NATIVE_SOURCE, BINDING_GYP, ADDON_FILE, ADDON_LOADS, nativeKind, xorText, GYP_LIMITS, GYP_FILE, GYP_QUIET, GYP_SCRIPT, gypExpansions, gypBuild, hiddenGypScript, addonDropper };

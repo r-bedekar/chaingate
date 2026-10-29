@@ -166,8 +166,14 @@ Some named rules are checked when npm downloads the tarball:
 **Tarball checks (0.1.5; every download since 0.1.6).** ChainGate also reads the files npm will run. Since 0.1.6 it
 does so on every version's first download (0.1.5 read them only when the version already carried a named warning, a
 publisher break, an entry point change, or the seed's coverage warning; each row still names which of these it was, or
-"every download"). At most 16 downloads are read at once; past that a download is served, recorded as "not checked:
-not armed (concurrency ceiling)" and read at its next download. The walk keeps the bodies of the files the registry manifest points npm at -- the install-hook targets, `main`, up to 4 `bin`
+"every download"). At most 16 downloads are read at once. A download that finds all 16 busy waits for one, up to 10
+seconds (`"static_walk_wait_ms"` in `config.json`, 0 to 60,000; at most half the upstream body timeout); past that it
+is served unread, recorded as "not checked: walk budget exceeded" and read at its next download. The reading adds no
+latency on typical packages and at most that wait per download on heavy ones: over 500 synthetic packages at npm's
+16 connections, typical tarballs (about 90 KiB) never waited and the install took 6 s; tarballs of 4.6 MB of mostly
+base64 text waited 3.4 s at the median (4.6 s at most), and every one was read. The proxy's memory rose by about 70
+MiB on the typical install and about 290 MiB at most on the heavy one. Each version's wait is recorded with its facts
+(`walk_wait_ms`). The walk keeps the bodies of the files the registry manifest points npm at -- the install-hook targets, `main`, up to 4 `bin`
 targets; at most 6 files of 1 MiB each -- and checks them. It warns when:
 - an install-hook command fetches code (curl, wget, Invoke-WebRequest, certutil -urlcache, bitsadmin) and executes or
   decodes it (a pipe into a shell or interpreter, powershell -enc, base64 -d, eval, iex), or runs a network tool (curl,
