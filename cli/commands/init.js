@@ -72,9 +72,9 @@ async function installSeeds(opts, paths, deps, lock) {
     }
     // POLICY FIRST, strictly. A policy the gate cannot act on means the proxy will not start, and
     // discovering that after a bundle is installed and .npmrc redirected is the wrong order.
-    let policy;
+    let policy; let existing = {};
     try {
-      const existing = readConfigStrict(paths.configFile) || {};
+      existing = readConfigStrict(paths.configFile) || {};
       policy = { ...DEFAULT_POLICY, ...(existing.policy || {}) };
       validateConfig({ ...existing, policy }, paths.configFile);
     } catch (err) {
@@ -121,7 +121,8 @@ async function installSeeds(opts, paths, deps, lock) {
 
     // The operator's policy is host state and is written before activation; which bundle is active
     // is recorded ONLY by the link the next step swaps.
-    writeConfig(paths.configFile, { policy });
+    // the user's other settings (advisory_feed, static_withhold, caps) are kept; init sets the policy only
+    writeConfig(paths.configFile, { ...existing, policy });
     let identity;
     try {
       identity = activateBundle(paths.base, installed.dir_name, { lock, hooks: deps.hooks });

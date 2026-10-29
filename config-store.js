@@ -44,6 +44,9 @@ export class ConfigUnreadable extends Error {
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isObjOnly = isObj;
+/** 0.1.6: the published advisory feed, used when the configuration names none (`"advisory_feed": false` turns it off). */
+export const DEFAULT_ADVISORY_FEED_URL = 'https://raw.githubusercontent.com/cgsec-labs/chaingate-pins/main/pins/';
+
 export function isHttpsUrl(v) {
   if (typeof v !== 'string' || v.length > 2048) return false;
   try { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password && !u.search && !u.hash; } catch { return false; }
@@ -103,13 +106,13 @@ export function validateConfig(cfg, file = '(in memory)') {
     bad(`static_withhold must be true or false, got ${JSON.stringify(sw)}`);
   }
 
-  // 0.1.6: the advisory feed (internally the pins feed). `advisory_feed_url` is an https base URL; with it set the proxy fetches
-  // the feed at start and hourly unless `advisory_feed` is false. A wrong type or a URL that is not https refuses, as above.
+  // 0.1.6: the advisory feed (internally the pins feed). `advisory_feed_url` is an https base URL, the published feed when unset;
+  // the proxy fetches it at start and hourly unless `advisory_feed` is false. A wrong type or a URL that is not https refuses.
   const pf = cfg.advisory_feed;
   if (pf !== undefined && pf !== null && typeof pf !== 'boolean') bad(`advisory_feed must be true or false, got ${JSON.stringify(pf)}`);
   const pu = cfg.advisory_feed_url;
   if (pu !== undefined && pu !== null && !isHttpsUrl(pu)) bad(`advisory_feed_url must be an https URL, got ${JSON.stringify(pu)}`);
-  const pinsFeed = { url: pu ?? null, enabled: Boolean(pu) && pf !== false };
+  const pinsFeed = { url: pu ?? DEFAULT_ADVISORY_FEED_URL, enabled: pf !== false };
 
   return { policy: resolved, caps, staticWithhold: sw === true, pinsFeed };
 }

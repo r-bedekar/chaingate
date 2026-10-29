@@ -90,10 +90,10 @@ leaves out versions the feed named before. A cut adding more than 2,000 versions
 than 100 or a quarter of those held, is held for a manual step that names the versions it would
 lift. The seed's own entries are not affected by the feed. A cut cannot be replayed or rolled back
 past the cut a host holds, and every dated cut stays public, so a change is visible. The fetch is an
-outbound connection to the configured `advisory_feed_url` host (https only), at proxy start and
-hourly. It sends no identifiers, but that host sees the address of each client that fetches, as
-GitHub does for a seed download. It is off when no URL is configured or with
-`"advisory_feed": false`.
+outbound connection, on by default, to raw.githubusercontent.com (or the configured
+`advisory_feed_url` host, https only), at proxy start and hourly. It sends no identifiers, but that
+host sees the address of each client that fetches, as GitHub does for a seed download. It is off
+with `"advisory_feed": false`.
 
 ### v3 detection seeds and trust modes
 

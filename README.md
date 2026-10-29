@@ -667,10 +667,12 @@ the entry comes from ChainGate's own review of a captured tarball rather than a 
 `chaingate why` also says whether the registry's integrity for the version matches the tarball that was reviewed. The
 version is blocked either way; a difference is a warning beside the BLOCK and one line in the proxy log.
 
-**It makes an outbound connection.** With `"advisory_feed_url": "<https URL>"` in ChainGate's `config.json`, the proxy
-fetches the feed when it starts and then every hour, while a v3 seed is in use, and `chaingate init` says that it is on.
-Each fetch is a few plain GET requests to that host: no account, no registry token, and nothing about your packages or
-this machine. `"advisory_feed": false` turns it off, and a host with no seed never fetches. `chaingate update-advisories`
+**It makes an outbound connection, on by default.** The proxy fetches the feed from
+`https://raw.githubusercontent.com/cgsec-labs/chaingate-pins/main/pins/` when it starts and then every hour, while a
+v3 seed is in use, and `chaingate init` says that it is on. Each fetch is a few plain GET requests to that host: no
+account, no registry token, and nothing about your packages or this machine. `"advisory_feed": false` in ChainGate's
+`config.json` turns it off (`chaingate init` keeps that setting), `"advisory_feed_url": "<https URL>"` fetches a copy
+from another host, and a host with no seed never fetches. `chaingate update-advisories`
 fetches it now; `chaingate update-advisories --file <dir>` reads a copy from a local directory.
 
 **What it accepts.** A cut is used only when it verifies:

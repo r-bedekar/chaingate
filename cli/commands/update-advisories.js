@@ -43,7 +43,10 @@ export default async function updateAdvisories(args, deps = {}) {
     try { feed = validateConfig(readConfigStrict(paths.configFile) || {}, paths.configFile).pinsFeed; } catch (err) {
       console.error(fmt.fail(err.message)); return EXIT.ERROR;
     }
-    if (!feed.url) { console.error(fmt.fail('No advisory feed configured: set advisory_feed_url in the configuration, or pass --file <dir>.')); return EXIT.ERROR; }
+    if (!feed.enabled) {
+      console.error(fmt.fail('The advisory feed is off ("advisory_feed": false in the configuration): remove it, or pass --file <dir>.'));
+      return EXIT.ERROR;
+    }
     get = urlSource(feed.url);
   }
 
