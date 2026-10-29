@@ -175,12 +175,17 @@ test('W5 switch on: an armed download is held until the walk ends (no byte befor
   assert.equal(onEarly.n, 0, 'switch on: nothing is sent before the armed walk has read the whole tarball');
 });
 
-test('W6 switch on: a download that is not armed streams as today', async () => {
+// 0.1.6 every download is walked (deliberate change of expectation): with the switch on, a download no row arms is held too
+test('W6 switch on: a download no row arms is held while the checks read it, then served whole', async () => {
   const hold = { path: '/p/-/p-1.1.0.tgz', split: 100 };
   const r = await withProxy({ upstream: { hold }, config: ON }, async ({ base, release }) => {
     await get(`${base}/p`); const x = await bytesWithin(`${base}/p/-/p-1.1.0.tgz`, 400); release(); x.req.destroy(); return x;
   });
-  assert.ok(r.n > 0);
+  assert.equal(r.n, 0, 'nothing is sent before the walk has read the whole tarball');
+  await withProxy({ config: ON }, async ({ base }) => {
+    await get(`${base}/p`); const t = await get(`${base}/p/-/p-1.1.0.tgz`);
+    assert.equal(t.status, 200); assert.ok(t.body.equals(TARBALLS['/p/-/p-1.1.0.tgz']), 'served whole');
+  });
 });
 
 for (const chunked of [false, true]) {

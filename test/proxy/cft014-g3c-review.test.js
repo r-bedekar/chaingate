@@ -104,11 +104,11 @@ test('G3c-15 (note 5.6) no second walk; an aborted download records nothing; a f
       await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
       const walks = walkerStats().created;
       await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
-      // 0.1.5 static checks (deliberate change of expectation): MC's WARN is a named row and ARMS the next download's walk for the
-      // static checks (design note §3; ruling 2026-10-13) -- exactly one more walk; after it the outcome is settled
-      assert.equal(walkerStats().created, walks + 1, 'one more walk, armed by MC');
+      // 0.1.6 every download is walked (deliberate change of expectation; 0.1.5 had one more walk here, armed by MC's WARN): the
+      // first walk read the static checks too, so the outcome is settled
+      assert.equal(walkerStats().created, walks, 'no second walk');
       await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
-      assert.equal(walkerStats().created, walks + 1, 'a settled outcome is not walked again');
+      assert.equal(walkerStats().created, walks, 'a settled outcome is not walked again');
       // aborted: the client goes away mid-stream
       await new Promise((resolve) => {
         const req = http.get(`${base}/m/-/m-1.0.0.tgz`, { agent: false }, (res) => { res.once('data', () => { req.destroy(); setTimeout(resolve, 400); }); });

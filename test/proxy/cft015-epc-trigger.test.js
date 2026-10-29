@@ -104,10 +104,11 @@ test('EPC-E1 a main move against the lineage predecessor arms the walk: the stat
   });
 });
 
-test('EPC-E2 a first version (below the eight-version history floor, no predecessor) gets no entry-path-change NOTE: the walk stays MC-only', async () => {
+test('EPC-E2 a first version (below the eight-version history floor, no predecessor) gets no entry-path-change NOTE: the rows say every download armed the walk', async () => {
   await withProxy(async ({ base, proxy }) => {
     await get(`${base}/f`); await get(`${base}/f/-/f-1.0.0.tgz`); await settle();
     assert.ok(!classify(rowsOf(proxy, 'f', '1.0.0')).contributing.includes('entry-path-change'));
-    for (const id of ['S0', 'S1', 'S2', 'S3', 'S4']) assert.match(srow(proxy, 'f', '1.0.0', id)?.detail ?? '', /^not checked: not armed/, id);
+    // 0.1.6 every download is walked (deliberate change of expectation)
+    for (const id of ['S0', 'S1', 'S2', 'S3', 'S4']) assert.match(srow(proxy, 'f', '1.0.0', id)?.detail ?? '', /armed by every download$/, id);
   });
 });

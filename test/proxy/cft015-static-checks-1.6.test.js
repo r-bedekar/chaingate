@@ -317,7 +317,7 @@ const runCli = (args, env) => new Promise((resolve) => {
   let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; }); c.on('close', (code) => resolve({ code, out }));
 });
 
-test('E1 an armed download stores its static-checks-1.6 facts once (rule 6 wasm run, rule 7 on S5, 8d the shell script, 8h present); the download, its rows and its notice are unchanged; an unarmed one stores none', async () => {
+test('E1 an armed download stores its static-checks-1.6 facts once (rule 6 wasm run, rule 7 on S5, 8d the shell script, 8h present); the download, its rows and its notice are unchanged; one no row arms stores them too (since 0.1.6)', async () => {
   await withProxy({}, async ({ base, proxy }) => {
     await get(`${base}/z`); const t = await get(`${base}/z/-/z-1.1.0.tgz`);
     assert.equal(t.status, 200); assert.ok(t.body.equals(TARBALLS['/z/-/z-1.1.0.tgz']), 'served unchanged');
@@ -334,7 +334,8 @@ test('E1 an armed download stores its static-checks-1.6 facts once (rule 6 wasm 
     await get(`${base}/z/-/z-1.1.0.tgz`); await settle();
     assert.deepEqual(proxy.witnessDb.staticFactsFor('z', '1.1.0'), x, 'written once');
     await get(`${base}/q`); await get(`${base}/q/-/q-1.1.0.tgz`); await settle();
-    assert.equal(proxy.witnessDb.staticFactsFor('q', '1.1.0'), null, 'not armed: no member read for the facts');
+    // 0.1.6 every download is walked (deliberate change of expectation): S8 and S9 read the member facts, so every walk gathers them
+    assert.equal((await eventually(() => proxy.witnessDb.staticFactsFor('q', '1.1.0')))?.facts?.status, 'CHECKED', 'every download: the member facts are read');
   });
 });
 
@@ -417,7 +418,7 @@ test('T2 the store: recordStaticFacts(p, v, x, ms) writes static_facts_ms with t
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('T3 end to end: the armed version carries static_facts_ms beside facts_ms, read by the sqlite line; the unarmed one NULL; the facts block unchanged', async () => {
+test('T3 end to end: every walked version carries static_facts_ms beside facts_ms, read by the sqlite line; the facts block unchanged', async () => {
   await withProxy({}, async ({ base, proxy, dbPath }) => {
     await get(`${base}/z`); await get(`${base}/z/-/z-1.1.0.tgz`);
     const x = await eventually(() => proxy.witnessDb.staticFactsFor('z', '1.1.0'));
@@ -429,7 +430,8 @@ test('T3 end to end: the armed version carries static_facts_ms beside facts_ms, 
       const z = rows.find((w) => w.package_name === 'z'); const q = rows.find((w) => w.package_name === 'q');
       assert.ok(Number.isFinite(z?.static_facts_ms) && z.static_facts_ms > 0, JSON.stringify(rows));
       assert.ok(Number.isFinite(z.facts_ms), 'beside facts_ms');
-      assert.equal(q?.static_facts_ms ?? null, null, JSON.stringify(rows));
+      // 0.1.6 every download is walked (deliberate change of expectation)
+      assert.ok(Number.isFinite(q?.static_facts_ms), JSON.stringify(rows));
     } finally { r.close(); }
   });
 });

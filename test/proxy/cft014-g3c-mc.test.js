@@ -100,11 +100,11 @@ test('G3c-4/G3c-5 (D-M4, D-M5) the next download carries the notice without a se
     // since 0.1.6: install-introduced follows the tarball package.json npm runs (a first postinstall), beside MC
     assert.equal(t2.headers['npm-notice'], "chaingate: WARNING m@1.1.0: an install script appears that earlier releases did not have; its tarball's install scripts differ from its registry entry. Details: chaingate why m@1.1.0");
     await settle();
-    // 0.1.5 static checks (deliberate change of expectation): MC's WARN is a named row, so it ARMS the next download's walk for the
-    // static checks (design note §3; ruling 2026-10-13) -- exactly one more decision row; MC itself is not re-walked (its row rides along)
-    assert.equal(rows(), n + 1, 'one more walk, armed by MC; nothing else');
+    // 0.1.6 every download is walked (deliberate change of expectation; 0.1.5 had one more walk here, armed by MC's WARN): the first
+    // download's walk read the static checks too, so the outcome is settled and the next download walks nothing
+    assert.equal(rows(), n, 'settled on the first walk: no second walk');
     await get(`${base}/m`);
-    assert.equal(rows(), n + 1, 'carry-forward: no new row');
+    assert.equal(rows(), n, 'carry-forward: no new row');
     assert.equal(mcRow(proxy, '1.1.0').result, 'WARN');
   });
 });

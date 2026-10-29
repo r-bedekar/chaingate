@@ -154,7 +154,8 @@ test('EF-E1 an UNARMED download stores its entry facts once; the next version fi
     const t = await get(`${base}/g/-/g-1.0.0.tgz`); assert.equal(t.status, 200); assert.ok(t.body.equals(TARBALLS['/g/-/g-1.0.0.tgz']));
     await settle();
     assert.equal(proxy.witnessDb.hasEntryFacts('g', '1.0.0'), true);
-    assert.match(proxy.witnessDb.getLatestDecision('g', '1.0.0').gates_fired.find((r) => r.gate === 'static:S1-loader-in-hook-target')?.detail ?? 'not checked: not armed', /^not checked: not armed/, 'storing facts arms nothing');
+    // 0.1.6 every download is walked (deliberate change of expectation): the rows say what armed the walk, and no row armed this one
+    assert.match(proxy.witnessDb.getLatestDecision('g', '1.0.0').gates_fired.find((r) => r.gate === 'static:S1-loader-in-hook-target')?.detail ?? '', /armed by every download$/, 'storing facts arms nothing');
     await get(`${base}/g/-/g-1.1.0.tgz`); await settle();
     const p = proxy.witnessDb.predecessorEntryFacts('g', '1.1.0');
     assert.equal(p?.version, '1.0.0');

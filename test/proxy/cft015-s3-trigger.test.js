@@ -89,7 +89,7 @@ test('U1 armedBy: a named WARN row, the identity-break NOTE, or the seed coverag
   assert.equal(S.armedBy([{ gate: 'seed-v3', result: 'SKIP', detail: 'x', rows: [{ gate: 'seed-v3:coverage', result: 'SKIP' }] }]), null, 'a stale-seed SKIP is not the coverage WARN');
   assert.equal(S.armedBy([WARN('publisher-identity')]), null, 'a WARN from a contributing gate the role table has not yet turned is not named');
   assert.equal(S.armedBy([]), null); assert.equal(S.armedBy(null), null); assert.equal(S.armedBy([null, 7, { gate: 3 }]), null);
-  assert.equal(S.MAX_ARMED_WALKS, 4);
+  assert.equal(S.MAX_ARMED_WALKS, 16);   // 0.1.6: every download is walked, so the ceiling is npm's 16 connections (declared)
 });
 
 test('U2 roles: S1-S4 are contributing (S0 and S5 named 2026-10-15, cft015-s9; S6 and S7 named 2026-10-22, cft015-named-s6-s7; declared); a contributing static WARN is recorded as NOTE; MC stays named', async () => {
@@ -159,30 +159,30 @@ test('E1 armed by install-introduced: the first download records S1 as NOTE besi
   });
 });
 
-test('E2 not armed: the MC-only walk records the five static rows as "not checked: not armed", which chaingate why can show', async () => {
+// 0.1.6 every download is walked (deliberate change of expectation): E2 and E3 were "not armed" on the first download
+test('E2 nothing arms the download: it is walked anyway and every static row names "every download", which chaingate why can show', async () => {
   await withProxy(async ({ base, proxy }) => {
     await get(`${base}/p`); await get(`${base}/p/-/p-1.1.0.tgz`); await settle();
     const mc = rowsOf(proxy, 'p', '1.1.0').find((g) => g.gate === 'install-manifest-mismatch'); assert.equal(mc?.result, 'ALLOW');
-    for (const id of ['S0', 'S1', 'S2', 'S3', 'S4']) { const r = srow(proxy, 'p', '1.1.0', id); assert.equal(r?.result, 'SKIP', id); assert.equal(r.detail, 'not checked: not armed (no named row, no identity-break, no entry-path-change, no coverage gap)'); }
+    for (const id of ['S0', 'S1', 'S2', 'S3', 'S4']) { const r = srow(proxy, 'p', '1.1.0', id); assert.ok(r, id); assert.doesNotMatch(r.detail, /^not checked: not armed/, id); assert.match(r.detail, /; armed by every download$/, id); }
     assert.equal(proxy.witnessDb.getLatestDecision('p', '1.1.0').disposition, 'ALLOW');
     const n = proxy.witnessDb.getDecisionHistory('p', '1.1.0').length;
     await get(`${base}/p/-/p-1.1.0.tgz`); await settle();
-    assert.equal(proxy.witnessDb.getDecisionHistory('p', '1.1.0').length, n, 'still not armed: no second walk');
+    assert.equal(proxy.witnessDb.getDecisionHistory('p', '1.1.0').length, n, 'settled: no second walk');
   });
 });
 
-test('E3 MC\'s own WARN is a named row: it arms the NEXT download, which walks once more for the static rows; the third download walks nothing', async () => {
+test('E3 MC\'s WARN and the static rows come from the FIRST download\'s walk; the second download carries MC\'s notice and walks nothing', async () => {
   await withProxy(async ({ base, proxy }) => {
     await get(`${base}/m`); await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
     assert.equal(rowsOf(proxy, 'm', '1.1.0').find((g) => g.gate === 'install-manifest-mismatch').result, 'WARN');
-    assert.match(srow(proxy, 'm', '1.1.0', 'S1').detail, /^not checked: not armed/);
+    const s1 = srow(proxy, 'm', '1.1.0', 'S1');
+    assert.equal(s1.result, 'SKIP'); assert.equal(s1.detail, 'not checked: s.js named by the tarball package.json only (not kept); armed by every download');   // the runtime has no inventory, so it states what it knows
+    assert.equal(srow(proxy, 'm', '1.1.0', 'S2').detail, 'entry files carry no obfuscation marker pair (1 file read); armed by every download');
     const n1 = proxy.witnessDb.getDecisionHistory('m', '1.1.0').length;
     const t2 = await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
     assert.match(t2.headers['npm-notice'], /install scripts differ/, 'MC\'s notice on the second download, as before');
-    assert.equal(proxy.witnessDb.getDecisionHistory('m', '1.1.0').length, n1 + 1, 'one more walk, armed by MC');
-    const s1 = srow(proxy, 'm', '1.1.0', 'S1');
-    assert.equal(s1.result, 'SKIP'); assert.equal(s1.detail, 'not checked: s.js named by the tarball package.json only (not kept); armed by named rows install-introduced, install-manifest-mismatch');   // wording set after the failing-first record: the runtime has no inventory, so it states what it knows
-    assert.equal(srow(proxy, 'm', '1.1.0', 'S2').detail, 'entry files carry no obfuscation marker pair (1 file read); armed by named rows install-introduced, install-manifest-mismatch');
+    assert.equal(proxy.witnessDb.getDecisionHistory('m', '1.1.0').length, n1, 'settled on the first walk: no second walk');
     assert.equal(rowsOf(proxy, 'm', '1.1.0').find((g) => g.gate === 'install-manifest-mismatch').result, 'WARN', 'MC\'s row rides along unchanged');
     const n2 = proxy.witnessDb.getDecisionHistory('m', '1.1.0').length;
     await get(`${base}/m/-/m-1.1.0.tgz`); await settle();
