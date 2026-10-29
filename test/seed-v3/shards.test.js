@@ -1,5 +1,5 @@
 // Since 0.1.6: seed shards 1.0 (contract 1.3 seeds split into buckets of packages under a signed root). The reader side of the
-// contract's cache open rules, sections 3.1 and 3.2: the root verifies first (canonical bytes, a shards key named by a key list
+// contract's rules for opening a cache: the root verifies first (canonical bytes, a shards key named by a key list
 // the seed key signs, valid at the reader's time, the signature over the root's sha256 hex), then each bucket only whole, in
 // order: its size, its sha256, one gzip stream under raw_bytes_max, staged in a temporary database, its logical digest, read
 // layout, bucket rule and lineage ids, then imported in one transaction. The fixture is the seed lane's signed toy set (per-run
@@ -135,13 +135,14 @@ test('SH6 a newer root keeps the buckets it lists with the same logical digest a
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+// changed with the cache reads (shards-cache.test.js): a cache is opened on its stored root, not on a file digest
 test('SH7 a cache with every bucket of one root is read by the 0.1.6 seed reader as a contract 1.3 seed', async () => {
   const R = (await import('../../seed/v3/reader.js')).default;
   const root = rootOf(); const dir = tmp(); const cache = path.join(dir, 'chaingate-seed.db');
   try {
     for (let i = 0; i < 8; i += 1) SH.importBucket(cache, root, i, SH.verifyBucketBytes(root, i, fileOf(null, `buckets/${String(i).padStart(5, '0')}.db.gz`)));
-    fs.writeFileSync(`${cache}.sha256`, `${R.sha256File(cache)}  chaingate-seed.db\n`);
-    const rep = R.verify(cache, { trust: R.TRUST_UNSIGNED_DEV });
+    const rep = R.verify(cache, { trust: R.TRUST_AUTHENTICATED, pubkey: SEED_KEY, shardBits: 3, now: () => NOW });
+    assert.equal(rep.authenticated, true); assert.equal(rep.shard_cache.buckets_held, 8);
     assert.equal(rep.ok, true, JSON.stringify(Object.entries(rep.checks).filter(([, v]) => v !== true)));
     assert.equal(rep.meta.seed_contract_version, 'cft-seed-v3-contract-1.3');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
