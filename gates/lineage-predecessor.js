@@ -13,6 +13,8 @@
 //   predecessor (+pipekey1): a release takes the previous version of ANY tag family in its lineage key
 //   (publish order, so a prerelease can be its predecessor); a prerelease takes the previous version of ITS OWN tag family in
 //   that key, and the first of a family has none.
+//   tag family (+platfam1, since 0.1.6, tag family 0.3 as the live rule): a prerelease's platform tokens join its family, so
+//   "2.0.0-beta.25-darwin-arm64" follows "2.0.0-beta.24-darwin-arm64", not the "2.0.0-beta.25" published beside it.
 //
 // As in the seed's resolver, two maps are resolved: the legacy one (only the regex excludes) and the activated one (forward
 // rows by the stub predicate). A version takes its predecessor from the activated map when it was first observed at or after
@@ -28,10 +30,12 @@
 // prereleases change predecessor (2,149,041 of 24,248,817 versions), no release does.
 //
 // Cost: an index per packument (memoised per (versions, times) object), O(n log n); a lookup is O(1).
-import { RELEASE_FAMILY, HOLDING_DESCRIPTION, tagFamily } from '../seed/v3/tag-family.js';
+import { RELEASE_FAMILY, HOLDING_DESCRIPTION, tagFamily as seedTagFamily } from '../seed/v3/tag-family.js';
 
-export { HOLDING_DESCRIPTION, tagFamily };
-export const LINEAGE_RULE_VERSION = 'infra5d-1.2+fu2final+norm1+sizeshrink+pipekey1';
+export { HOLDING_DESCRIPTION };
+/** The tag family this predecessor groups by: 0.3, with the prerelease's platform tokens. */
+export const tagFamily = (version) => seedTagFamily(version, { platforms: true });
+export const LINEAGE_RULE_VERSION = 'infra5d-1.2+fu2final+norm1+sizeshrink+pipekey1+platfam1';
 export const DETECTOR_STUB_EFFECTIVE_AT = '2026-10-13T22:00:00Z';   // collector/stub_recognition.py, the same instant
 export const STUB_RE = /0\.0\.\d+-security$/;          // E4, exactly the corpus's pattern
 const LEGACY_STUB_VERSION = '0.0.1-security';

@@ -132,7 +132,9 @@ warning:
     version before it, and its link to the repository broke: `gitHead` is missing where the version before it had one,
     or the repository URL changed. npm prints "its tarball grew fivefold and its link to the repository broke". "The
     version before it" is the previous version in the release's line; for a prerelease it is the previous version of
-    its own tag (a `-canary` is compared with the last canary). The first version of a new tag has none, and the rule
+    its own tag (a `-canary` is compared with the last canary). Since 0.1.6 a build for one platform is compared with the
+    last build of its tag for the same platform (`2.0.0-beta.25-darwin-arm64` with `2.0.0-beta.24-darwin-arm64`, not with
+    the `2.0.0-beta.25` published beside it). The first version of a new tag, or of a tag on a platform, has none, and the rule
     says it is not evaluable. A holding package npm publishes in place of removed malware is never used as the version
     before;
   - six of the tarball checks (below).
