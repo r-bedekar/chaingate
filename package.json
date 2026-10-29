@@ -24,13 +24,13 @@
   ],
   "license": "Apache-2.0",
   "author": "CGSec",
-  "homepage": "https://github.com/r-bedekar/chaingate#readme",
+  "homepage": "https://github.com/cgsec-labs/chaingate#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/r-bedekar/chaingate.git"
+    "url": "git+https://github.com/cgsec-labs/chaingate.git"
   },
   "bugs": {
-    "url": "https://github.com/r-bedekar/chaingate/issues"
+    "url": "https://github.com/cgsec-labs/chaingate/issues"
   },
   "publishConfig": {
     "access": "public"

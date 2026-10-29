@@ -7,7 +7,7 @@ import { join } from 'node:path';
 // where CLI version releases (vN.M.K) and seed releases (seed-vN.M) coexist
 // on the same repo: the CLI filters by SEED_TAG_PATTERN and picks the most
 // recently published matching release.
-export const SEED_REPO = 'r-bedekar/chaingate';
+export const SEED_REPO = 'cgsec-labs/chaingate';
 export const SEED_TAG_PATTERN = /^seed-v\d+(\.\d+)*$/;
 
 export const SEED_FILES = [

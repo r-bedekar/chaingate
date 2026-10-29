@@ -214,7 +214,7 @@ The chaingate CLI resolves the most recent legacy seed release dynamically
 via the GitHub REST API rather than relying on a fixed download URL.
 On `chaingate update-seed`:
 
-1. The CLI calls `https://api.github.com/repos/r-bedekar/chaingate/releases`
+1. The CLI calls `https://api.github.com/repos/cgsec-labs/chaingate/releases`
 2. Filters releases whose tag matches `^seed-v\d+(\.\d+)*$`
 3. Selects the most recently published matching release
 4. Fetches three assets from that release: `chaingate-seed.db`,

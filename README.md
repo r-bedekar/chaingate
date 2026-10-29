@@ -473,13 +473,13 @@ Not tested on Windows:
 From source:
 
 ```bash
-git clone https://github.com/r-bedekar/chaingate.git
+git clone https://github.com/cgsec-labs/chaingate.git
 cd chaingate && npm install
 npm test
 ```
 
 **You download the v3 detection seed yourself.** It is published as the signed GitHub release
-[seed-v3.2-full](https://github.com/r-bedekar/chaingate/releases/tag/seed-v3.2-full). Download its
+[seed-v3.2-full](https://github.com/cgsec-labs/chaingate/releases/tag/seed-v3.2-full). Download its
 `chaingate-seed-v3.db.gz`, `chaingate-seed-v3.db.sha256` and `chaingate-seed-v3.db.sig` assets into one folder
 (about 1 GB to download, about 2.4 GB once installed) and pass the `.gz` file with `--seed`. **ChainGate does not
 download it for you.** seed-v3.2-full needs ChainGate 0.1.5 or later: earlier versions refuse it and keep the

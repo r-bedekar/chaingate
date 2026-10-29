@@ -9,7 +9,7 @@ A v3 seed is never downloaded automatically: you pass it to `chaingate init --se
 ## seed-v3.2-full: signed v3 detection seed (current)
 
 **Status:** published as the GitHub release
-[seed-v3.2-full](https://github.com/r-bedekar/chaingate/releases/tag/seed-v3.2-full), for
+[seed-v3.2-full](https://github.com/cgsec-labs/chaingate/releases/tag/seed-v3.2-full), for
 `@cgsec/chaingate` 0.1.5 or later. 0.1.4 and earlier cannot read it.
 
 - **Signed.** The seed is signed with the ChainGate seed key `ed25519:09f6c9fdb8f5a2ea`, the key built into the
@@ -72,7 +72,7 @@ Upgrade the runtime to 0.1.5 before you switch to this seed. To go back to 0.1.4
 ## seed-v3.1-full: signed v3 detection seed (previous)
 
 **Status:** published as the GitHub pre-release
-[seed-v3.1-full](https://github.com/r-bedekar/chaingate/releases/tag/seed-v3.1-full), for
+[seed-v3.1-full](https://github.com/cgsec-labs/chaingate/releases/tag/seed-v3.1-full), for
 `@cgsec/chaingate` 0.1.4. 0.1.5 also reads it.
 
 - **Signed.** The seed is signed with the ChainGate seed key `ed25519:09f6c9fdb8f5a2ea`, the key built into the
@@ -141,7 +141,7 @@ Do not add `--unsigned-development`. This seed is signed and never needs it; tha
 engineering and test seeds.
 
 To request a correction or a removal (for example a withdrawn advisory or a wrong pairing), open an issue at
-https://github.com/r-bedekar/chaingate/issues. Corrected seeds are cut with the regular classification refresh, every one
+https://github.com/cgsec-labs/chaingate/issues. Corrected seeds are cut with the regular classification refresh, every one
 to two weeks.
 
 The seed is licensed CC BY 4.0; third-party data keeps its own terms (see `THIRD_PARTY_NOTICES.txt` on the release).

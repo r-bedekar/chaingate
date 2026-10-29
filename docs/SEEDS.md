@@ -4,7 +4,7 @@ History of signed seed bundles published to GitHub Releases.
 
 ## seed-v2.1 (2026-04-25)
 
-- Release: https://github.com/r-bedekar/chaingate/releases/tag/seed-v2.1
+- Release: https://github.com/cgsec-labs/chaingate/releases/tag/seed-v2.1
 - SHA256: `db86c7ff90bb71c769735e1f770a52d1655c34cda3ec1b72f7eb8763e99e3515`
 - Schema version: 2
 - Status: rebuilt to verify the new collection pipeline; the first seed
@@ -15,7 +15,7 @@ History of signed seed bundles published to GitHub Releases.
 
 ## seed-v2 (2026-04-20)
 
-- Release: https://github.com/r-bedekar/chaingate/releases/tag/seed-v2
+- Release: https://github.com/cgsec-labs/chaingate/releases/tag/seed-v2
 - SHA256: `7911df707fce0b6f9880dd5103e8f72097c4a794625140fa2cd498237aa085b2`
 - Seed version: `2026.04.20.1`
 - Schema version: 2

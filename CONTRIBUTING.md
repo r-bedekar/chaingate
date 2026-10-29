@@ -3,7 +3,7 @@
 ## Getting Started
 
 ```bash
-git clone https://github.com/r-bedekar/chaingate.git
+git clone https://github.com/cgsec-labs/chaingate.git
 cd chaingate
 npm install
 npm run hooks  # activates the git guard hooks (.githooks/)
