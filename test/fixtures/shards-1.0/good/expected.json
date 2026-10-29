@@ -1,0 +1,25 @@
+{
+ "bucket_bits": 3,
+ "bucket_of": {
+  "@sc/pkg-c": 0,
+  "pkg-a": 3,
+  "pkg-b": 2,
+  "pkg-d": 3,
+  "pkg-e": 4,
+  "pkg-f": 5,
+  "pkg-gone": 3
+ },
+ "now": "2026-10-29T12:00:00Z",
+ "pins": [
+  [
+   "pkg-b",
+   "1.1.0"
+  ],
+  [
+   "pkg-gone",
+   "6.6.6"
+  ]
+ ],
+ "seed_logical_digest": "fdf30828855241c79c08332471ca24e9d3150d0e5ce3124239e86043e80b9e56",
+ "signing_key_id": "ed25519:f96ebc12c69f735e"
+}

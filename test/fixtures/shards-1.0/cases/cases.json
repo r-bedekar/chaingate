@@ -1,0 +1,93 @@
+[
+ {
+  "name": "bucket-bytes-changed",
+  "replaces": [
+   "buckets/00003.db.gz"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "gz_sha256"
+ },
+ {
+  "name": "bucket-longer-than-gz-bytes",
+  "replaces": [
+   "buckets/00003.db.gz"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "gz_bytes"
+ },
+ {
+  "name": "bucket-past-raw-bytes-max",
+  "replaces": [
+   "buckets/00003.db.gz",
+   "root.json",
+   "root.json.gz",
+   "root.json.sig"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "raw_bytes_max (the root is validly signed and names these bytes)"
+ },
+ {
+  "name": "root-changed-after-signing",
+  "replaces": [
+   "root.json",
+   "root.json.gz"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "root signature"
+ },
+ {
+  "name": "root-signed-by-another-key",
+  "replaces": [
+   "root.json.sig"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "root signature"
+ },
+ {
+  "name": "root-not-canonical",
+  "replaces": [
+   "root.json"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "canonical"
+ },
+ {
+  "name": "manifest-not-by-the-seed-key",
+  "replaces": [
+   "keys.json.sig"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "key manifest signature"
+ },
+ {
+  "name": "manifest-has-no-shards-key",
+  "replaces": [
+   "keys.json",
+   "keys.json.sig"
+  ],
+  "at": "2026-10-29T12:00:00Z",
+  "expect": "refused",
+  "reason": "shards key"
+ },
+ {
+  "name": "shards-key-expired",
+  "replaces": [],
+  "at": "2027-01-28T00:00:00Z",
+  "expect": "refused",
+  "reason": "valid at"
+ },
+ {
+  "name": "shards-key-not-yet-valid",
+  "replaces": [],
+  "at": "2026-10-28T23:59:59Z",
+  "expect": "refused",
+  "reason": "valid at"
+ }
+]
