@@ -180,4 +180,51 @@ export async function setUpSeedCache({ get, cachePath, names = [], seedKey = SEE
   } catch (e) { return { ok: false, why: String(e?.why ?? e?.message ?? e).slice(0, 300) }; }
 }
 
-export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath, lockfileNames, setUpSeedCache };
+/**
+ * What a cache file holds, for `status` and `doctor`, read without verifying (the proxy verifies when it opens the cache):
+ * { root_cut_at, root_digest, buckets_held, buckets_total, last_fetch }, or null when there is no cache or no root yet.
+ */
+export function readSeedCache(cachePath) {
+  try {
+    return readCache(cachePath, (db) => {
+      if (!db || !tableOf(db, 'shard_root')) return null;
+      const r = db.prepare('SELECT digest, cut_at, root_json FROM shard_root WHERE id = 1').get();
+      if (!r) return null;
+      let total = null;
+      try { total = Array.isArray(JSON.parse(r.root_json).buckets) ? JSON.parse(r.root_json).buckets.length : null; } catch { /* unread */ }
+      const f = SH.readFetch(db);
+      return { root_cut_at: r.cut_at, root_digest: r.digest, buckets_held: heldOf(db).size, buckets_total: total,
+        last_fetch: f ? { outcome: f.outcome, attempted_at: f.attempted_at, why: f.why } : null };
+    });
+  } catch { return null; }
+}
+
+const age = (ms) => (ms < 48 * 3600e3 ? `${Math.max(0, Math.floor(ms / 3600e3))} h` : `${Math.floor(ms / 86400e3)} days`);
+
+/**
+ * What `status` and `doctor` say about the seed cache. `url` is the configured host or null (off); `cache` is readSeedCache's
+ * result. Returns { state, text, notice }: state is 'off', 'none', 'fresh', 'old' (past 48 hours) or 'stale' (past 7 days);
+ * notice is true when the user should look (no root yet, old, stale, a failed or refused fetch).
+ */
+export function describeSeedCache({ url, cache, now = Date.now() }) {
+  if (!url && !cache) return { state: 'off', text: 'off (seed_cache is false)', notice: false };
+  const parts = [];
+  let state = 'none';
+  if (!cache) parts.push('no root fetched yet; the installed full seed, if any, serves until one is');
+  else {
+    const ms = now - Date.parse(cache.root_cut_at);
+    state = ms > 7 * 864e5 ? 'stale' : ms > 48 * 3600e3 ? 'old' : 'fresh';
+    parts.push(`root of ${cache.root_cut_at} (${age(ms)} old), ${cache.buckets_held} of ${cache.buckets_total ?? '?'} buckets held `
+      + '(the others are fetched when a package needs them)');
+    if (state === 'old') parts.push('older than 48 hours');
+    if (state === 'stale') parts.push('older than 7 days, stated on every decision');
+  }
+  const last = cache?.last_fetch;
+  if (last && ['failed', 'refused'].includes(last.outcome)) parts.push(`last fetch ${last.outcome} at ${last.attempted_at}: ${last.why}`);
+  if (!url) parts.push('fetching is off');
+  const notice = state !== 'fresh' || ['failed', 'refused'].includes(last?.outcome);
+  return { state, text: parts.join('; '), notice };
+}
+
+export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath, lockfileNames, setUpSeedCache,
+  readSeedCache, describeSeedCache };
