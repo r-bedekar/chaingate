@@ -179,3 +179,26 @@ test('SF8 the names a lockfile lists: package-lock or shrinkwrap, lockfile versi
     assert.deepEqual(F.lockfileNames(dir), ['z']);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('SF9 what status and doctor say: off, none yet (a notice), held buckets and the root age, older than 48 hours or 7 days, a failed fetch', async () => {
+  const H = 3600e3;
+  assert.deepEqual(F.describeSeedCache({ url: null, cache: null }), { state: 'off', text: 'off (seed_cache is false)', notice: false });
+  const none = F.describeSeedCache({ url: 'https://shards.example/', cache: null });
+  assert.equal(none.state, 'none'); assert.equal(none.notice, true); assert.match(none.text, /no root fetched yet/);
+  await serve(async ({ base, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: cache, names: ['pkg-b', 'pkg-e'], ...opts() });
+    assert.equal(r.ok, true);
+    const c = F.readSeedCache(cache);
+    assert.deepEqual({ ...c, last_fetch: c.last_fetch.outcome }, { root_cut_at: EXPECTED.now, root_digest: r.root_digest, buckets_held: 2,
+      buckets_total: 8, last_fetch: 'accepted' });
+    const fresh = F.describeSeedCache({ url: base, cache: c, now: NOW + 2 * H });
+    assert.equal(fresh.state, 'fresh'); assert.equal(fresh.notice, false);
+    assert.equal(fresh.text, `root of ${EXPECTED.now} (2 h old), 2 of 8 buckets held (the others are fetched when a package needs them)`);
+    const old = F.describeSeedCache({ url: base, cache: c, now: NOW + 50 * H });
+    assert.equal(old.state, 'old'); assert.equal(old.notice, true); assert.match(old.text, /older than 48 hours/);
+    const stale = F.describeSeedCache({ url: base, cache: c, now: NOW + 8 * 24 * H });
+    assert.equal(stale.state, 'stale'); assert.match(stale.text, /8 days old.*older than 7 days, stated on every decision/);
+    const failed = F.describeSeedCache({ url: base, cache: { ...c, last_fetch: { outcome: 'failed', attempted_at: 'T', why: 'HTTP 503' } }, now: NOW + H });
+    assert.equal(failed.notice, true); assert.match(failed.text, /last fetch failed at T: HTTP 503/);
+  });
+});
