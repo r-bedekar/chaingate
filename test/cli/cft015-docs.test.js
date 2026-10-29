@@ -55,7 +55,7 @@ test('D6 the README says which commands honour CHAINGATE_PORT (doctor, report, p
 
 test('D7 the 0.1.5 README points at seed-v3.2-full as a .gz, says it needs 0.1.5, and states the 0.1.5 test run', () => {
   const r = words('README.md');
-  assert.match(r, /\[seed-v3\.2-full\]\(https:\/\/github\.com\/r-bedekar\/chaingate\/releases\/tag\/seed-v3\.2-full\)/);
+  assert.match(r, /\[seed-v3\.2-full\]\(https:\/\/github\.com\/cgsec-labs\/chaingate\/releases\/tag\/seed-v3\.2-full\)/);   // the repository moved (0.1.6)
   assert.match(r, /seed-v3\.2-full needs ChainGate 0\.1\.5 or later/);
   assert.doesNotMatch(r, /releases\/tag\/seed-v3\.1-full/, 'the published seed the README sends users to is v3.2');
   assert.match(r, /\$ chaingate init --seed \.\/seed-v3\.2\/chaingate-seed-v3\.db\.gz/);

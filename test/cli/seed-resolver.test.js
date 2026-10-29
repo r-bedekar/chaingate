@@ -15,7 +15,7 @@ function release({ tag, publishedAt = '2026-04-25T12:00:00Z', assets = null }) {
     published_at: publishedAt,
     assets: assets ?? SEED_FILES.map((name) => ({
       name,
-      browser_download_url: `https://github.com/r-bedekar/chaingate/releases/download/${tag}/${name}`,
+      browser_download_url: `https://github.com/cgsec-labs/chaingate/releases/download/${tag}/${name}`,
     })),
   };
 }
@@ -83,6 +83,15 @@ describe('pickLatestSeedRelease — edge cases', () => {
   });
 });
 
+// since 0.1.6: the repository moved to cgsec-labs/chaingate (GitHub redirects the old name, but a release asks the new one)
+describe('fetchReleases — the repository', () => {
+  it('asks the GitHub API for the releases of cgsec-labs/chaingate', async () => {
+    let asked = null;
+    await fetchReleases({ fetchImpl: async (u) => { asked = String(u); return { ok: true, status: 200, headers: { get: () => null }, json: async () => [] }; } });
+    assert.equal(asked, 'https://api.github.com/repos/cgsec-labs/chaingate/releases');
+  });
+});
+
 describe('fetchReleases — edge cases', () => {
   it('throws SeedResolutionError(rate-limit) on 403 with rate-limit headers', async () => {
     const resetTs = Math.floor(Date.now() / 1000) + 1800;
@@ -122,7 +131,7 @@ describe('extractAssetUrls', () => {
     const urls = extractAssetUrls(r);
     for (const f of SEED_FILES) {
       assert.ok(urls[f], `missing URL for ${f}`);
-      assert.match(urls[f], /^https:\/\/github\.com\/r-bedekar\/chaingate\/releases\/download\/seed-v2\.1\//);
+      assert.match(urls[f], /^https:\/\/github\.com\/cgsec-labs\/chaingate\/releases\/download\/seed-v2\.1\//);
     }
   });
 
