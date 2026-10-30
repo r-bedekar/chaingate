@@ -16,12 +16,14 @@ import Database from 'better-sqlite3';
 import * as F from '../../cli/seed-shards.js';
 import * as SH from '../../seed/v3/shards.js';
 import R from '../../seed/v3/reader.js';
+import { fixtureRel, caPathOf, fixtureRoot } from '../helpers/shards-host.mjs';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'shards-1.0');
 const EXPECTED = JSON.parse(fs.readFileSync(path.join(FIX, 'good', 'expected.json'), 'utf8'));
 const CASES = JSON.parse(fs.readFileSync(path.join(FIX, 'cases', 'cases.json'), 'utf8'));
 const SEED_KEY = crypto.createPublicKey(fs.readFileSync(path.join(FIX, 'good', 'fixture-seed-pub.pem')));
 const NOW = Date.parse(EXPECTED.now);
+const GOOD_ROOT = fixtureRoot(FIX);
 const fileOf = (c, rel) => fs.readFileSync(path.join(FIX, c && c.replaces.includes(rel) ? path.join('cases', c.name) : 'good', rel));
 
 /** A local server for the fixture (or one of its cases); `over` replaces a path's answer; every request is recorded. */
@@ -32,7 +34,7 @@ async function serve(fn, { c = null, over = {} } = {}) {
     seen.push({ rel, inm: req.headers['if-none-match'] ?? null, ua: req.headers['user-agent'] ?? null, auth: req.headers.authorization ?? null });
     if (over[rel]) return over[rel](req, res);
     let body;
-    try { body = fileOf(c, rel); } catch { res.writeHead(404); return res.end(); }
+    try { body = fileOf(c, fixtureRel(rel)); } catch { res.writeHead(404); return res.end(); }
     // a case that replaces root.json alone is served as the gzip of its root.json, the bytes the client reads
     if (rel === 'root.json.gz' && c && c.replaces.includes('root.json') && !c.replaces.includes('root.json.gz')) body = zlib.gzipSync(fileOf(c, 'root.json'));
     const etag = `"${crypto.createHash('sha256').update(body).digest('hex').slice(0, 16)}"`;
@@ -66,7 +68,7 @@ test('SF1 a first refresh takes the root; the buckets of the named packages are 
     // plain requests: no identifiers, no registry token
     assert.ok(seen.every((s) => s.auth === null));
     assert.deepEqual(seen.map((s) => s.rel).sort(),
-      [...need.map((i) => `buckets/${String(i).padStart(5, '0')}.db.gz`), 'keys.json', 'keys.json.sig', 'root.json.gz', 'root.json.sig'].sort(),
+      [...need.map((i) => caPathOf(GOOD_ROOT, i)), 'keys.json', 'keys.json.sig', 'root.json.gz', 'root.json.sig'].sort(),
       'each file once');
   });
 });
@@ -116,12 +118,12 @@ test('SF4 the key list beside the root must be the advisory feed\'s, byte for by
 test('SF5 a bucket download stops at the root\'s gz_bytes; a failed bucket is listed and the others are imported', async () => {
   const big = Buffer.alloc(4 * 1024 * 1024, 7); let sent = 0;
   const over = {
-    'buckets/00002.db.gz': (req, res) => {
+    [caPathOf(GOOD_ROOT, 2)]: (req, res) => {
       res.writeHead(200);
       const tick = () => { if (sent >= big.length || res.destroyed) return res.end(); const n = Math.min(65536, big.length - sent); sent += n; res.write(big.subarray(sent - n, sent), tick); };
       tick();
     },
-    'buckets/00004.db.gz': (req, res) => { res.writeHead(503); res.end(); },
+    [caPathOf(GOOD_ROOT, 4)]: (req, res) => { res.writeHead(503); res.end(); },
   };
   await serve(async ({ base, cache }) => {
     const get = F.shardSource(base);
@@ -205,10 +207,16 @@ test('SF9 what status and doctor say: off, none yet (a notice), held buckets and
     assert.equal(r.ok, true);
     const c = F.readSeedCache(cache);
     assert.deepEqual({ ...c, last_fetch: c.last_fetch.outcome }, { root_cut_at: EXPECTED.now, root_digest: r.root_digest, buckets_held: 2,
-      buckets_total: 8, last_fetch: 'accepted' });
+      buckets_total: 8, seed_version: null, last_fetch: 'accepted' });
     const fresh = F.describeSeedCache({ url: base, cache: c, now: NOW + 2 * H });
     assert.equal(fresh.state, 'fresh'); assert.equal(fresh.notice, false);
     assert.equal(fresh.text, `root of ${EXPECTED.now} (2 h old), 2 of 8 buckets held (the others are fetched when a package needs them)`);
+    // the root's seed_version (the published seed's tag) is shown beside cut_at; nothing decides on it
+    const tagged = F.describeSeedCache({ url: base, cache: { ...c, seed_version: 'seed-v3.3-full' }, now: NOW + 2 * H });
+    assert.equal(tagged.text, `root of ${EXPECTED.now}, seed seed-v3.3-full (2 h old), 2 of 8 buckets held (the others are fetched when a package needs them)`);
+    assert.equal(tagged.state, 'fresh');
+    const odd = F.describeSeedCache({ url: base, cache: { ...c, seed_version: 'x\u202ey\n' }, now: NOW + 2 * H });
+    assert.equal(odd.text, fresh.text, 'a seed_version that is not a plain short tag is not shown');
     const old = F.describeSeedCache({ url: base, cache: c, now: NOW + 50 * H });
     assert.equal(old.state, 'old'); assert.equal(old.notice, true); assert.match(old.text, /older than 48 hours/);
     const stale = F.describeSeedCache({ url: base, cache: c, now: NOW + 8 * 24 * H });
@@ -216,4 +224,50 @@ test('SF9 what status and doctor say: off, none yet (a notice), held buckets and
     const failed = F.describeSeedCache({ url: base, cache: { ...c, last_fetch: { outcome: 'failed', attempted_at: 'T', why: 'HTTP 503' } }, now: NOW + H });
     assert.equal(failed.notice, true); assert.match(failed.text, /last fetch failed at T: HTTP 503/);
   });
+});
+
+test('SF10 a bucket the host does not have (404): the root is refreshed and the bucket asked for once more under it; still missing, it is uncovered', async () => {
+  const p2 = caPathOf(GOOD_ROOT, 2); const p4 = caPathOf(GOOD_ROOT, 4);
+  // (a) the second request finds it (a root the host had just replaced, say)
+  let n2 = 0;
+  await serve(async ({ base, cache }) => {
+    const get = F.shardSource(base);
+    await F.refreshRoot({ get, cachePath: cache, ...opts() });
+    let refreshed = 0;
+    const f = await F.fetchBuckets({ get, cachePath: cache, buckets: [2, 3], ...opts(), refresh: async () => { refreshed += 1; return null; } });
+    assert.deepEqual(f.imported, [2, 3]); assert.deepEqual(f.failed, []);
+    assert.equal(refreshed, 1); assert.equal(n2, 2);
+  }, { over: { [p2]: (req, res) => { n2 += 1; if (n2 === 1) { res.writeHead(404); return res.end(); } res.writeHead(200); return res.end(fileOf(null, 'buckets/00002.db.gz')); } } });
+  // (b) still missing: one refresh for the whole call, each bucket asked twice, then listed as failed (uncovered)
+  const asked = { [p2]: 0, [p4]: 0 };
+  const gone = (p) => (req, res) => { asked[p] += 1; res.writeHead(404); res.end(); };
+  await serve(async ({ base, cache }) => {
+    const get = F.shardSource(base);
+    await F.refreshRoot({ get, cachePath: cache, ...opts() });
+    let refreshed = 0;
+    const f = await F.fetchBuckets({ get, cachePath: cache, buckets: [2, 3, 4], ...opts(), refresh: async () => { refreshed += 1; return null; } });
+    assert.deepEqual(f.imported, [3]); assert.deepEqual(f.failed.map((x) => x.i), [2, 4]);
+    assert.match(f.failed[0].why, /HTTP 404/);
+    assert.equal(refreshed, 1); assert.deepEqual(asked, { [p2]: 2, [p4]: 2 });
+    // (c) with no refresh given (a caller that cannot refresh), a 404 is not asked again
+    asked[p2] = 0;
+    const g = await F.fetchBuckets({ get, cachePath: cache, buckets: [2], ...opts() });
+    assert.deepEqual(g.failed.map((x) => x.i), [2]); assert.equal(asked[p2], 1);
+  }, { over: { [p2]: gone(p2), [p4]: gone(p4) } });
+  // (d) another failure (503) is not a missing bucket: no refresh, no second request
+  let n5 = 0;
+  await serve(async ({ base, cache }) => {
+    const get = F.shardSource(base);
+    await F.refreshRoot({ get, cachePath: cache, ...opts() });
+    let refreshed = 0;
+    const f = await F.fetchBuckets({ get, cachePath: cache, buckets: [2], ...opts(), refresh: async () => { refreshed += 1; return null; } });
+    assert.deepEqual(f.failed.map((x) => x.i), [2]); assert.equal(refreshed, 0); assert.equal(n5, 1);
+  }, { over: { [p2]: (req, res) => { n5 += 1; res.writeHead(503); res.end(); } } });
+  // (e) init's setup refreshes the root itself (a 304 here) before asking again
+  await serve(async ({ base, seen, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: cache, names: ['pkg-b'], ...opts() });
+    assert.equal(r.ok, true); assert.deepEqual(r.failed.map((x) => x.i), [2]);
+    assert.equal(seen.filter((s) => s.rel === 'root.json.gz').length, 2, 'the root once at setup, once after the 404');
+    assert.equal(seen.filter((s) => s.rel === p2).length, 2);
+  }, { over: { [p2]: (req, res) => { res.writeHead(404); res.end(); } } });
 });

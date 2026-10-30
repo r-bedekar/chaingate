@@ -16,6 +16,7 @@ import { resolvePaths } from '../../cli/paths.js';
 import { shardSource } from '../../cli/seed-shards.js';
 import { readConfigStrict, writeConfig, DEFAULT_POLICY } from '../../config-store.js';
 import { loadConfig } from '../../proxy/config.js';
+import { fixtureRel, caPathOf, fixtureRoot } from '../helpers/shards-host.mjs';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'shards-1.0');
 const EXPECTED = JSON.parse(fs.readFileSync(path.join(FIX, 'good', 'expected.json'), 'utf8'));
@@ -27,7 +28,7 @@ async function withHome({ status = 200, cfg = {} } = {}, fn) {
   const host = http.createServer((req, res) => {
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname.slice(1)); seen.push(rel);
     if (status !== 200) { res.writeHead(status); return res.end(); }
-    try { const b = fs.readFileSync(path.join(FIX, 'good', rel)); res.writeHead(200); return res.end(b); } catch { res.writeHead(404); return res.end(); }
+    try { const b = fs.readFileSync(path.join(FIX, 'good', fixtureRel(rel))); res.writeHead(200); return res.end(b); } catch { res.writeHead(404); return res.end(); }
   });
   await new Promise((r) => host.listen(0, '127.0.0.1', r));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cg016-init-'));
@@ -50,7 +51,7 @@ test('IC1 init sets up the cache from the lockfile, writes the policy, keeps the
     const r = await installSeeds({ ...OPTS }, paths, deps, null);
     assert.equal(r.exit, undefined, out.join('\n'));
     assert.match(r.intended.seed_cache_root, /^[0-9a-f]{64}$/); assert.equal(r.intended.trust, 'authenticated');
-    assert.ok(seen.includes('buckets/00002.db.gz'), 'the bucket of the lockfile\'s package');
+    assert.ok(seen.includes(caPathOf(fixtureRoot(FIX), 2)), 'the bucket of the lockfile\'s package, by its content address');
     const cfg = readConfigStrict(paths.configFile);
     assert.deepEqual(cfg.policy, DEFAULT_POLICY); assert.equal(cfg.static_withhold, true); assert.equal(cfg.advisory_feed, false);
     assert.ok(fs.existsSync(paths.witnessDb));

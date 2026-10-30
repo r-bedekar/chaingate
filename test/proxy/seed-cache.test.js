@@ -16,6 +16,7 @@ import { loadConfig } from '../../proxy/config.js';
 import { createProxyServer } from '../../proxy/server.js';
 import * as SH from '../../seed/v3/shards.js';
 import { docFor, LIVE } from '../seed-v3/u05-fixtures.mjs';
+import { fixtureRel, caPathOf } from '../helpers/shards-host.mjs';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'shards-1.0');
 const EXPECTED = JSON.parse(fs.readFileSync(path.join(FIX, 'good', 'expected.json'), 'utf8'));
@@ -71,7 +72,7 @@ test('SC2 a cache holding a bucket replaces the full seed: the proxy reads it, a
 
 // ------------------------------------------------------------------------------------------------ the proxy
 /** The bucket host (the fixture, or `down`: every request refused) and a registry with pkg-b's document. */
-async function withProxy({ held = [0], down = false, slowMs = 0, waitMs = 5_000 } = {}, fn) {
+async function withProxy({ held = [0], down = false, slowMs = 0, waitMs = 5_000, missing = [] } = {}, fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg016-scp-'));
   const cache = path.join(dir, 'chaingate-seed.db');
   for (const i of held) SH.importBucket(cache, ROOT, i, SH.verifyBucketBytes(ROOT, i, good(`buckets/${String(i).padStart(5, '0')}.db.gz`)));
@@ -79,8 +80,8 @@ async function withProxy({ held = [0], down = false, slowMs = 0, waitMs = 5_000 
   const host = http.createServer((req, res) => {
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname.slice(1));
     seen.push(rel);
-    if (down) { res.writeHead(503); return res.end(); }
-    let body; try { body = good(rel); } catch { res.writeHead(404); return res.end(); }
+    if (down || missing.some((i) => rel === caPathOf(ROOT, i))) { res.writeHead(down ? 503 : 404); return res.end(); }
+    let body; try { body = good(fixtureRel(rel)); } catch { res.writeHead(404); return res.end(); }
     setTimeout(() => { res.writeHead(200, { etag: `"${crypto.createHash('sha256').update(body).digest('hex').slice(0, 16)}"` }); res.end(body); },
       rel.startsWith('buckets/') ? slowMs : 0);
   });
@@ -108,7 +109,7 @@ test('SC3 a package whose bucket the cache does not hold: the proxy fetches it b
     const pk = await get(`${base}/pkg-b`);
     assert.equal(pk.status, 200);
     assert.ok(!('1.1.0' in pk.json.versions), 'the version the seed pins is removed from the metadata npm sees');
-    assert.ok(seen.includes('buckets/00002.db.gz'));
+    assert.ok(seen.includes(caPathOf(ROOT, 2)));
     assert.equal(proxy.seedCacheState().buckets_held, 2);
     const t = await get(`${base}/pkg-b/-/pkg-b-1.1.0.tgz`);
     assert.equal(t.status, 403);
@@ -130,6 +131,19 @@ test('SC4 a bucket host that is down or slow: the decision waits at most the bou
     assert.equal(proxy.seedCacheState().buckets_held, 2, 'the bucket kept downloading');
     const again = await get(`${base}/pkg-b`);
     assert.ok(!('1.1.0' in again.json.versions), 'the next decision has the bucket and the pin');
+  });
+});
+
+test('SC6 a bucket the host does not have (404): the proxy refreshes the root and asks once more; still missing, the package is uncovered (WARN, served)', async () => {
+  await withProxy({ held: [0], missing: [2] }, async ({ base, proxy, seen }) => {
+    await proxy.seedCacheIdle();
+    const roots = seen.filter((r) => r === 'root.json.gz').length;
+    const pk = await get(`${base}/pkg-b`);
+    assert.equal(pk.status, 200); assert.ok('1.1.0' in pk.json.versions, 'uncovered warns; it does not block');
+    await proxy.seedCacheIdle();
+    assert.equal(seen.filter((r) => r === caPathOf(ROOT, 2)).length, 2, 'asked twice');
+    assert.equal(seen.filter((r) => r === 'root.json.gz').length, roots + 1, 'the root refreshed once in between');
+    assert.equal(proxy.seedCacheState().buckets_held, 1);
   });
 });
 
