@@ -89,7 +89,7 @@ const settle = () => new Promise((r) => setTimeout(r, 250));
 // ------------------------------------------------------------------ (A) identity
 test('A1 identity: static-checks-1.6 (recon\'s tree mirrored, R5, R9; 1.6 facts only, R11); S0-S5 gates, roles and texts as 1.3; S6, S7 with recon\'s names', async () => {
   const S = await SC();
-  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.9');   // declared: 1.7 bound-module sinks, 1.8 S8 and S9 (cft015-static-checks-1.7, -1.8)
+  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8.1');   // declared: 1.7 bound-module sinks, 1.8 S8 and S9 (cft015-static-checks-1.7, -1.8)
   assert.deepEqual(S.CHECKS.map(({ cls: _c, ...c }) => c), [
     { id: 'S0', gate: S0G, roles: null, notice: S0_TEXT },
     { id: 'S1', gate: 'static:S1-loader-in-hook-target', roles: ['hook'], notice: 'an install script runs a small loader that fetches and executes' },
