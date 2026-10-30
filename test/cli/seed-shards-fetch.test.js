@@ -207,7 +207,7 @@ test('SF9 what status and doctor say: off, none yet (a notice), held buckets and
     assert.equal(r.ok, true);
     const c = F.readSeedCache(cache);
     assert.deepEqual({ ...c, last_fetch: c.last_fetch.outcome }, { root_cut_at: EXPECTED.now, root_digest: r.root_digest, buckets_held: 2,
-      buckets_total: 8, seed_version: null, last_fetch: 'accepted' });
+      buckets_total: 8, seed_version: null, notices_path: null, notices_sha256: null, last_fetch: 'accepted' });
     const fresh = F.describeSeedCache({ url: base, cache: c, now: NOW + 2 * H });
     assert.equal(fresh.state, 'fresh'); assert.equal(fresh.notice, false);
     assert.equal(fresh.text, `root of ${EXPECTED.now} (2 h old), 2 of 8 buckets held (the others are fetched when a package needs them)`);
@@ -223,6 +223,44 @@ test('SF9 what status and doctor say: off, none yet (a notice), held buckets and
     assert.equal(stale.state, 'stale'); assert.match(stale.text, /8 days old.*older than 7 days, stated on every decision/);
     const failed = F.describeSeedCache({ url: base, cache: { ...c, last_fetch: { outcome: 'failed', attempted_at: 'T', why: 'HTTP 503' } }, now: NOW + H });
     assert.equal(failed.notice, true); assert.match(failed.text, /last fetch failed at T: HTTP 503/);
+  });
+});
+
+test('SF11 the third-party notices the root names: status and doctor show their address on the configured host; anything but a plain file name and a sha256 shows nothing', async () => {
+  const H = 3600e3;
+  await serve(async ({ base, cache }) => {
+    const r = await F.setUpSeedCache({ get: F.shardSource(base), cachePath: cache, names: ['pkg-b'], ...opts() });
+    assert.equal(r.ok, true);
+    const sha = 'ab'.repeat(32);
+    // status reads the cache file without verifying it; the root here gains the two fields a cut now signs
+    const withRoot = (extra) => {
+      const db = new Database(cache);
+      try {
+        const root = JSON.parse(db.prepare('SELECT root_json FROM shard_root WHERE id = 1').pluck().get());
+        db.prepare('UPDATE shard_root SET root_json = ? WHERE id = 1').run(JSON.stringify({ ...root, ...extra }));
+      } finally { db.close(); }
+      return F.readSeedCache(cache);
+    };
+    const c = withRoot({ notices_sha256: sha, notices_path: 'THIRD_PARTY_NOTICES.txt' });
+    assert.equal(c.notices_path, 'THIRD_PARTY_NOTICES.txt'); assert.equal(c.notices_sha256, sha);
+    assert.equal(F.seedCacheNoticesUrl('https://shards.example', c), 'https://shards.example/THIRD_PARTY_NOTICES.txt');
+    assert.equal(F.seedCacheNoticesUrl('https://h.example/seed/', c), 'https://h.example/seed/THIRD_PARTY_NOTICES.txt');
+    assert.equal(F.seedCacheNoticesUrl(null, c), null, 'fetching off: no host to name');
+    const d = F.describeSeedCache({ url: base, cache: c, now: NOW + 2 * H });
+    assert.equal(d.state, 'fresh'); assert.equal(d.notice, false);
+    assert.ok(d.text.endsWith(`buckets held (the others are fetched when a package needs them); third-party notices: ${F.seedCacheNoticesUrl(base, c)}`), d.text);
+    for (const [extra, why] of [
+      [{ notices_sha256: sha, notices_path: '../x.txt' }, 'a path'],
+      [{ notices_sha256: sha, notices_path: 'https://elsewhere.example/n.txt' }, 'a URL'],
+      [{ notices_sha256: sha, notices_path: 'N\u202e.txt' }, 'a control character'],
+      [{ notices_sha256: 'AB'.repeat(32), notices_path: 'THIRD_PARTY_NOTICES.txt' }, 'a sha256 that is not lower-case hex'],
+      [{ notices_sha256: null, notices_path: 'THIRD_PARTY_NOTICES.txt' }, 'no sha256'],
+      [{ notices_sha256: sha, notices_path: null }, 'no file name'],
+    ]) {
+      const o = withRoot(extra);
+      assert.equal(o.notices_path, null, why); assert.equal(o.notices_sha256, null, why);
+      assert.doesNotMatch(F.describeSeedCache({ url: base, cache: o, now: NOW + 2 * H }).text, /notices/, why);
+    }
   });
 });
 

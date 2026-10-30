@@ -9,7 +9,7 @@ import { resolveActiveBundle, bundleFiles, ActivationBroken, readActivationInten
 import { DEFAULT_PORT, DEFAULT_HOST, EXIT } from '../constants.js';
 import { readConfigStrict, validateConfig } from '../../config-store.js';
 import { describePinsFeed } from '../pins-feed.js';
-import { readSeedCache, describeSeedCache } from '../seed-shards.js';
+import { readSeedCache, describeSeedCache, seedCacheNoticesUrl } from '../seed-shards.js';
 
 function parseArgs(args) {
   const opts = { scope: 'user', json: false };
@@ -92,7 +92,8 @@ export default async function status(args) {
         seed: { version: seedVersion, exported_at: seedExported },
         seed_v3: seedV3,
         advisory_feed: { state: pins.state, url: pinsUrl?.enabled ? pinsUrl.url : null, cut: pinsFeed, last_fetch: pinsFetch },
-        seed_cache: { state: seedCache.state, url: cacheUrl, ...(cacheHeld ?? {}) },
+        seed_cache: { state: seedCache.state, url: cacheUrl, ...(cacheHeld ?? {}),
+          notices_url: seedCacheNoticesUrl(cacheUrl, cacheHeld) },
         proxy: { running: !!pid, pid, port: DEFAULT_PORT, host: DEFAULT_HOST,
           pid_state: pidRecord?.state ?? 'none', responding: Boolean(self),
           storage: self?.storage ?? null, unstored_blocks: self?.unstored_blocks ?? null, self },

@@ -728,6 +728,13 @@ again the first time it is used after the proxy starts. An index more than 7 day
 `chaingate doctor` gives a notice past 48 hours. A cache holding at least one bucket takes the place of an installed full
 seed; until then the full seed serves. `chaingate status` shows the index, the seed it was cut from, its age and how many buckets are held.
 
+**Licences.** The buckets are cut from a published seed release (the one `chaingate status` names) and carry its terms:
+the seed is licensed CC BY 4.0, and the data in it keeps its own licence: GitHub Advisory Database records (GHSA
+identifiers) CC BY 4.0, OpenSSF malicious-packages records (MAL identifiers) Apache-2.0 (see [SEEDS.md](SEEDS.md)). The
+host serves that release's third-party notices at `https://shards.cgsec.dev/THIRD_PARTY_NOTICES.txt`; the signed index
+names the file and its sha256, and `chaingate status` and `chaingate doctor` show its address. ChainGate never fetches or
+reads the file to decide anything.
+
 ## What's Next
 
 **Detection rules as code.** Export the gate rules and their evidence so that your own tools can

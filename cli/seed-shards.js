@@ -201,7 +201,8 @@ export async function setUpSeedCache({ get, cachePath, names = [], seedKey = SEE
 
 /**
  * What a cache file holds, for `status` and `doctor`, read without verifying (the proxy verifies when it opens the cache):
- * { root_cut_at, root_digest, buckets_held, buckets_total, last_fetch }, or null when there is no cache or no root yet.
+ * { root_cut_at, root_digest, buckets_held, buckets_total, seed_version, notices_path, notices_sha256, last_fetch }, or null
+ * when there is no cache or no root yet.
  */
 export function readSeedCache(cachePath) {
   try {
@@ -209,20 +210,33 @@ export function readSeedCache(cachePath) {
       if (!db || !tableOf(db, 'shard_root')) return null;
       const r = db.prepare('SELECT digest, cut_at, root_json FROM shard_root WHERE id = 1').get();
       if (!r) return null;
-      let total = null; let version = null;
+      let total = null; let version = null; let notices = { path: null, sha256: null };
       try {
         const root = JSON.parse(r.root_json);
         total = Array.isArray(root.buckets) ? root.buckets.length : null;
         version = typeof root.seed_version === 'string' ? root.seed_version : null;
+        notices = noticesOf(root);
       } catch { /* unread */ }
       const f = SH.readFetch(db);
       return { root_cut_at: r.cut_at, root_digest: r.digest, buckets_held: heldOf(db).size, buckets_total: total, seed_version: version,
-        last_fetch: f ? { outcome: f.outcome, attempted_at: f.attempted_at, why: f.why } : null };
+        notices_path: notices.path, notices_sha256: notices.sha256, last_fetch: f ? { outcome: f.outcome, attempted_at: f.attempted_at, why: f.why } : null };
     });
   } catch { return null; }
 }
 
 const SEED_TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+// The third-party notices the root names: a plain file name on the host and the sha256 of its bytes. Shown only, never fetched
+// or read by a decision; a root naming anything else shows no notices.
+const NOTICES_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const noticesOf = (root) => (typeof root.notices_path === 'string' && NOTICES_FILE.test(root.notices_path)
+  && typeof root.notices_sha256 === 'string' && /^[0-9a-f]{64}$/.test(root.notices_sha256)
+  ? { path: root.notices_path, sha256: root.notices_sha256 } : { path: null, sha256: null });
+
+/** The URL of the notices the cache's root names, on the configured host, or null. */
+export function seedCacheNoticesUrl(url, cache) {
+  if (!url || !cache?.notices_path) return null;
+  try { return new URL(cache.notices_path, url.endsWith('/') ? url : `${url}/`).href; } catch { return null; }
+}
 const age = (ms) => (ms < 48 * 3600e3 ? `${Math.max(0, Math.floor(ms / 3600e3))} h` : `${Math.floor(ms / 86400e3)} days`);
 
 /**
@@ -244,6 +258,8 @@ export function describeSeedCache({ url, cache, now = Date.now() }) {
       + '(the others are fetched when a package needs them)');
     if (state === 'old') parts.push('older than 48 hours');
     if (state === 'stale') parts.push('older than 7 days, stated on every decision');
+    const notices = seedCacheNoticesUrl(url, cache);
+    if (notices) parts.push(`third-party notices: ${notices}`);
   }
   const last = cache?.last_fetch;
   if (last && ['failed', 'refused'].includes(last.outcome)) parts.push(`last fetch ${last.outcome} at ${last.attempted_at}: ${last.why}`);
@@ -253,4 +269,4 @@ export function describeSeedCache({ url, cache, now = Date.now() }) {
 }
 
 export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath, lockfileNames, setUpSeedCache,
-  readSeedCache, describeSeedCache };
+  readSeedCache, describeSeedCache, seedCacheNoticesUrl };
