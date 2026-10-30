@@ -78,7 +78,7 @@ import { DEFAULTS as WALK } from './tar-walk.js';
 import { classify } from '../witness/row-class.js';
 import { NAMED_RUNNER_GATES, NAMED_ROWS } from '../seed/v3/policy.js';
 
-export const STATIC_CHECKS_VERSION = 'static-checks-1.8.1';
+export const STATIC_CHECKS_VERSION = 'static-checks-1.9';
 /** The reason a file row states when its roles had a candidate on the keep list and no file was read (ruled 2026-10-14). */
 export const NOTHING_READ = 'no eligible file in the tarball';
 export const LIMITS = Object.freeze({ maxKeep: WALK.maxKeep, maxKeepBytes: WALK.maxKeepBytes, maxBin: 4, maxHookTargets: 3, s1MaxBytes: 8192,
@@ -121,6 +121,17 @@ export function withholdingChecks(rows, named = NAMED_RUNNER_GATES) {
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall'];
 const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const names = (list, s) => list.filter(([, re]) => re.test(s)).map(([n]) => n);
+/** 1.9 S6: is the match at idx inside the argument of a .update( call (a hash input)? */
+export function insideUpdateArg(s, idx) {
+  let depth = 0;
+  for (let k = idx - 1; k >= 0 && k >= idx - 4000; k -= 1) { const c = s[k];
+    if (c === ')') depth += 1;
+    else if (c === '(') { if (depth === 0) return /\.\s*update\s*$/.test(s.slice(Math.max(0, k - 24), k)); depth -= 1; } }
+  return false;
+}
+/** 1.9 S6: the host-identity sources with at least one use outside a hash's .update( argument (a hashed-only device id is not a raw source). */
+export const hostIdentityNames = (s) => HOST_IDENTITY.filter(([, re]) => { const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
+  for (const m of s.matchAll(g)) if (!insideUpdateArg(s, m.index)) return true; return false; }).map(([n]) => n);
 // publisher text: control and bidi characters stripped, capped at 80 characters (as MC's shownName, G4 D-C1)
 const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
 export const shownName = (n) => { const x = String(n ?? '').replace(UNSAFE, ''); return x.length > 80 ? `${x.slice(0, 80)}…` : x; };
@@ -272,18 +283,45 @@ export const SHELLS = Object.freeze(['sh', 'bash', 'dash', 'zsh']);
 export const SHELL_C = new RegExp(`${CMD_POS}${ABS_PREFIX}(?:${SHELLS.join('|')})\\s+(?:-[a-zA-Z]+\\s+)*-[a-zA-Z]*c[a-zA-Z]*\\s+(?:'([^']*)'|"((?:[^"\\\\]|\\\\.)*)")`, 'g');
 /** The quoted -c arguments of shells at a command position in one hook command (each read as a command string of its own). */
 export function shellCArgs(s) { const out = []; if (typeof s !== 'string') return out; for (const m of s.matchAll(SHELL_C)) out.push(m[1] ?? m[2] ?? ''); return out; }
-/** { fetch, exec, net_tools, sends, exfil, fires } for one hook command; a non-string never throws and never fires. */
+/** 1.9 S0: in a hook command that runs inline node code (node -e/--eval/-p/--print), the arguments of a console.* call are output, not
+ *  a command: they are blanked before S0 reads the command, but only when they hold no call of their own
+ *  (console.log(require('child_process').execSync(...)) still counts). Shell commands are unchanged (echo can be piped to sh). */
+export const INLINE_NODE = /(?:^|[\s;&|(])node(?:\.exe)?\s+(?:--?[\w-]+(?:=\S+)?\s+)*?(?:-e|--eval|-p|--print)\b/;
+export function blankConsoleOutput(s) {
+  if (typeof s !== 'string' || !INLINE_NODE.test(s)) return s;
+  let out = s;
+  for (const m of s.matchAll(/\bconsole\s*\.\s*(?:log|error|warn|info|debug|trace)\s*\(/g)) {
+    const start = m.index + m[0].length; let depth = 1; let q = null; let code = ''; let i = start;
+    for (; i < s.length && depth > 0; i += 1) { const c = s[i];
+      if (c === '\\') { i += 1; continue; }
+      if (q) { if (c === q) q = null; continue; }
+      if (c === "'" || c === '"' || c === '`') { q = c; continue; }
+      if (c === '(') depth += 1; else if (c === ')') { depth -= 1; if (depth === 0) break; }
+      code += c; }
+    if (depth !== 0 || /[\w$)\]]\s*\(/.test(code)) continue;   // unbalanced, or a call inside the arguments: keep it
+    out = out.slice(0, start) + ' '.repeat(i - start) + out.slice(i);
+  }
+  return out;
+}
+/** 1.9 S0 and S6: a node dns lookup/resolve call AND process or host data in one unit (an install hook command for S0, one hook target
+ *  file for S6) is DNS exfiltration. A dns module bound to another name (const d = require('dns')) is not read. */
+export const NODE_DNS_CALL = /\b(?:dns(?:\.promises)?|require\(\s*['"](?:node:)?dns(?:\/promises)?['"]\s*\)(?:\.promises)?)\s*\.\s*(?:lookup|lookupService|resolve(?:4|6|Any|Cname|Mx|Ns|Txt|Srv|Ptr|Soa|Naptr|Caa)?|reverse)\s*\(/;
+export const DNS_DATA = /\bprocess\.(?:cwd\s*\(|env\b|argv\b)|\b(?:os|require\(\s*['"](?:node:)?os['"]\s*\))\s*\.\s*(?:hostname|userInfo|homedir|networkInterfaces)\s*\(|\b__dirname\b/;
+export const dnsExfil = (s) => typeof s === 'string' && NODE_DNS_CALL.test(s) && DNS_DATA.test(s);
+/** { fetch, exec, net_tools, sends, exfil, dns_exfil, fires } for one hook command; a non-string never throws and never fires. */
 export function hookFetchExec(cmd) {
-  const s = typeof cmd === 'string' ? cmd : '';
+  const s = blankConsoleOutput(typeof cmd === 'string' ? cmd : '');   // 1.9: console output in inline node code is not a command
   const fetch = names(FETCH_MARKERS, s); const exec = names(EXEC_MARKERS, s);
   const net_tools = [...new Set([s, ...shellCArgs(s)].flatMap((x) => names(NET_TOOLS, x)))].sort((a, b) => NET_TOOLS.findIndex(([n]) => n === a) - NET_TOOLS.findIndex(([n]) => n === b)); const sends = sendsOf(s);   // 1.4: + the sh -c arguments
   // 1.2: hook-command exfiltration = a network tool at a command position AND a sends marker; the DNS tools only with command substitution
   const exfil = net_tools.some((t) => (DNS_TOOLS.includes(t) ? sends.includes('command-substitution') : sends.length > 0));
-  return { fetch, exec, net_tools, sends, exfil, fires: (fetch.length > 0 && exec.length > 0) || exfil };
+  const dns_exfil = dnsExfil(s);   // 1.9
+  return { fetch, exec, net_tools, sends, exfil, dns_exfil, fires: (fetch.length > 0 && exec.length > 0) || exfil || dns_exfil };
 }
 /** The S0 detail for a fired hook: the 1.0 fetch-and-execute part, the bump's exfiltration part, or both (marker names only). */
 const s0What = (r) => [r.fetch.length && r.exec.length ? `contains a fetch (${r.fetch.join(', ')}) and an execute (${r.exec.join(', ')})` : null,
-  r.exfil ? `runs a network tool (${r.net_tools.join(', ')}) that sends (${r.sends.join(', ')})` : null].filter(Boolean).join(' and ');
+  r.exfil ? `runs a network tool (${r.net_tools.join(', ')}) that sends (${r.sends.join(', ')})` : null,
+  r.dns_exfil ? 'makes a DNS lookup carrying process or host data' : null].filter(Boolean).join(' and ');   // 1.9: the dns part
 
 // ---- the keep list: what the registry manifest points npm at ----
 const META = /[`$(){}<>*?![\]'"&#~\\]/;
@@ -383,7 +421,7 @@ export function fileFacts(file) {
   if (foreign.length && POST_MARKER.test(s)) sinks.push('post-to-literal-host');
   return { ...base, binary: false, net_sinks: names(NET_SINKS, s), exec_sinks: names(EXEC_SINKS, s), obf_idents: idents.size, decode_markers: decode,
     hex_density: Number(hexDensity.toFixed(3)), numeric_hex: numericHex, cred_sources: names(CRED_SOURCES, s), sinks, overrides: names(OVERRIDES, s), address_families: names(ADDRESS_FAMILIES, s),
-    host_identity: names(HOST_IDENTITY, s) };   // 1.4: host_identity (S6)
+    host_identity: hostIdentityNames(s), dns_exfil: dnsExfil(s) };   // 1.4: host_identity (S6); 1.9: a use only inside a hash .update( does not count, and dns_exfil (S6)
 }
 
 // ---- 0.1.5 entry facts (operator ruling R4 2026-10-21): the main and bin facts of EVERY download, stored once per served version ----
@@ -516,8 +554,9 @@ export function capabilityDelta({ predecessor, current } = {}) {
 }
 /** R3 runtime basis: the predecessor is the last version this proxy served (witness.db entry facts, R4). */
 export const S7_BASIS = 'the version this proxy served before';
-/** Since 0.1.6: stored entry facts S7 compares. 1.8.1 changes a fact field nothing decides on, so facts stored by 1.8 stay comparable. */
-export const S7_COMPARABLE_VERSIONS = Object.freeze(['static-checks-1.8', STATIC_CHECKS_VERSION]);
+/** Since 0.1.6: stored entry facts S7 compares. 1.8.1 changes a fact field nothing decides on, and 1.9 changes S0 and S6 only (S7's
+ *  capabilities read neither host_identity nor dns_exfil), so facts stored by 1.8 and 1.8.1 stay comparable. */
+export const S7_COMPARABLE_VERSIONS = Object.freeze(['static-checks-1.8', 'static-checks-1.8.1', STATIC_CHECKS_VERSION]);
 /** The predecessor argument of capabilityDelta from a witness.db predecessorEntryFacts record (null: cold start; 'unreadable': a storage error). */
 function s7Predecessor(rec) {
   if (rec === 'unreadable') return { version: null, basis: S7_BASIS, status: 'NOT_CHECKED', reason: 'the stored entry facts of earlier versions could not be read' };
@@ -663,7 +702,11 @@ export function staticRows({ manifest, packageJson = null, walk, armed = null, p
       else if (c.id === 'S2' && F.obf_idents >= LIMITS.s2MinIdents && F.decode_markers.length) detail = `entry file ${x.shown} (${F.size} B) has ${F.obf_idents} _0x identifiers and a decode marker (${list(F.decode_markers)})`;
       else if (c.id === 'S3' && F.cred_sources.length && F.sinks.includes('exfil-host')) detail = `${x.shown} (${F.size} B) has a credential source (${list(F.cred_sources)}) and an outbound sink (${list(F.sinks)})`;
       else if (c.id === 'S4' && F.overrides.length && F.address_families.length >= LIMITS.s4MinAddressFamilies) detail = `entry file ${x.shown} (${F.size} B) has an override (${list(F.overrides)}) and ${F.address_families.length} address-regex families (${list(F.address_families)})`;
-      else if (c.id === 'S6' && apiNet(F).length && F.host_identity.length && !F.exec_sinks.length) detail = `hook target ${x.shown} (${F.size} B) has a network API sink (${list(apiNet(F))}) and a host-identity source (${list(F.host_identity)}) and no execution sink`;
+      else if (c.id === 'S6') {   // 1.9: or a dns call carrying process or host data (no execution-sink condition, as measured)
+        const beacon = apiNet(F).length && F.host_identity.length && !F.exec_sinks.length;
+        detail = [beacon ? `hook target ${x.shown} (${F.size} B) has a network API sink (${list(apiNet(F))}) and a host-identity source (${list(F.host_identity)}) and no execution sink` : null,
+          F.dns_exfil ? `${beacon ? 'and it' : `hook target ${x.shown} (${F.size} B)`} makes a DNS lookup carrying process or host data` : null].filter(Boolean).join('; ') || null;
+      }
       if (detail) hits.push({ detail, plats: x.plats });
     }
     const cand = read || hits.length || (skipped.length && !(skipped.length === unread.length && absentOnly(unread))) ? null : candidateOf(c);
@@ -1013,5 +1056,5 @@ export function staticSettled(latest) {
 
 export default { FACTS_LIMITS, FACTS_NOTE, DECODED_MAGIC, magicOf, B64_RUN, HEX_ESCAPE_RUN, encodedRuns, makeBase64Share, EXCLUDED_PATH, DYNAMIC_CODE,
   AGENT_CONFIG_NAMES, AGENT_HOME_DIR, AGENT_XDG_DIR, WRITE_MARKERS, SHELL_REDIRECT, SHELL_SCRIPT, agentConfigWrite, IO_CLASSES, IO_TOKENS, memberFacts, staticFacts,
-  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, walkReason, budgetRows, unarmedRows, noManifestRows, staticSettled,
+  s5Base64Fields, MAX_FACTS_MEMBERS, createMemberTally, staticFactsOf, RAW_IP_URL, entryKeepFor, entryFactsOf, entrySummaryOf, capabilitiesOf, capabilityDelta, s7Named, S7_NAMED_ARMS, S7_DECODE_OBF_EXCLUDED, S7_EXEC_EXCLUDED, CAPABILITY_CLASSES, API_NET_SINKS, HOST_IDENTITY, IDENTITY_ENV, SHELLS, SHELL_C, shellCArgs, insideUpdateArg, hostIdentityNames, INLINE_NODE, blankConsoleOutput, NODE_DNS_CALL, DNS_DATA, dnsExfil, MAX_FACTS_WALKS, STATIC_CHECKS_VERSION, NOTHING_READ, LIMITS, CHECKS, STATIC_GATES, MAX_ARMED_WALKS, hookFetchExec, hookTargets, keepListFor, fileFacts, staticRows, shownName, armedBy, walkReason, budgetRows, unarmedRows, noManifestRows, staticSettled,
   S8_LIMITS, NATIVE_MAGIC, NATIVE_SOURCE, BINDING_GYP, ADDON_FILE, ADDON_LOADS, nativeKind, xorText, GYP_LIMITS, GYP_FILE, GYP_QUIET, GYP_SCRIPT, gypExpansions, gypBuild, hiddenGypScript, addonDropper };
