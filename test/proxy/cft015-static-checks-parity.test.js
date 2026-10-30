@@ -507,7 +507,7 @@ const want = (list) => list.map((x) => ({ name: x.name, regex: x.regex, flags: x
 test('P14-1 the version string and the eight checks (id, gate, class, roles, notice) are recon\'s (static-checks-1.5; 1.6 adds facts only)', async () => {
   const S = await SC();
   // static-checks-1.6 (R11, recon v6.14) is a facts-only bump: every 1.5 constant here is unchanged (cft015-static-checks-1.6, C2)
-  assert.equal(R14.version, 'static-checks-1.5'); assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8.1');   // then 1.7: the bound-module sinks; 1.8: S8 and S9 appended
+  assert.equal(R14.version, 'static-checks-1.5'); assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.9');   // 1.9: S0 and S6 (cft016-static-checks-1.9); then 1.7: the bound-module sinks; 1.8: S8 and S9 appended
   assert.deepEqual(S.CHECKS.slice(0, 8).map(({ id, gate, cls, roles, notice }) => ({ id, gate, cls, roles, notice })), R14.checks);   // S0-S7; 1.8 appends S8, S9 (declared)
 });
 

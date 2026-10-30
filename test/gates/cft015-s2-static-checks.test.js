@@ -36,7 +36,7 @@ const PLAIN = { name: 'p', version: '1.0.0', main: 'index.js' };
 
 test('T1 identity: static-checks-1.6 (declared: S5 added, cft015-s8; S0 wording only, cft015-s9; recon 1.4, 1.5, then 1.6 facts only mirrored, R5, R9, R11), eight checks (S6, S7 by rulings R2, R3 2026-10-21, cft015-s6-s7) with the proxy gate names and the §5 notice texts, limits equal to the walker\'s caps', async () => {
   const S = await SC();
-  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8.1');   // declared: 1.7 bound-module sinks, 1.8 S8 and S9 (cft015-static-checks-1.7, -1.8)
+  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.9');   // declared: 1.9 S0 and S6 (cft016-static-checks-1.9), 1.7 bound-module sinks, 1.8 S8 and S9 (cft015-static-checks-1.7, -1.8)
   assert.deepEqual(S.CHECKS.map((c) => c.id), ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9']);   // S8, S9: 1.8 (declared)
   assert.deepEqual(S.CHECKS.map((c) => c.gate), ['static:S0-shell-fetch-in-hook', 'static:S1-loader-in-hook-target', 'static:S2-obfuscated-entry', 'static:S3-secret-harvest-with-sink', 'static:S4-wallet-swap-hook', 'static:S5-oversized-hook-target',
     'static:S6-network-beacon-in-hook-target', 'static:S7-entry-capability-gain', 'static:S8-prebuilt-addon-dropper-in-hook', 'static:S9-hidden-script-in-gyp-build']);
