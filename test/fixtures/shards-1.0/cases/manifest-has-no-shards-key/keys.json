@@ -1,1 +1,1 @@
-{"key_manifest_version":"pins-keys-1.0","keys":[{"key_id":"ed25519:66631930959fee1f","role":"pins","spki_b64":"MCowBQYDK2VwAyEAUZ8eKI9CAgrmzV14FUD9/nOyiq331ng6+eLiE0Qu6dU=","valid_from":"2026-10-29T00:00:00Z","valid_to":"2027-01-27T00:00:00Z"}]}
+{"key_manifest_version":"pins-keys-1.0","keys":[{"key_id":"ed25519:178e9d23cf4b3c38","role":"pins","spki_b64":"MCowBQYDK2VwAyEA5ZFqm0DZM/yt3VTyP5RGj/SZIwiVB1X5B+/U4KLV48E=","valid_from":"2026-10-29T00:00:00Z","valid_to":"2027-01-27T00:00:00Z"}]}

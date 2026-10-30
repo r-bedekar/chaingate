@@ -19,7 +19,7 @@ import L from '../../seed/v3/logical.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'shards-1.0');
 const sums = fs.readFileSync(path.join(FIX, 'SHA256SUMS'));
-assert.equal(crypto.createHash('sha256').update(sums).digest('hex'), '1051afd9abd133d75616d5a89ad3b466f6269c8a6cbaf3c3e6a0f0e460201f91');
+assert.equal(crypto.createHash('sha256').update(sums).digest('hex'), '24bf04ed18fe2a2b7ae11e354038921c0033a86db223be932874306bcf2e5c5d');
 for (const line of sums.toString('ascii').trim().split('\n')) {
   const [h, f] = line.split(/\s+/);
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(FIX, f))).digest('hex'), h, `${f} is the seed lane's, unchanged`);

@@ -26,6 +26,8 @@
    "version": "lineage-tag-family-cases-0.3"
   }
  },
+ "notices_path": "THIRD_PARTY_NOTICES.txt",
+ "notices_sha256": "86afa5a357a24a2527ed7ff56fddb80909c53929f731dc0637c2c012fb265728",
  "now": "2026-10-29T12:00:00Z",
  "pins": [
   [
@@ -41,5 +43,6 @@
   3
  ],
  "seed_logical_digest": "dce04b8b17556ec1521421d7bfad0e3a9bb2549607ebfbb09a5c3113140dbff7",
- "signing_key_id": "ed25519:66631930959fee1f"
+ "seed_version": "seed-v0.0-fixture",
+ "signing_key_id": "ed25519:178e9d23cf4b3c38"
 }

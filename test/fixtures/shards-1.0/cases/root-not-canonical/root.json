@@ -82,6 +82,8 @@
  "history_policy": "d3K20/h2/s2",
  "label_input_digest": null,
  "lineage_id_rule": "pkg4096-1",
+ "notices_path": "THIRD_PARTY_NOTICES.txt",
+ "notices_sha256": "86afa5a357a24a2527ed7ff56fddb80909c53929f731dc0637c2c012fb265728",
  "package_count": 6,
  "pin_count": 2,
  "raw_bytes_max": 3997696,
@@ -125,7 +127,7 @@
   "stub_detector_effective_at": "2026-10-13T22:00:00+00:00",
   "tag_family_fixture": "{\"sha256\":\"82f551e75df644954b7813dc6fcb804369f67e0c565b3e318ccf31d8971ffe37\",\"version\":\"lineage-tag-family-cases-0.3\"}"
  },
- "seed_version": null,
+ "seed_version": "seed-v0.0-fixture",
  "shards_contract": "cft-seed-v3-shards-1.0",
- "signing_key_id": "ed25519:66631930959fee1f"
+ "signing_key_id": "ed25519:178e9d23cf4b3c38"
 }
