@@ -27,7 +27,7 @@ const OVER = { path: 'install.js', reason: 'over the kept-file cap (1048576 byte
 
 test('A1 identity: static-checks-1.2 (now 1.3, declared: wording-only, cft015-s9); S5 sixth with recon 1.2\'s gate, roles and notice (S6, S7 follow: R2, R3, cft015-s6-s7)', async () => {
   const S = await SC();
-  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.8.1');   // declared (1.7 bound-module sinks, 1.8 S8 and S9, cft015-static-checks-1.7, -1.8): recon's static-checks-1.5 mirrored (R5, R9; cft015-static-checks-parity), then 1.6 facts only (R11; cft015-static-checks-1.6)
+  assert.equal(S.STATIC_CHECKS_VERSION, 'static-checks-1.9');   // declared (1.7 bound-module sinks, 1.8 S8 and S9, cft015-static-checks-1.7, -1.8): recon's static-checks-1.5 mirrored (R5, R9; cft015-static-checks-parity), then 1.6 facts only (R11; cft015-static-checks-1.6)
   assert.deepEqual(S.CHECKS.map((c) => c.id), ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9']);   // S8, S9: 1.8 (declared)
   assert.deepEqual(S.CHECKS[5], { id: 'S5', gate: S5G, cls: 'oversized-hook-target', roles: ['hook'], notice: 'an install script runs a file too large to read' });   // cls: recon's class name, carried by 1.4 (declared)
   assert.deepEqual(S.STATIC_GATES, S.CHECKS.map((c) => c.gate));

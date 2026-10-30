@@ -1,0 +1,56 @@
+{
+ "static_checks_version": "static-checks-1.9",
+ "source": "recon v6.23 static-checks.mjs (sealed investigations/recon/v6.23, manifest RECON-v6.23.SHA256SUMS a293604a, static-checks.mjs 808e4d18), branch g10-c2-recon-v6.23",
+ "changes_from_1_8_1": [
+  "S0 1.5: in a hook command that runs inline node code (INLINE_NODE), the arguments of a console.(log|error|warn|info|debug|trace) call are blanked before S0 reads the command, only when they are balanced and hold no call ([\\w$)\\]]\\s*\\(); shell commands unchanged",
+  "S0 #1: a hook command fires when NODE_DNS_CALL and DNS_DATA both match it (dns_exfil on the S0 hook row; excerpt clause \"makes a DNS lookup carrying process or host data\")",
+  "S6: a HOST_IDENTITY source counts only when at least one match is outside the argument of a .update( call (insideUpdateArg: walk back up to 4000 chars to the enclosing \"(\", then /\\.\\s*update\\s*$/ over the 24 chars before it)",
+  "S6 #1: a hook target file fires when NODE_DNS_CALL and DNS_DATA both match it, with no execution-sink condition; the earlier S6 condition unchanged (dns_exfil on the S6 file entry)"
+ ],
+ "s0": {
+  "inline_node": "(?:^|[\\s;&|(])node(?:\\.exe)?\\s+(?:--?[\\w-]+(?:=\\S+)?\\s+)*?(?:-e|--eval|-p|--print)\\b",
+  "console_methods": [
+   "log",
+   "error",
+   "warn",
+   "info",
+   "debug",
+   "trace"
+  ],
+  "blank_console_output": "export function blankConsoleOutput(s) {\n  if (typeof s !== 'string' || !INLINE_NODE.test(s)) return s;\n  let out = s;\n  for (const m of s.matchAll(/\\bconsole\\s*\\.\\s*(?:log|error|warn|info|debug|trace)\\s*\\(/g)) {\n    const start = m.index + m[0].length; let depth = 1; let q = null; let code = ''; let i = start;\n    for (; i < s.length && depth > 0; i += 1) { const c = s[i];\n      if (c === '\\\\') { i += 1; continue; }\n      if (q) { if (c === q) q = null; continue; }\n      if (c === \"'\" || c === '\"' || c === '`') { q = c; continue; }\n      if (c === '(') depth += 1; else if (c === ')') { depth -= 1; if (depth === 0) break; }\n      code += c; }\n    if (depth !== 0 || /[\\w$)\\]]\\s*\\(/.test(code)) continue;   // unbalanced, or a call inside the arguments: keep it\n    out = out.slice(0, start) + ' '.repeat(i - start) + out.slice(i);\n  }\n  return out;\n}",
+  "hook_fetch_exec": "export function hookFetchExec(cmd) {\n  const s = blankConsoleOutput(typeof cmd === 'string' ? cmd : '');   // v6.23 S0 1.5\n  const fetch = names(FETCH_MARKERS, s); const exec = names(EXEC_MARKERS, s);\n  const net_tools = [...new Set([s, ...shellCArgs(s)].flatMap((x) => names(NET_TOOLS, x)))].sort((a, b) => NET_TOOLS.findIndex(([n]) => n === a) - NET_TOOLS.findIndex(([n]) => n === b)); const sends = sendsOf(s);   // v6.12: + the sh -c arguments\n  // 1.2: hook-command exfiltration = a network tool at a command position AND a sends marker; the DNS tools only with command substitution\n  const exfil = net_tools.some((t) => (DNS_TOOLS.includes(t) ? sends.includes('command-substitution') : sends.length > 0));\n  const dns_exfil = dnsExfil(s);   // v6.23 #1\n  return { fetch, exec, net_tools, sends, exfil, dns_exfil, fires: (fetch.length > 0 && exec.length > 0) || exfil || dns_exfil };\n}"
+ },
+ "dns": {
+  "node_dns_call": "\\b(?:dns(?:\\.promises)?|require\\(\\s*['\"](?:node:)?dns(?:\\/promises)?['\"]\\s*\\)(?:\\.promises)?)\\s*\\.\\s*(?:lookup|lookupService|resolve(?:4|6|Any|Cname|Mx|Ns|Txt|Srv|Ptr|Soa|Naptr|Caa)?|reverse)\\s*\\(",
+  "dns_data": "\\bprocess\\.(?:cwd\\s*\\(|env\\b|argv\\b)|\\b(?:os|require\\(\\s*['\"](?:node:)?os['\"]\\s*\\))\\s*\\.\\s*(?:hostname|userInfo|homedir|networkInterfaces)\\s*\\(|\\b__dirname\\b",
+  "dns_exfil": "export const dnsExfil = (s) => typeof s === 'string' && NODE_DNS_CALL.test(s) && DNS_DATA.test(s);",
+  "measured": "~/artifacts/recon-v623-20261030/dns-measure (measure_dns.mjs 89b46a9f, out.jsonl 09c38ff6) and dns-integrated (out.jsonl eeda7c1a): 3,404 stored install-hook tarballs, 9 fires (5 MAL-labelled, 4 unlabelled probe-shaped), 0 benign-shaped"
+ },
+ "s6": {
+  "host_identity": [
+   [
+    "os.hostname",
+    "(?:\\bos|\\brequire\\(\\s*['\"\\x60](?:node:)?os['\"\\x60]\\s*\\))\\s*\\.\\s*hostname\\s*\\("
+   ],
+   [
+    "os.userInfo",
+    "(?:\\bos|\\brequire\\(\\s*['\"\\x60](?:node:)?os['\"\\x60]\\s*\\))\\s*\\.\\s*userInfo\\s*\\("
+   ],
+   [
+    "os.networkInterfaces",
+    "(?:\\bos|\\brequire\\(\\s*['\"\\x60](?:node:)?os['\"\\x60]\\s*\\))\\s*\\.\\s*networkInterfaces\\s*\\("
+   ],
+   [
+    "env-dump",
+    "JSON\\.stringify\\(\\s*process\\.env\\s*\\)|Object\\.(?:keys|entries|values)\\(\\s*process\\.env\\s*\\)|\\.\\.\\.process\\.env\\b"
+   ],
+   [
+    "identity-env",
+    "\\bprocess\\.env(?:\\.(?:USER|USERNAME|LOGNAME|HOSTNAME|COMPUTERNAME)\\b|\\[\\s*(['\"\\x60])(?:USER|USERNAME|LOGNAME|HOSTNAME|COMPUTERNAME)\\1\\s*\\])"
+   ]
+  ],
+  "inside_update_arg": "function insideUpdateArg(s, idx) {\n  let depth = 0;\n  for (let k = idx - 1; k >= 0 && k >= idx - 4000; k -= 1) { const c = s[k];\n    if (c === ')') depth += 1;\n    else if (c === '(') { if (depth === 0) return /\\.\\s*update\\s*$/.test(s.slice(Math.max(0, k - 24), k)); depth -= 1; } }\n  return false;\n}",
+  "host_identity_names": "const hostIdentityNames = (s) => HOST_IDENTITY.filter(([, re]) => { const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);\n  for (const m of s.matchAll(g)) if (!insideUpdateArg(s, m.index)) return true; return false; }).map(([n]) => n);"
+ },
+ "unchanged": "S1-S5, S7, S8, S9, the facts (1.8.1), every gate, class, role and notice"
+}
