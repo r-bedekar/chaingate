@@ -180,19 +180,14 @@ targets; at most 6 files of 1 MiB each -- and checks them. It warns when:
 - an install-hook command fetches code (curl, wget, Invoke-WebRequest, certutil -urlcache, bitsadmin) and executes or
   decodes it (a pipe into a shell or interpreter, powershell -enc, base64 -d, eval, iex), or runs a network tool (curl,
   wget, nc; nslookup, dig, host or ping only with command substitution) that sends data out (command substitution, a
-  data flag, a raw-IP or known exfiltration host URL), or makes a DNS lookup through node's `dns` module carrying process or
-  host data (the environment, the arguments, the working directory, `__dirname`, the host name, user, home directory or network
-  interfaces). In a command that runs inline node code (`node -e`, `--eval`, `-p`, `--print`), what a `console` call only
-  prints is not read as a command, unless the printed text itself makes a call. npm prints "an install script downloads code to
-  run or sends data to an outside host";
+  data flag, a raw-IP or known exfiltration host URL). npm prints "an install script downloads code to run or sends
+  data to an outside host";
 - a hook target is over the 1 MiB file cap (its size is read from the archive header; its body is not kept). npm prints
   "an install script runs a file too large to read";
 - a hook target makes a network call (an HTTP request, fetch, a socket, a WebSocket, XMLHttpRequest or axios) and reads
   what identifies this machine (its host name, user or network interfaces, a dump of the whole environment, or the
   variables USER, USERNAME, LOGNAME, HOSTNAME or COMPUTERNAME), with no way to run code in the same file: a beacon. A
-  URL written in the file is not a network call, reading other environment variables is not identification, and a value
-  used only as the input of a hash (`.update(...)`) is not identification. A hook target that makes a DNS lookup through
-  node's `dns` module carrying the same process or host data as above also warns, whether or not it can run code. npm
+  URL written in the file is not a network call, and reading other environment variables is not identification. npm
   prints "an install script sends details about this machine to the network";
 - `main` or a `bin` file gained something the same file of the version this proxy served before did not have: a decode
   or obfuscation marker other than the `Function` constructor, or a network call together with a way to run code other
