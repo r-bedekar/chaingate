@@ -3,6 +3,8 @@
 // - Before a package is decided, its bucket is fetched when the cache does not hold it. The decision waits at most `waitMs`
 //   (5 seconds by default); past that the package is uncovered for this decision and the bucket keeps downloading, one fetch per
 //   bucket however many requests need it.
+// - A bucket the host does not have (404) means the root moved on: the root is refreshed and the bucket asked for once more;
+//   still missing, the package is uncovered.
 // - The root is refreshed at start and hourly (a 304 when nothing changed). A new root is opened and verified as at start, then
 //   taken over by the seed the gate holds; the buckets it changed are fetched again.
 // - With no cache in use yet (an installed full seed serves, or none), the refresh fetches the root and one bucket, so the next
@@ -37,7 +39,9 @@ export function createSeedCache({ get, cachePath, seedKey = null, bits = SH.BUCK
 
   const fetchOne = (i) => {
     if (inflight.has(i)) return inflight.get(i);
-    const p = fetchBuckets({ get, cachePath, buckets: [i], seedKey: key, bits, root: seed?.shards?.root ?? null })
+    // a 404 means the root moved on: refresh it (shared with any refresh in progress), then ask once more under the root now held
+    const p = fetchBuckets({ get, cachePath, buckets: [i], seedKey: key, bits, root: seed?.shards?.root ?? null,
+      refresh: async () => { await refresh(); return seed?.shards?.root ?? null; } })
       .then((r) => {
         if (r.failed.length) log?.warn?.(`[seed-cache] bucket ${i}: ${r.failed[0].why}`);
         else seed?.reloadHeld();

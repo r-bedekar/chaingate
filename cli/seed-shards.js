@@ -1,7 +1,9 @@
 // Since 0.1.6: fetching seed shards (a contract 1.3 seed as buckets of packages under a signed root) into a seed cache.
 //
 // The host serves root.json.gz, root.json.sig, keys.json and keys.json.sig (the key list the seed key signs, the advisory
-// feed's own, copied unchanged) and buckets/<5-digit bucket>.db.gz. Each request is a plain GET with no identifiers and no
+// feed's own, copied unchanged) at fixed paths, and each bucket at buckets/<5-digit bucket>/<its gz sha256>.gz, the name the root
+// gives it (a bucket the host does not have, a 404, means the root moved on: the root is fetched again and the bucket asked for
+// once more under it; still missing, its packages are uncovered). Each request is a plain GET with no identifiers and no
 // registry token, over https, with no redirect, 10 seconds at most. root.json.gz is asked for with the ETag of the last one, so a
 // refresh with no new cut costs one 304. A root is accepted at the reader's clock, never at its own cut time; a bucket download
 // stops at the size the root names. Verifying and importing are seed/v3/shards.js; this module only fetches and records.
@@ -18,8 +20,11 @@ const BUCKET_FETCHES_AT_ONCE = 8;
 const SEED_KEY = createPublicKey({ key: Buffer.from(CHAINGATE_SEED_PUBKEY_B64, 'base64'), format: 'der', type: 'spki' });
 
 class TooLarge extends Error {}
+/** A host answer other than 200 (or an expected 304); `status` is the HTTP status. */
+class HttpStatus extends Error { constructor(message, status) { super(message); this.status = status; } }
 const capOf = (path) => (path.startsWith('keys.json') ? PINS_LIMITS.manifestBytes : path === 'root.json.sig' ? 64 : SH.SHARD_LIMITS.rootBytes);
-export const bucketPath = (i) => `buckets/${String(i).padStart(5, '0')}.db.gz`;
+/** Where bucket `i` is served: by the gz sha256 its root names, so a bucket's address changes whenever its bytes do. */
+export const bucketPath = (i, gzSha256) => `buckets/${String(i).padStart(5, '0')}/${gzSha256}.gz`;
 
 /**
  * An https base URL as a source: get(path, { cap, etag }) resolves to { status: 200, bytes, etag } or, when `etag` is given and
@@ -34,7 +39,7 @@ export function shardSource(base, { fetchImpl = fetch, timeoutMs = SHARDS_FETCH_
     const res = await fetchImpl(new URL(path, u), { redirect: 'error', headers: etag ? { 'if-none-match': etag } : {},
       signal: AbortSignal.timeout(timeoutMs) });
     if (res.status === 304 && etag) { await res.body?.cancel?.(); return { status: 304 }; }
-    if (res.status !== 200) { await res.body?.cancel?.(); throw new Error(`${path}: HTTP ${res.status}`); }
+    if (res.status !== 200) { await res.body?.cancel?.(); throw new HttpStatus(`${path}: HTTP ${res.status}`, res.status); }
     const parts = []; let n = 0;
     for await (const c of res.body) {
       n += c.length;
@@ -98,31 +103,44 @@ export function bucketsFor(cachePath, names, { bits = SH.BUCKET_BITS } = {}) {
 /**
  * Fetch, verify and import these buckets under the cache's current root, a few at a time: `root` when the caller holds it
  * verified (the proxy's open seed cache), else checked again from the cache. Resolves to { imported, failed: [{ i, why }] }: a
- * bucket that fails is left out whole and the others are imported; importing refuses a root that is not the cache's.
+ * bucket that fails is left out whole and the others are imported; importing refuses a root that is not the cache's. With
+ * `refresh`, a bucket the host answers 404 for is asked for once more after one root refresh for the whole call.
  */
-export async function fetchBuckets({ get, cachePath, buckets, seedKey = SEED_KEY, bits = SH.BUCKET_BITS, root: held = null }) {
-  const root = held ?? readCache(cachePath, (db) => {
+export async function fetchBuckets({ get, cachePath, buckets, seedKey = SEED_KEY, bits = SH.BUCKET_BITS, root: held = null, refresh = null }) {
+  const cacheRoot = () => readCache(cachePath, (db) => {
     if (!db) throw new SH.ShardRefused('the seed cache has no root yet');
     return SH.checkCache(db, { seedKey, bits }).root;
   });
+  let root = held ?? cacheRoot();
   const imported = []; const failed = [];
-  const queue = [...buckets];
-  const one = async () => {
-    for (let i = queue.shift(); i !== undefined; i = queue.shift()) {
-      const e = root.buckets[i];
-      try {
-        if (!e) throw new SH.ShardRefused(`bucket ${i} is not listed in the root`);
-        let got;
-        try { got = await get(bucketPath(i), { cap: e.gz_bytes }); } catch (err) {
-          if (err instanceof TooLarge) throw new SH.ShardRefused(`bucket ${i}: longer than its gz_bytes (${e.gz_bytes})`);
-          throw err;
-        }
-        SH.importBucket(cachePath, root, i, SH.verifyBucketBytes(root, i, got.bytes));
-        imported.push(i);
-      } catch (err) { failed.push({ i, why: String(err?.why ?? err?.message ?? err).slice(0, 300) }); }
-    }
+  const pass = async (list, { last }) => {
+    const missing = []; const queue = [...list];
+    const one = async () => {
+      for (let i = queue.shift(); i !== undefined; i = queue.shift()) {
+        const e = root.buckets[i];
+        try {
+          if (!e) throw new SH.ShardRefused(`bucket ${i} is not listed in the root`);
+          let got;
+          try { got = await get(bucketPath(i, e.gz_sha256), { cap: e.gz_bytes }); } catch (err) {
+            if (err instanceof TooLarge) throw new SH.ShardRefused(`bucket ${i}: longer than its gz_bytes (${e.gz_bytes})`);
+            if (err instanceof HttpStatus && err.status === 404 && !last) { missing.push(i); continue; }
+            throw err;
+          }
+          SH.importBucket(cachePath, root, i, SH.verifyBucketBytes(root, i, got.bytes));
+          imported.push(i);
+        } catch (err) { failed.push({ i, why: String(err?.why ?? err?.message ?? err).slice(0, 300) }); }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(BUCKET_FETCHES_AT_ONCE, list.length) }, one));
+    return missing;
   };
-  await Promise.all(Array.from({ length: Math.min(BUCKET_FETCHES_AT_ONCE, buckets.length) }, one));
+  // a 404 means the root moved on: refresh it once for the whole call (`refresh` resolves to the new root, or null to read it
+  // from the cache), then ask for each missing bucket once more under it
+  const missing = await pass(buckets, { last: !refresh });
+  if (missing.length) {
+    try { root = (await refresh()) ?? cacheRoot(); } catch { /* the root held stays */ }
+    await pass(missing, { last: true });
+  }
   const byI = (a, b) => (a.i ?? a) - (b.i ?? b);
   return { imported: imported.sort(byI), failed: failed.sort(byI) };
 }
@@ -168,10 +186,11 @@ export async function setUpSeedCache({ get, cachePath, names = [], seedKey = SEE
     fs.mkdirSync(dirname(cachePath), { recursive: true });
     const r = await refreshRoot({ get, cachePath, seedKey, now, bits, feedKeys });
     const need = bucketsFor(cachePath, names, { bits });
-    const f = await fetchBuckets({ get, cachePath, buckets: need, seedKey, bits });
+    const refresh = async () => { await refreshRoot({ get, cachePath, seedKey, now, bits, feedKeys }); return null; };
+    const f = await fetchBuckets({ get, cachePath, buckets: need, seedKey, bits, refresh });
     let held = readCache(cachePath, (db) => [...heldOf(db)].sort((a, b) => a - b));
     if (!held.length) {
-      const one = await fetchBuckets({ get, cachePath, buckets: [0], seedKey, bits });
+      const one = await fetchBuckets({ get, cachePath, buckets: [0], seedKey, bits, refresh });
       if (!one.imported.length) return { ok: false, why: one.failed[0]?.why ?? 'no bucket could be fetched' };
       held = [0];
     }
@@ -190,15 +209,20 @@ export function readSeedCache(cachePath) {
       if (!db || !tableOf(db, 'shard_root')) return null;
       const r = db.prepare('SELECT digest, cut_at, root_json FROM shard_root WHERE id = 1').get();
       if (!r) return null;
-      let total = null;
-      try { total = Array.isArray(JSON.parse(r.root_json).buckets) ? JSON.parse(r.root_json).buckets.length : null; } catch { /* unread */ }
+      let total = null; let version = null;
+      try {
+        const root = JSON.parse(r.root_json);
+        total = Array.isArray(root.buckets) ? root.buckets.length : null;
+        version = typeof root.seed_version === 'string' ? root.seed_version : null;
+      } catch { /* unread */ }
       const f = SH.readFetch(db);
-      return { root_cut_at: r.cut_at, root_digest: r.digest, buckets_held: heldOf(db).size, buckets_total: total,
+      return { root_cut_at: r.cut_at, root_digest: r.digest, buckets_held: heldOf(db).size, buckets_total: total, seed_version: version,
         last_fetch: f ? { outcome: f.outcome, attempted_at: f.attempted_at, why: f.why } : null };
     });
   } catch { return null; }
 }
 
+const SEED_TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const age = (ms) => (ms < 48 * 3600e3 ? `${Math.max(0, Math.floor(ms / 3600e3))} h` : `${Math.floor(ms / 86400e3)} days`);
 
 /**
@@ -214,7 +238,9 @@ export function describeSeedCache({ url, cache, now = Date.now() }) {
   else {
     const ms = now - Date.parse(cache.root_cut_at);
     state = ms > 7 * 864e5 ? 'stale' : ms > 48 * 3600e3 ? 'old' : 'fresh';
-    parts.push(`root of ${cache.root_cut_at} (${age(ms)} old), ${cache.buckets_held} of ${cache.buckets_total ?? '?'} buckets held `
+    // the root's seed_version (the published seed's tag) is shown beside its cut, only as a plain short tag; nothing decides on it
+    const tag = typeof cache.seed_version === 'string' && SEED_TAG.test(cache.seed_version) ? `, seed ${cache.seed_version}` : '';
+    parts.push(`root of ${cache.root_cut_at}${tag} (${age(ms)} old), ${cache.buckets_held} of ${cache.buckets_total ?? '?'} buckets held `
       + '(the others are fetched when a package needs them)');
     if (state === 'old') parts.push('older than 48 hours');
     if (state === 'stale') parts.push('older than 7 days, stated on every decision');

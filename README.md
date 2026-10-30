@@ -710,8 +710,9 @@ needs instead of the whole seed file, and the index is refreshed every hour.
 `npm-shrinkwrap.json`). When a package the proxy decides falls in a bucket the cache does not hold yet, the proxy fetches
 that bucket first and waits for it at most 5 seconds. If it has not arrived by then, that decision says the seed did not
 check the package, which warns (as for a package the seed does not cover; `on_no_evidence` decides), and the bucket keeps
-downloading for the next one. The index is fetched again at start and every hour; a request with nothing new is answered
-"not modified". Each request is a plain GET with no account, no registry token and no identifiers.
+downloading for the next one. A bucket the host no longer has (a newer index replaced it) is asked for once more after the
+index is fetched again; if it is still missing, the decision is the same as for a bucket that has not arrived. The index
+is fetched again at start and every hour; a request with nothing new is answered "not modified". Each request is a plain GET with no account, no registry token and no identifiers.
 `"seed_cache": false` in `config.json` turns it off; ChainGate then reads a full seed you install with
 `chaingate init --seed`. `"seed_cache_url": "<https URL>"` fetches from another host.
 
@@ -725,7 +726,7 @@ checked before anything in it is read: its size and sha256 against the index, th
 index names. A bucket that fails is not used, and the rest of the cache keeps serving. A bucket already held is checked
 again the first time it is used after the proxy starts. An index more than 7 days old is stated on every decision, and
 `chaingate doctor` gives a notice past 48 hours. A cache holding at least one bucket takes the place of an installed full
-seed; until then the full seed serves. `chaingate status` shows the index, its age and how many buckets are held.
+seed; until then the full seed serves. `chaingate status` shows the index, the seed it was cut from, its age and how many buckets are held.
 
 ## What's Next
 
