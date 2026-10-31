@@ -743,6 +743,9 @@ reads the file to decide anything.
 
 ## What's Next
 
+**A GitHub Action (0.1.7).** A ready-made action that runs `chaingate check` in a CI job, on the same seed cache and
+advisory feed as a workstation.
+
 **Detection rules as code.** Export the gate rules and their evidence so that your own tools can
 read and audit them, instead of receiving a single score.
 

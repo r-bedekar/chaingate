@@ -28,7 +28,7 @@ on by default, fetches the current seed in buckets instead (README, "The seed ca
 | file | `chaingate-seed-v3.db` (decompressed), 2,430,681,088 bytes; `chaingate-seed-v3.db.gz`, 992,716,347 bytes |
 | file SHA-256 | `daaa783e8d85df9d7d75168112d1835a0f31272d154c5086830a966c4e41e9ab` (decompressed) |
 | data cutoff | 2026-10-29T23:14:59Z; advisories reviewed up to 2026-10-30T00:22:00Z |
-| content | 367,612 npm packages and 1,023,772 lineages; 3,065 pinned package versions |
+| content | 367,612 npm packages and 1,023,772 lineages; 2,942 pinned package versions |
 | signing key | `ed25519:09f6c9fdb8f5a2ea` |
 
 ### Verify the download
