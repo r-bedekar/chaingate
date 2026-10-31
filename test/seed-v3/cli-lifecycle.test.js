@@ -306,7 +306,8 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
       const b2 = makeBundle(home, { name: 'two.db', snapshot: 'b'.repeat(64) });
       // 0.1.6: the user's settings survive init (it used to rewrite config.json with the policy alone), and this test fetches no feed
       mkdirSync(base, { recursive: true });
-      writeFileSync(join(base, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false, seed_cache: false }, null, 2));
+      // 0.1.6: no seed_cache setting here: `init --seed` turns the cache off itself, so the restarts below serve the bundles
+      writeFileSync(join(base, 'config.json'), JSON.stringify({ config_version: 1, advisory_feed: false }, null, 2));
       const kept = () => JSON.parse(readFileSync(join(base, 'config.json'), 'utf8')).advisory_feed;
 
       try {
@@ -314,6 +315,8 @@ function lifecycleFor({ label, scopeArgs, baseOf, cwdOf }) {
         const init = cli(['init', ...scopeArgs, '--seed', b1, '--unsigned-development'], ctx);
         assert.equal(init.status, 0, `init must SUCCEED:\n${init.stdout}\n${init.stderr}`);
         assert.equal(kept(), false, 'init keeps advisory_feed: false');
+        assert.equal(JSON.parse(readFileSync(join(base, 'config.json'), 'utf8')).seed_cache, false, 'init --seed turns the seed cache off');
+        assert.match(init.stdout, /Seed cache off/);
         assert.doesNotMatch(`${init.stdout}`, /Advisory feed: on/);
         // U-05: the witness database is reported once (it used to be "created" and then "found")
         const wdb = `${init.stdout}${init.stderr}`.split('\n').filter((l) => /witness database/i.test(l));

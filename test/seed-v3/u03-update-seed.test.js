@@ -100,6 +100,33 @@ test('local update and rollback still work on a v3 host, and plain update-seed s
   } finally { h.cleanup(); }
 });
 
+test('0.1.6: update-seed --seed and --rollback turn the seed cache off (the full seed they activate is the one served), keep the other settings, and say so once', async () => {
+  const h = host();
+  try {
+    const cfg = path.join(h.base, 'config.json');
+    fs.writeFileSync(cfg, JSON.stringify({ config_version: 1, advisory_feed: false, static_withhold: true }, null, 2));
+    const up = await run(() => updateSeed(['--seed', h.seeds.B, '--unsigned-development'], h.deps));
+    assert.equal(up.code, 0, up.err);
+    const after = JSON.parse(fs.readFileSync(cfg, 'utf8'));
+    assert.equal(after.seed_cache, false); assert.equal(after.advisory_feed, false); assert.equal(after.static_withhold, true);
+    assert.match(up.out, /Seed cache off/); assert.match(up.out, /"seed_cache": false/);
+    const back = await run(() => updateSeed(['--rollback'], h.deps));
+    assert.equal(back.code, 0, back.err);
+    assert.doesNotMatch(back.out, /Seed cache off/, 'already off: nothing to say');
+    assert.equal(JSON.parse(fs.readFileSync(cfg, 'utf8')).seed_cache, false);
+  } finally { h.cleanup(); }
+  // a rollback on its own turns it off too, and a host with no config.json gets one
+  const r = host();
+  try {
+    const up = await run(() => updateSeed(['--seed', r.seeds.B, '--unsigned-development'], r.deps));
+    assert.equal(up.code, 0, up.err);
+    fs.writeFileSync(path.join(r.base, 'config.json'), JSON.stringify({ config_version: 1 }, null, 2));
+    const back = await run(() => updateSeed(['--rollback'], r.deps));
+    assert.equal(back.code, 0, back.err); assert.match(back.out, /Seed cache off/);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(r.base, 'config.json'), 'utf8')).seed_cache, false);
+  } finally { r.cleanup(); }
+});
+
 test('a v3 activation record that does not resolve also refuses (never falls back to the legacy download)', async () => {
   const h = host();
   try {
