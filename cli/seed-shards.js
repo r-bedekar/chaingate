@@ -14,6 +14,7 @@ import Database from 'better-sqlite3';
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../witness/seed_verify.js';
 import { PINS_LIMITS } from '../witness/pins-feed.js';
 import * as SH from '../seed/v3/shards.js';
+import { readConfigStrict, writeConfig } from '../config-store.js';
 
 export const SHARDS_FETCH_TIMEOUT_MS = 10_000;
 const BUCKET_FETCHES_AT_ONCE = 8;
@@ -268,5 +269,19 @@ export function describeSeedCache({ url, cache, now = Date.now() }) {
   return { state, text: parts.join('; '), notice };
 }
 
+/**
+ * Since 0.1.6: a command that installs or activates a full seed (`init --seed`, `update-seed --seed`, `update-seed --rollback`)
+ * turns the seed cache off, so the seed it activates is the one ChainGate reads; the user's other settings are kept. Returns the
+ * line to print, or null when the cache was already off.
+ */
+export function seedCacheOffForFullSeed(configFile) {
+  const existing = readConfigStrict(configFile) || {};
+  if (existing.seed_cache === false) return null;
+  writeConfig(configFile, { ...existing, seed_cache: false });
+  return seedCacheOffLine(configFile);
+}
+export const seedCacheOffLine = (configFile) => `Seed cache off ("seed_cache": false in ${configFile}): the full seed you installed is the `
+  + 'one ChainGate reads. Remove that setting to use the seed cache again.';
+
 export default { SHARDS_FETCH_TIMEOUT_MS, shardSource, refreshRoot, bucketsFor, fetchBuckets, bucketPath, lockfileNames, setUpSeedCache,
-  readSeedCache, describeSeedCache, seedCacheNoticesUrl };
+  readSeedCache, describeSeedCache, seedCacheNoticesUrl, seedCacheOffForFullSeed };

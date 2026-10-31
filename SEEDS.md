@@ -5,7 +5,8 @@ how to check a download. It lives in the signed git history, so the digests belo
 through the maintainer's git signing key, independently of the release page that hosts the files.
 
 A full v3 seed file is never downloaded automatically: you pass it to `chaingate init --seed`. Since 0.1.6 the seed cache,
-on by default, fetches the current seed in buckets instead (README, "The seed cache").
+on by default, fetches the current seed in buckets instead (README, "The seed cache"); installing a full seed with
+`init --seed` or `update-seed --seed` turns the seed cache off, so the file you install is the one ChainGate reads.
 
 ## seed-v3.3-full: signed v3 detection seed (current)
 

@@ -12,6 +12,7 @@ import { stageIncomingSeed, finishStagedBundle, activateBundle, rollbackActivati
   previousBundleId, verifyBundleDir, seedsDir, withSeedMutation, ActivationRecoveryRefused } from '../seed-bundle.js';
 import { LockUnavailable } from '../seed-mutation-lock.js';
 import { readConfigStrict } from '../../config-store.js';
+import { seedCacheOffForFullSeed } from '../seed-shards.js';
 
 function parseArgs(args) {
   const opts = { scope: 'user', force: false, seedPath: null, rollback: false,
@@ -39,6 +40,17 @@ function parseArgs(args) {
  *     in a different file on purpose, and replacing evidence must not discard the record of what was
  *     decided under the evidence that came before.
  */
+/** Since 0.1.6: the bundle just activated is the one served, so the seed cache is turned off; a failure to record that is said. */
+function seedCacheOff(paths) {
+  try {
+    const line = seedCacheOffForFullSeed(paths.configFile);
+    if (line) console.log(fmt.dim(`  ${line}`));
+  } catch (err) {
+    console.log(fmt.warn(`  could not turn the seed cache off (${err.message}); while it is on, a seed cache holding buckets is read `
+      + 'instead of this bundle. Set "seed_cache": false in config.json.'));
+  }
+}
+
 export async function updateSeedV3(opts, paths, deps, staged = null, lock = null) {
   // Which bundle is active is ONE record — the `seeds/active` link. Nothing here rewrites a second
   // copy of that fact, so an interrupted update leaves the previously active bundle active and a
@@ -58,6 +70,7 @@ export async function updateSeedV3(opts, paths, deps, staged = null, lock = null
       return EXIT.ERROR;
     }
     console.log(fmt.ok(`Rolled back to bundle ${identity.bundle_id}`));
+    seedCacheOff(paths);
     console.log(fmt.dim(`  sha256 ${identity.sha256.slice(0, 16)}... trust ${identity.trust}`));
     console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
     console.log(fmt.dim('  Witness state untouched: decisions taken under it are still recorded.'));
@@ -122,6 +135,7 @@ export async function updateSeedV3(opts, paths, deps, staged = null, lock = null
     + `snapshot ${String(identity.corpus_snapshot_digest).slice(0, 12)}... trust ${identity.trust}`));
   console.log(fmt.dim(`  Previous bundle ${activeId || '(none)'} kept for `
     + '`chaingate update-seed --rollback`.'));
+  seedCacheOff(paths);
   console.log(fmt.dim('  Restart the proxy to load it: chaingate stop && chaingate init'));
   console.log(fmt.dim('  Witness state untouched.'));
   return EXIT.OK;

@@ -721,7 +721,8 @@ downloading for the next one. `chaingate check` fetches the bucket of the packag
 index is fetched again; if it is still missing, the decision is the same as for a bucket that has not arrived. The index
 is fetched again at start and every hour; a request with nothing new is answered "not modified". Each request is a plain GET with no account, no registry token and no identifiers.
 `"seed_cache": false` in `config.json` turns it off; ChainGate then reads a full seed you install with
-`chaingate init --seed`. `"seed_cache_url": "<https URL>"` fetches from another host.
+`chaingate init --seed`. `init --seed`, `update-seed --seed` and `update-seed --rollback` set it for you and say so, so
+the full seed they install or activate is the one ChainGate reads; remove the setting to use the seed cache again. `"seed_cache_url": "<https URL>"` fetches from another host.
 
 **What the host learns.** Each bucket request names one bucket, which narrows a package to about 22 names that share
 it. The host, like any web server, also sees the address of the machine that asks. A full seed file reveals nothing about

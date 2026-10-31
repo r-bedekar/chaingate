@@ -5,7 +5,7 @@ import { npmrcPath, readCurrentRegistry, applyChaingateBlock, findScopedRegistri
 import { readPid, readPidRecord, spawnProxy, isPortInUse, waitForProxyReady, stopProxy,
   isAlive } from '../proxy-control.js';
 import { fetchSeedBundle } from '../seed-download.js';
-import { shardSource, setUpSeedCache, lockfileNames } from '../seed-shards.js';
+import { shardSource, setUpSeedCache, lockfileNames, seedCacheOffLine } from '../seed-shards.js';
 import { verifySeed, verifyStagedSeed } from '../../witness/seed_verify.js';
 import { installLegacySeed, readInstallMarker, downloadedSeed, reportLegacyInstall,
   LegacyInstallRefused } from '../legacy-seed.js';
@@ -123,7 +123,8 @@ export async function installSeeds(opts, paths, deps, lock) {
     // The operator's policy is host state and is written before activation; which bundle is active
     // is recorded ONLY by the link the next step swaps.
     // the user's other settings (advisory_feed, static_withhold, caps) are kept; init sets the policy only
-    writeConfig(paths.configFile, { ...existing, policy });
+    // Since 0.1.6: a full seed installed here is the one served, so the seed cache is turned off (said below, once)
+    writeConfig(paths.configFile, { ...existing, policy, seed_cache: false });
     let identity;
     try {
       identity = activateBundle(paths.base, installed.dir_name, { lock, hooks: deps.hooks });
@@ -140,6 +141,7 @@ export async function installSeeds(opts, paths, deps, lock) {
       + `trust ${identity.trust}${identity.authenticated ? ' (authenticated)' : ''}`));
     console.log(fmt.dim(`  policy on_unusable_input=${policy.on_unusable_input} `
       + `on_no_evidence=${policy.on_no_evidence}  (edit ${paths.configFile} to change)`));
+    if (existing.seed_cache !== false) console.log(fmt.dim(`  ${seedCacheOffLine(paths.configFile)}`));
     if (installed.replaced_damaged) {
       console.log(fmt.warn(`  replaced a damaged retained bundle: ${installed.replaced_damaged}`));
     }
