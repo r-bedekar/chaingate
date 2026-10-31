@@ -104,6 +104,31 @@ async function withProxy({ held = [0], down = false, slowMs = 0, waitMs = 5_000,
   }
 }
 
+test('SC7 a proxy whose seed cache directory does not exist yet (started after `init --seed`): its first root refresh creates the cache', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg016-scp7-'));
+  const cache = path.join(dir, 'seed-cache', 'chaingate-seed.db');
+  const host = http.createServer((req, res) => {
+    const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname.slice(1));
+    let body; try { body = good(fixtureRel(rel)); } catch { res.writeHead(404); return res.end(); }
+    res.writeHead(200); res.end(body);
+  });
+  const upstream = http.createServer((req, res) => { res.writeHead(404, { 'content-type': 'application/json' }); res.end('{}'); });
+  const hostUrl = `${await listen(host)}/`; const upstreamUrl = await listen(upstream);
+  const proxy = createProxyServer({ port: 0, host: '127.0.0.1', upstream: upstreamUrl, witnessDbPath: path.join(dir, 'witness.db'),
+    headersTimeoutMs: 5_000, bodyTimeoutMs: 15_000, seedCacheUrl: hostUrl, seedCachePath: cache, seedCacheKey: SEED_KEY,
+    seedCacheBits: 3, seedCacheNow: () => NOW });
+  const realErr = console.error; const logged = []; console.error = (...a) => { logged.push(a.join(' ')); };
+  try {
+    await listen(proxy);
+    const r = await proxy.refreshSeedCache();
+    assert.equal(r?.outcome, 'accepted', JSON.stringify({ r, logged }));
+    assert.equal(fs.existsSync(cache), true);
+    assert.ok(!logged.some((l) => /directory does not exist/.test(l)), logged.join('\n'));
+  } finally {
+    console.error = realErr; await close(proxy); await close(upstream); await close(host); fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('SC3 a package whose bucket the cache does not hold: the proxy fetches it before deciding, and the seed\'s pin BLOCKs', async () => {
   await withProxy({ held: [0] }, async ({ base, proxy, seen }) => {
     const pk = await get(`${base}/pkg-b`);

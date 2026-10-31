@@ -273,6 +273,22 @@ test('SF11 the third-party notices the root names: status and doctor show their 
   });
 });
 
+test('SF12 a cache whose directory does not exist yet (a proxy after `init --seed`): the root refresh and a bucket fetch create it', async () => {
+  await serve(async ({ base, dir }) => {
+    const cachePath = path.join(dir, 'seed-cache', 'chaingate-seed.db');
+    assert.equal(fs.existsSync(path.dirname(cachePath)), false);
+    const get = F.shardSource(base);
+    const r = await F.refreshRoot({ get, cachePath, ...opts() });
+    assert.equal(r.outcome, 'accepted'); assert.equal(fs.existsSync(cachePath), true);
+    const f = await F.fetchBuckets({ get, cachePath, buckets: [2], ...opts() });
+    assert.deepEqual(f.imported, [2]); assert.deepEqual(f.failed, []);
+    // a bucket imported before any root was held (the proxy's on-demand path) also finds its directory
+    const other = path.join(dir, 'other', 'cache.db');
+    SH.importBucket(other, GOOD_ROOT, 2, SH.verifyBucketBytes(GOOD_ROOT, 2, fileOf(null, 'buckets/00002.db.gz')));
+    assert.equal(fs.existsSync(other), true);
+  });
+});
+
 test('SF10 a bucket the host does not have (404): the root is refreshed and the bucket asked for once more under it; still missing, it is uncovered', async () => {
   const p2 = caPathOf(GOOD_ROOT, 2); const p4 = caPathOf(GOOD_ROOT, 4);
   // (a) the second request finds it (a root the host had just replaced, say)
