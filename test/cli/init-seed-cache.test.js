@@ -78,3 +78,13 @@ test('IC3 seed_cache false, --no-seed or --seed: init fetches nothing from the c
     });
   }
 });
+
+test('IC6 what init and status say the proxy reads: the seed cache root when it serves one, else the active bundle', async () => {
+  const { servedSeedLine } = await import('../../cli/commands/init.js');
+  const { bundleNote } = await import('../../cli/commands/status.js');
+  assert.equal(servedSeedLine({ seed_cache_root: 'ab'.repeat(32), bundle_id: null, sha256: null }), `seed cache, root ${'ab'.repeat(8)}...`);
+  assert.equal(servedSeedLine({ bundle_id: 'fa41735ffad28100', sha256: '1408e015a7026ea292' }), 'active bundle fa41735ffad28100 sha256 1408e015a7026ea2...');
+  assert.doesNotMatch(servedSeedLine({ seed_cache_root: 'cd'.repeat(32) }), /null/);
+  assert.equal(bundleNote({ cacheInUse: true }), '(installed; the seed cache is read instead while it is on)');
+  assert.equal(bundleNote({ cacheInUse: false }), '(recorded; `chaingate doctor` verifies it)');
+});
