@@ -119,7 +119,7 @@ export default async function status(args) {
       : seedV3.active
         ? `bundle ${seedV3.bundle_id}  sha256 ${String(seedV3.sha256 ?? 'unknown').slice(0, 16)}...  trust ${seedV3.trust ?? 'unknown'}`
           + (seedV3.manifest_error ? fmt.red(`  (its bundle.json is unreadable: ${seedV3.manifest_error})`)
-            : fmt.dim('  (recorded; `chaingate doctor` verifies it)'))
+            : fmt.dim(`  ${bundleNote({ cacheInUse: Boolean(cacheUrl && cacheHeld?.buckets_held) })}`))
         : fmt.dim('none active (run `chaingate init --seed <bundle>`)');
 
     console.log(renderTable([
@@ -149,4 +149,9 @@ export default async function status(args) {
   }
 
   return seedV3.broken ? EXIT.ERROR : EXIT.OK;
+}
+
+/** Since 0.1.6: while the seed cache is on and holds buckets, the proxy and `check` read it, not the installed bundle. */
+export function bundleNote({ cacheInUse }) {
+  return cacheInUse ? '(installed; the seed cache is read instead while it is on)' : '(recorded; `chaingate doctor` verifies it)';
 }

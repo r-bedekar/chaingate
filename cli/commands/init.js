@@ -586,8 +586,7 @@ export default async function init(args, deps = {}) {
     }
     console.log(fmt.ok(`Proxy running on ${registryUrl} (pid ${pid})`));
     if (self.seed_v3) {
-      console.log(fmt.dim(`  active bundle ${self.seed_v3.bundle_id} `
-        + `sha256 ${String(self.seed_v3.sha256).slice(0, 16)}...`));
+      console.log(fmt.dim(`  ${servedSeedLine(self.seed_v3)}`));
       console.log(fmt.dim(`  trust ${self.seed_v3.trust}`
         + `${self.seed_v3.authenticated ? ' (authenticated)' : ''}`
         + `  policy ${JSON.stringify(self.seed_v3.policy)}`));
@@ -613,4 +612,10 @@ export default async function init(args, deps = {}) {
   console.log(`\nReady. ${storeCounts.packages} packages, ${storeCounts.versions} versions in witness store.`);
 
   return EXIT.OK;
+}
+
+/** What the started proxy reads: its seed cache's root (0.1.6), or the active bundle. */
+export function servedSeedLine(seedV3) {
+  if (seedV3?.seed_cache_root) return `seed cache, root ${String(seedV3.seed_cache_root).slice(0, 16)}...`;
+  return `active bundle ${seedV3?.bundle_id} sha256 ${String(seedV3?.sha256).slice(0, 16)}...`;
 }
