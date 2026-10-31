@@ -716,7 +716,8 @@ needs instead of the whole seed file, and the index is refreshed every hour.
 `npm-shrinkwrap.json`). When a package the proxy decides falls in a bucket the cache does not hold yet, the proxy fetches
 that bucket first and waits for it at most 5 seconds. If it has not arrived by then, that decision says the seed did not
 check the package, which warns (as for a package the seed does not cover; `on_no_evidence` decides), and the bucket keeps
-downloading for the next one. A bucket the host no longer has (a newer index replaced it) is asked for once more after the
+downloading for the next one. `chaingate check` fetches the bucket of the package it checks the same way, with the same
+5-second bound. A bucket the host no longer has (a newer index replaced it) is asked for once more after the
 index is fetched again; if it is still missing, the decision is the same as for a bucket that has not arrived. The index
 is fetched again at start and every hour; a request with nothing new is answered "not modified". Each request is a plain GET with no account, no registry token and no identifiers.
 `"seed_cache": false` in `config.json` turns it off; ChainGate then reads a full seed you install with

@@ -108,7 +108,7 @@ first time it is read after a start; the others keep serving.
 A stolen seed cache key could publish an index that leaves packages out or changes their history, until the key list
 drops the key (at most 90 days). An index older than the one held is refused. The fetch is an outbound connection, on by
 default, to shards.cgsec.dev (or the configured `seed_cache_url` host, https only), at `init`, at proxy start, hourly, and
-for each bucket a decision needs. A bucket request tells that host which of 16,384 buckets a machine needs, which narrows a
+for each bucket a decision needs (in the proxy or `chaingate check`). A bucket request tells that host which of 16,384 buckets a machine needs, which narrows a
 package to about 22 names. It is off with `"seed_cache": false`.
 
 ### v3 detection seeds and trust modes

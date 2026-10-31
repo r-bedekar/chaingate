@@ -24,6 +24,8 @@ import { openWitnessDB } from '../../witness/db.js';
 import { loadConfig } from '../../proxy/config.js';
 import { openSeed, TRUST_AUTHENTICATED, TRUST_UNSIGNED_DEV } from '../../seed/v3/reader.js';
 import { CHAINGATE_SEED_PUBKEY_B64 } from '../../witness/seed_verify.js';
+import { createSeedCache, DEFAULT_SEED_CACHE_WAIT_MS } from '../../proxy/seed-cache.js';
+import { shardSource } from '../seed-shards.js';
 import {
   buildCheckRecord, toolErrorRecord, inputFromPackument, exitCodeFor, EXIT_TOOL_ERROR, withTarball,
 } from '../check-record.js';
@@ -94,8 +96,11 @@ function readPackument(file, packageName) {
   return { doc, source };
 }
 
-/** Resolve the active seed ONCE and open it read-only, as the proxy does at start-up. */
-function openActiveSeed(env) {
+/**
+ * Resolve the active seed ONCE and open it read-only, as the proxy does at start-up. `seams` exist for the seed cache tests (a
+ * toy root of 3 bits under a fixture key, a fixed clock, a local host); production passes none.
+ */
+function openActiveSeed(env, seams = {}) {
   let config;
   try { config = loadConfig(env); } catch (e) {
     throw new ToolError('config_unusable', e.message);
@@ -115,7 +120,10 @@ function openActiveSeed(env) {
   }
   const trust = config.seedV3Trust === 'unsigned-development' ? TRUST_UNSIGNED_DEV : TRUST_AUTHENTICATED;
   let seed;
-  try { seed = openSeed(config.seedV3Path, { trust, pubkey: CHAINGATE_SEED_PUBKEY_B64 }); } catch (e) {
+  try {
+    seed = openSeed(config.seedV3Path, { trust, pubkey: seams.seedKey ?? CHAINGATE_SEED_PUBKEY_B64,
+      ...(seams.shardBits ? { shardBits: seams.shardBits } : {}), ...(seams.now ? { now: seams.now } : {}) });
+  } catch (e) {
     throw new ToolError('seed_refused', e.message);
   }
   return { seed, config, policy };
@@ -197,7 +205,8 @@ async function evaluateTarball({ file, manifest }) {
  * Run a check and return { record, exit }. No output; the caller prints. Exported for `why` and for
  * tests, which call it in-process with an explicit environment. Async since 0.1.5 (the tarball walk streams).
  */
-export async function runCheck({ name, version, packument, tarball = null, scope = 'user', env = process.env, cwd = process.cwd() }) {
+export async function runCheck({ name, version, packument, tarball = null, scope = 'user', env = process.env, cwd = process.cwd(),
+  seams = {} }) {
   const request = { package: name, version };
   let seed = null;
   try {
@@ -205,8 +214,17 @@ export async function runCheck({ name, version, packument, tarball = null, scope
     request.source = source;
     const paths = resolvePaths(scope, cwd, env);
     const senv = scopedEnv(paths, env);
-    const active = openActiveSeed(senv);
+    const active = openActiveSeed(senv, seams);
     seed = active.seed;
+    // Since 0.1.6: on a seed cache, the package's bucket is fetched first when the cache does not hold it, waiting at most the
+    // proxy's bound; one that has not arrived leaves the package not checked by the seed, as in the proxy
+    if (seed.shards && active.config.seedCacheUrl) {
+      const sc = createSeedCache({ get: seams.get ?? shardSource(active.config.seedCacheUrl), cachePath: active.config.seedV3Path,
+        seedKey: seams.seedKey ?? null, ...(seams.shardBits ? { bits: seams.shardBits } : {}), ...(seams.now ? { now: seams.now } : {}),
+        waitMs: seams.waitMs ?? DEFAULT_SEED_CACHE_WAIT_MS });
+      sc.attach(seed);
+      await sc.need(name);
+    }
     const override = lookupOverride(active.config.witnessDbPath, name, version);
     const record = buildCheckRecord({
       // A seed named by CHAINGATE_SEED_V3 is not the active bundle, so the bundle id would describe a
