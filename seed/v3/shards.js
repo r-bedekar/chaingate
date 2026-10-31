@@ -199,8 +199,10 @@ CREATE TABLE IF NOT EXISTS shard_fetch (id INTEGER PRIMARY KEY CHECK (id = 1), r
 `;
 const DDL_ONLY = /^CREATE (?:TABLE|UNIQUE INDEX|INDEX) /;
 
-/** The cache for writing; a new one gets the seed writer's page size. */
+/** The cache for writing, its directory made when missing (a proxy may start before `init` made it); a new one gets the seed
+ * writer's page size. */
 function openCache(cachePath) {
+  fs.mkdirSync(path.dirname(path.resolve(cachePath)), { recursive: true });
   const fresh = !fs.existsSync(cachePath);
   const db = new Database(cachePath);
   if (fresh) db.pragma('page_size = 8192');
@@ -284,6 +286,7 @@ export function setRoot(cachePath, root, rootBytes) {
  * replace bucket `i` in the cache in one transaction. A cache with no root takes this one; a cache under another root refuses.
  */
 export function importBucket(cachePath, root, i, raw) {
+  fs.mkdirSync(path.dirname(path.resolve(cachePath)), { recursive: true });
   const dir = fs.mkdtempSync(path.join(path.dirname(path.resolve(cachePath)), '.shard-stage-'));
   const staged = path.join(dir, `${String(i).padStart(5, '0')}.db`);
   try {
