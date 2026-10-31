@@ -491,12 +491,13 @@ cd chaingate && npm install
 npm test
 ```
 
-**You download the v3 detection seed yourself.** It is published as the signed GitHub release
-[seed-v3.2-full](https://github.com/cgsec-labs/chaingate/releases/tag/seed-v3.2-full). Download its
+**You download the full v3 detection seed file yourself.** It is published as the signed GitHub release
+[seed-v3.3-full](https://github.com/cgsec-labs/chaingate/releases/tag/seed-v3.3-full). Download its
 `chaingate-seed-v3.db.gz`, `chaingate-seed-v3.db.sha256` and `chaingate-seed-v3.db.sig` assets into one folder
 (about 1 GB to download, about 2.4 GB once installed) and pass the `.gz` file with `--seed`. **ChainGate does not
-download it for you.** seed-v3.2-full needs ChainGate 0.1.5 or later: earlier versions refuse it and keep the
-seed they have.
+download the full file for you**; with the seed cache on (the default), it fetches the same seed in buckets instead (see
+[The seed cache](#the-seed-cache-016)). seed-v3.3-full needs ChainGate 0.1.6 or later: earlier versions refuse it and
+keep the seed they have.
 
 Since 0.1.5, `--seed` also takes the compressed database, `chaingate-seed-v3.db.gz`, not only an uncompressed
 `chaingate-seed-v3.db`. ChainGate decompresses it into its own staging copy (at most 8 GiB, with free space checked
@@ -517,11 +518,11 @@ v3 seed. For a full v3 seed file, pass `--seed`.
 **1. Initialize.** This installs the v3 seed, starts the proxy and points npm at it:
 
 ```console
-$ chaingate init --seed ./seed-v3.2/chaingate-seed-v3.db.gz
+$ chaingate init --seed ./seed-v3.3/chaingate-seed-v3.db.gz
 Verifying v3 seed signature...
 ✓ v3 seed signature verified
 ✓ v3 seed bundle <bundle id> active
-  sha256 1408e015a7026ea2...  snapshot <snapshot>...  trust authenticated (authenticated)
+  sha256 daaa783e8d85df9d...  snapshot <snapshot>...  trust authenticated (authenticated)
   policy on_unusable_input=BLOCK on_no_evidence=WARN
 ✓ .npmrc updated
 ```
@@ -634,7 +635,7 @@ There are two kinds of seed.
 
 - **v3 detection seed**, installed by `init --seed` or `update-seed --seed`. It is built from public
   npm registry metadata and published as signed GitHub
-  releases (`seed-v3.*`), starting with `seed-v3.1-full`; the current one is `seed-v3.2-full`.
+  releases (`seed-v3.*`), starting with `seed-v3.1-full`; the current one is `seed-v3.3-full`.
   **You download the full file yourself; it is not downloaded automatically** (with the seed cache on, ChainGate
   fetches the same seed in buckets instead). It is opened read-only and checked
   against its `.sha256` file. It counts as authenticated only when its signature verifies against the

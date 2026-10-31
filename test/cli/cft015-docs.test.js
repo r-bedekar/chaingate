@@ -40,11 +40,11 @@ test('D4 README and SEEDS.md say --seed takes the compressed database', () => {
   assert.match(words('SEEDS.md'), /chaingate-seed-v3\.db\.gz/);
 });
 
-test('D5 the package is 0.1.5: package.json and both version fields of package-lock.json', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.1.5');
+test('D5 the package is 0.1.6: package.json and both version fields of package-lock.json', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.1.6');
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(lock.version, '0.1.5');
-  assert.equal(lock.packages[''].version, '0.1.5');
+  assert.equal(lock.version, '0.1.6');
+  assert.equal(lock.packages[''].version, '0.1.6');
 });
 
 test('D6 the README says which commands honour CHAINGATE_PORT (doctor, report, pin) and which use the default port 6173 (init, stop, status)', () => {
@@ -53,12 +53,13 @@ test('D6 the README says which commands honour CHAINGATE_PORT (doctor, report, p
   assert.match(r, /`chaingate init`, `chaingate stop` and `chaingate status` always use port 6173/);
 });
 
-test('D7 the 0.1.5 README points at seed-v3.2-full as a .gz, says it needs 0.1.5, and states the 0.1.5 test run', () => {
+test('D7 the 0.1.6 README points at seed-v3.3-full as a .gz and says it needs 0.1.6', () => {
   const r = words('README.md');
-  assert.match(r, /\[seed-v3\.2-full\]\(https:\/\/github\.com\/cgsec-labs\/chaingate\/releases\/tag\/seed-v3\.2-full\)/);   // the repository moved (0.1.6)
-  assert.match(r, /seed-v3\.2-full needs ChainGate 0\.1\.5 or later/);
-  assert.doesNotMatch(r, /releases\/tag\/seed-v3\.1-full/, 'the published seed the README sends users to is v3.2');
-  assert.match(r, /\$ chaingate init --seed \.\/seed-v3\.2\/chaingate-seed-v3\.db\.gz/);
+  assert.match(r, /\[seed-v3\.3-full\]\(https:\/\/github\.com\/cgsec-labs\/chaingate\/releases\/tag\/seed-v3\.3-full\)/);
+  assert.match(r, /seed-v3\.3-full needs ChainGate 0\.1\.6 or later/);
+  assert.doesNotMatch(r, /releases\/tag\/seed-v3\.[12]-full/, 'the published seed the README sends users to is v3.3');
+  assert.match(r, /the current one is `seed-v3\.3-full`/);
+  assert.match(r, /\$ chaingate init --seed \.\/seed-v3\.3\/chaingate-seed-v3\.db\.gz/);
   assert.match(r, /\*\*Supported platforms\.\*\*/);
   assert.doesNotMatch(r, /In 0\.1\.4 it warns|evaluates the seed only in 0\.1\.4|In 0\.1\.4 `check`/, 'no current-behaviour sentence still says 0.1.4');
 });
